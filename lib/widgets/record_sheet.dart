@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/calc.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import 'common.dart';
+import 'calc_keypad.dart';
 import 'picker_wheels.dart';
 
 /// 打开「记一笔」面板。传入 [editing] 则为编辑模式。
@@ -80,9 +82,13 @@ class _RecordSheetState extends State<RecordSheet> {
     return list.isEmpty ? null : list.first.id;
   }
 
-  int get _amountCents => Fmt.parseCents(_amountInput);
+  /// 表达式求值结果（分）。没输完或非法时为 null，此时不能保存。
+  ///
+  /// 0 与负数都算合法：负数表示这一笔的**净额**（代购代付后对方多给的钱，
+  /// 记一笔支出 −20，而不是拆成一笔支出加一笔收入）。
+  int? get _amountCents => Calc.cents(_amountInput);
 
-  bool get _canSave => _amountCents > 0;
+  bool get _canSave => _amountCents != null;
 
   @override
   void dispose() {
@@ -108,28 +114,9 @@ class _RecordSheetState extends State<RecordSheet> {
     if (pick.note == null) _noteFocus.requestFocus();
   }
 
+  /// 按键只是对表达式字符串做一次变换，规则都收在 Calc.press 里
   void _pressKey(String k) {
-    setState(() {
-      if (k == 'del') {
-        if (_amountInput.isNotEmpty) {
-          _amountInput = _amountInput.substring(0, _amountInput.length - 1);
-        }
-        return;
-      }
-      if (k == '.') {
-        if (_amountInput.contains('.')) return;
-        _amountInput = _amountInput.isEmpty ? '0.' : '$_amountInput.';
-        return;
-      }
-      // 数字
-      if (_amountInput == '0') _amountInput = '';
-      // 小数位最多两位
-      final dot = _amountInput.indexOf('.');
-      if (dot >= 0 && _amountInput.length - dot > 2) return;
-      // 整数位最多 9 位
-      if (dot < 0 && _amountInput.length >= 9) return;
-      _amountInput += k;
-    });
+    setState(() => _amountInput = Calc.press(_amountInput, k));
   }
 
   /// 点模板 = 把模板里的东西一次性填进来。此时还不算「用了一次」，
@@ -208,7 +195,7 @@ class _RecordSheetState extends State<RecordSheet> {
       name: name.isEmpty ? catName : name,
       icon: Store.i.categoryOf(_categoryId)?.icon ?? 'tpl',
       type: _type,
-      amountCents: _amountCents,
+      amountCents: _amountCents ?? 0,
       categoryId: _categoryId,
       accountId: _accountId,
       note: _note.text.trim(),
@@ -222,6 +209,7 @@ class _RecordSheetState extends State<RecordSheet> {
   Future<void> _save() async {
     if (!_canSave || _saving) return;
     setState(() => _saving = true);
+    final cents = _amountCents!;
 
     final store = Store.i;
     final note = _note.text.trim();
@@ -235,7 +223,7 @@ class _RecordSheetState extends State<RecordSheet> {
           id: old.id,
           ledgerId: old.ledgerId,
           type: _type,
-          amountCents: _amountCents,
+          amountCents: cents,
           date: _date,
           categoryId: _categoryId,
           accountId: _accountId,
@@ -250,7 +238,7 @@ class _RecordSheetState extends State<RecordSheet> {
           id: 0,
           ledgerId: store.ledgerId,
           type: _type,
-          amountCents: _amountCents,
+          amountCents: cents,
           date: _date,
           categoryId: _categoryId,
           accountId: _accountId,
@@ -384,7 +372,11 @@ class _RecordSheetState extends State<RecordSheet> {
             ),
           ),
           const Divider(height: 1, color: C.line),
-          _Keypad(onKey: _pressKey, onSave: _save, canSave: _canSave && !_saving),
+          CalcKeypad(
+            onKey: _pressKey,
+            onConfirm: _save,
+            canConfirm: _canSave && !_saving,
+          ),
         ],
       ),
     );
@@ -482,27 +474,55 @@ class _AmountDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = input.isEmpty ? '0' : input;
+    final cents = Calc.cents(input);
+    // 收支决定这笔记账的方向；金额本身带负号时符号自然翻转
+    // （支出 −20 = 净流入 20，显示成 +20.00）
+    final signed = cents == null ? 0 : (type.isIncome ? cents : -cents);
+    // 金额还是 0 的时候，符号只能由收支类型决定（支出显示 −、收入显示 +）
+    final sign = (cents == null || cents == 0)
+        ? (type.isIncome ? '+' : '-')
+        : (signed > 0 ? '+' : '-');
+    final amountText = cents == null
+        ? '0'
+        : Fmt.money(signed.abs(), trimZero: true);
+
     return Padding(
-      // 顶部多了一排模板，这里收一点，保证备注框在首屏里露全
-      padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+      // 顶部多了一排模板，这里收一点，保证键盘在首屏里露全
+      padding: const EdgeInsets.fromLTRB(S.lg, S.xs, S.lg, S.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            type.isIncome ? '+' : '-',
-            style: T.hero.copyWith(fontSize: 26, color: C.ink3),
+          // 有运算才显示算式行，纯数字时不浪费高度
+          SizedBox(
+            height: 16,
+            child: Calc.hasOperator(input)
+                ? Text(
+                    Calc.pretty(input),
+                    style: T.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : null,
           ),
-          const SizedBox(width: 4),
-          Text('¥', style: T.hero.copyWith(fontSize: 26, color: C.ink2)),
-          const SizedBox(width: 6),
-          Expanded(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(text, style: T.hero.copyWith(fontSize: 44)),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                sign,
+                style: T.hero.copyWith(fontSize: 24, color: C.ink3),
+              ),
+              const SizedBox(width: 3),
+              Text('¥', style: T.hero.copyWith(fontSize: 24, color: C.ink2)),
+              const SizedBox(width: 5),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(amountText, style: T.hero.copyWith(fontSize: 40)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -702,100 +722,3 @@ class _NoteField extends StatelessWidget {
   }
 }
 
-/// 自定义数字键盘。用自建键盘而不是系统键盘，是为了让整个记账流程
-/// 不用切输入法，单手就能完成 —— 这是记账类应用的体验关键。
-class _Keypad extends StatelessWidget {
-  const _Keypad({
-    required this.onKey,
-    required this.onSave,
-    required this.canSave,
-  });
-
-  final ValueChanged<String> onKey;
-  final VoidCallback onSave;
-  final bool canSave;
-
-  static const _rows = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['.', '0', 'del'],
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(S.md, S.sm, S.md, S.md),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 3,
-            child: Column(
-              children: [
-                for (final row in _rows)
-                  Row(
-                    children: [
-                      for (final k in row) Expanded(child: _key(k)),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: S.sm),
-          Expanded(
-            flex: 1,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: canSave ? onSave : null,
-              child: Container(
-                height: 196,
-                decoration: BoxDecoration(
-                  color: canSave ? C.ink : C.bg2,
-                  borderRadius: BorderRadius.circular(R.md),
-                ),
-                child: Center(
-                  child: Text(
-                    '保存',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: canSave ? C.bg : C.ink4,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _key(String k) {
-    final isDel = k == 'del';
-    return GestureDetector(
-      // ★ 必须显式 opaque：默认的 deferToChild 会把命中区交给子节点，
-      //   而这里的子节点只是 SizedBox + Center + Text，只有数字字形那一小块
-      //   能被点中，整格其余地方全是死区 —— 表现就是「键盘很不灵敏」，
-      //   手指要精准按在笔画上才有反应。
-      behavior: HitTestBehavior.opaque,
-      onTap: () => onKey(k),
-      child: SizedBox(
-        height: 49,
-        child: Center(
-          child: isDel
-              ? const Icon(Icons.backspace_outlined, size: 20, color: C.ink2)
-              : Text(
-                  k,
-                  style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w500,
-                    color: C.ink,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-}

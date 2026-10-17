@@ -576,9 +576,9 @@ class _TxnRow extends StatelessWidget {
             ),
             const SizedBox(width: S.sm),
             Text(
-              txn.type.isIncome
-                  ? '+${Fmt.money(txn.amountCents)}'
-                  : '-${Fmt.money(txn.amountCents)}',
+              // 用 signedCents：支出为负、收入为正。金额本身为负（净额，如代购
+              // 对方多给的钱）时符号自然翻转，不会出现「--20.00」
+              Fmt.money(txn.signedCents, sign: true),
               style: T.amount.copyWith(
                 color: txn.type.isIncome ? C.ink2 : C.ink,
               ),
@@ -596,7 +596,7 @@ class _TxnRow extends StatelessWidget {
         title: const Text('删除这笔记录？', style: T.section),
         content: Text(
           '${txn.note.isNotEmpty ? txn.note : (Store.i.categoryOf(txn.categoryId)?.name ?? '未分类')}'
-          ' · ${Fmt.money(txn.amountCents)}',
+          ' · ${Fmt.money(txn.signedCents, sign: true)}',
           style: T.body2,
         ),
         actions: [

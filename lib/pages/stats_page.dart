@@ -20,7 +20,11 @@ class _StatsPageState extends State<StatsPage> {
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    final stats = _type.isExpense ? s.expenseStats : s.incomeStats;
+    // 金额允许为负（净额记账），某分类合计可能 ≤0 —— 饼图和排行榜画不出负扇区，
+    // 这类分类直接不参与，明细里仍然照常显示
+    final stats = (_type.isExpense ? s.expenseStats : s.incomeStats)
+        .where((e) => e.totalCents > 0)
+        .toList();
     final total = _type.isExpense ? s.monthExpenseCents : s.monthIncomeCents;
     final maxV = stats.isEmpty
         ? 1

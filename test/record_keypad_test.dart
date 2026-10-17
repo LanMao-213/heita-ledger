@@ -14,6 +14,7 @@ import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/store.dart';
+import 'package:ledger/widgets/calc_keypad.dart';
 import 'package:ledger/widgets/record_sheet.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -75,8 +76,8 @@ void main() {
     // 金额显示区也多了一个「5」
     expect(find.text('5'), findsNWidgets(2));
 
-    // 能存下来才算真的通
-    await tester.tap(find.text('保存'));
+    // 能存下来才算真的通（确认键 = 结算并保存）
+    await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
 
     final rows = await tester.runAsync(() => Repo.listTxns(
@@ -87,5 +88,51 @@ void main() {
     expect(rows!.length, 1);
     expect(rows.first.amountCents, 500);
     expect(rows.first.type, TxnType.expense);
+  });
+
+  testWidgets('行首负号能录入并落到数据库（净额记账）', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.runAsync(() => Store.i.boot());
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (ctx) => Center(
+            child: ElevatedButton(
+              onPressed: () => showRecordSheet(ctx),
+              child: const Text('记一笔'),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('记一笔'));
+    await tester.pumpAndSettle();
+
+    // 按键要在键盘范围内找：金额显示区也会出现 '-' 和数字
+    Finder key(String t) => find.descendant(
+          of: find.byType(CalcKeypad),
+          matching: find.text(t),
+        );
+
+    // 行首按减号 → 负数
+    await tester.tap(key('-'));
+    await tester.pump();
+    await tester.tap(key('2'));
+    await tester.tap(key('0'));
+    await tester.pump();
+
+    await tester.tap(find.text('确认'));
+    await tester.pumpAndSettle();
+
+    final rows = await tester.runAsync(() => Repo.listTxns(
+          ledgerId: Store.i.ledgerId,
+          month: Fmt.month(DateTime.now()),
+        ));
+    expect(rows!.any((t) => t.amountCents == -2000), isTrue,
+        reason: '应有一条 −20.00 的记录');
   });
 }
