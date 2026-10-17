@@ -117,5 +117,38 @@ void main() {
     await tester.tap(find.text('重置'));
     await tester.pumpAndSettle();
     expect(Store.i.filtering, isFalse);
+
+    // ---- 筛选态下记一笔：走的是 afterTxnChange 重跑筛选这条路 ----
+    // 不符合当前条件的记录不该混进结果，但必须进当月明细 ——
+    // 漏掉这一步的表现是「删了/记了，列表还是旧的」。
+    await tester.runAsync(() async {
+      await Store.i.applyFilter(TxnFilter(categoryId: foodId));
+    });
+    await tester.pumpAndSettle();
+    expect(Store.i.filteredTxns.length, 3);
+
+    await tester.runAsync(() async {
+      final cats = await Repo.listCategories(
+        Store.i.ledgerId,
+        type: TxnType.expense,
+      );
+      final other = cats.firstWhere((c) => c.id != foodId).id;
+      await Repo.insertTxn(Txn(
+        id: 0,
+        ledgerId: Store.i.ledgerId,
+        type: TxnType.expense,
+        amountCents: 700,
+        date: Fmt.today(),
+        categoryId: other,
+        note: '打车',
+      ));
+      await Store.i.afterTxnChange();
+    });
+    await tester.pumpAndSettle();
+
+    expect(Store.i.filteredTxns.length, 3);
+    expect(Store.i.filteredTxns.any((t) => t.note == '打车'), isFalse);
+    expect(Store.i.monthTxns.any((t) => t.note == '打车'), isTrue);
+    expect(find.text('3 笔'), findsOneWidget);
   });
 }

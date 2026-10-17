@@ -187,4 +187,41 @@ void main() {
     expect(exact.$1.length, 4);
     expect(exact.$2, isFalse);
   });
+
+  // 这条不是在测「功能对不对」，而是在钉住一个**已知的取舍**：
+  // 超过 500 条时列表被截断，界面上那句合计是按「被截断后的 500 条」算的，
+  // 会比真实总量小。哪天有人改成 count 查询、或者改成不截断，这条会先红。
+  test('超过 500 条：列表截断，合计口径只覆盖前 500 条', () async {
+    final db = await Db.open();
+    final batch = db.batch();
+    for (var i = 1; i <= 501; i++) {
+      batch.insert(
+        'txn',
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.expense,
+          amountCents: 100,
+          date: '2026-09-01',
+          categoryId: catFood,
+          accountId: accCash,
+          note: '第 $i 笔',
+        ).toMap(),
+      );
+    }
+    await batch.commit(noResult: true);
+
+    final (items, truncated) = await Repo.searchTxns(ledgerId: ledgerId);
+    expect(items.length, Repo.searchLimit);
+    expect(truncated, isTrue);
+
+    // 真实总量 501 笔 × 1.00 = 50100 分，但界面能算到的只有 50000 分
+    final shown = items.fold<int>(0, (a, t) => a + t.amountCents);
+    expect(shown, 50000);
+    final real = await db.rawQuery(
+      'SELECT SUM(amount_cents) AS s FROM txn WHERE ledger_id = ?',
+      [ledgerId],
+    );
+    expect(real.first['s'], 50100);
+  });
 }
