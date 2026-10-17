@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黑塔消费日记 · 视觉规范</title>
+<style>
+:root{
+  --ink:#14161A; --ink-2:#5C626B; --ink-3:#9AA0A8; --ink-4:#C4C9CF;
+  --bg:#FFFFFF; --bg-2:#F4F5F6; --line:#E8EAEC; --red:#D93A2C;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:46px 24px 90px;background:var(--bg);color:var(--ink);
+  font-family:"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:26px;font-weight:500;margin:0 0 6px;letter-spacing:-.3px}
+.lead{font-size:13.5px;color:var(--ink-2);line-height:1.85;margin:0 0 44px}
+h2{font-size:15px;font-weight:500;margin:0 0 4px;padding-top:34px;border-top:1px solid var(--line)}
+h2:first-of-type{border-top:0;padding-top:0}
+.sub{font-size:12.5px;color:var(--ink-3);margin:0 0 20px;line-height:1.75}
+.li{stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;display:block}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px}
+
+.mark-row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.markcell{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  border-radius:16px;padding:22px 26px;border:1px solid var(--line)}
+.markcell.dk{background:var(--ink);border-color:var(--ink)}
+.markcell span{font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+.markcell.dk span{color:#6C737E}
+.icons-row{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:6px}
+.iconcell{display:flex;flex-direction:column;align-items:center;gap:10px}
+.iconcell span{font-size:11.5px;color:var(--ink-3)}
+.note{font-size:12px;color:var(--ink-2);line-height:1.85;background:var(--bg-2);border-radius:10px;padding:13px 15px;margin-top:16px}
+.note b{font-weight:500;color:var(--ink)}
+.swatch-row{display:flex;flex-wrap:wrap;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.sw{flex:1 1 92px;min-width:92px;height:80px;display:flex;flex-direction:column;justify-content:flex-end;padding:9px;font-size:10.5px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+.tile{background:var(--bg-2);border-radius:12px;padding:14px 10px 11px;display:flex;flex-direction:column;align-items:center;gap:9px}
+.tile .box{width:42px;height:42px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.tile span{font-size:11.5px;color:var(--ink-2)}
+.tile i{font-style:normal;font-size:9.5px;color:var(--ink-3);font-family:ui-monospace,Menlo,monospace}
+table{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:6px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--ink-2);font-weight:500;font-size:11.5px}
+td code{font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>黑塔消费日记 · 视觉规范</h1>
+  <p class="lead">
+    黑白红三色 · 全站线稿图标 · 无渐变无阴影。<br>
+    黑 <code>#14161A</code> 作主体，白作底与反白。红有两档：<b>火焰 <code>#D93A2C</code></b> 与 <b>超支警示 <code>#A3231A</code></b>（深红）。<br>
+    红色<b>只在「火焰」和「超支」两种情况下出现</b>，其余一律黑白灰——正因为用得少，出现时才格外有分量。
+  </p>
+
+  <h2>品牌标志</h2>
+  <p class="sub">
+    剑与烛穿过方框，正中一只眼，顶端一簇火焰。<br>
+    <b>标志外形按参考图 1:1 矢量化描摹，未做任何形状改动。</b>描摹结果的像素比对不一致率为 <b>1.83%</b>，且残差全部集中在边缘抗锯齿带，无任何结构性偏差。
+  </p>
+  <div class="mark-row" id="markRow"></div>
+
+  <div class="note">
+    <b>用法：</b>浅色底用黑标，深色底用白标，红色恒定。标志四周禁止加文字或图形，最小高度 24px。<br>
+    <b>实现要点：</b>标志是单条偶数填充（evenodd）路径，<b>填充规则不能改</b>——眼睛处嵌套了 4 层轮廓（外杏仁 → 白区 → 眼环 → 环内白区），
+    改成 nonzero 会让眼内白区被填实。深色底版本不需要额外处理：白区的"空"会自动透出底色。
+  </div>
+
+  <h2>应用启动图标</h2>
+  <p class="sub">按 Android 自适应图标（Adaptive Icon）规范绘制：图形收在中央 72/108 安全区内，方形、圆角方形、圆形遮罩都不会切到主体。</p>
+  <div class="icons-row" id="appIcons"></div>
+  <div class="icons-row" id="maskDemo" style="margin-top:14px"></div>
+
+  <div class="note">
+    <b>需要导出的尺寸：</b>mipmap 五档 48 / 72 / 96 / 144 / 192 px · 自适应前景层 432×432 px · 自适应背景层纯色不用图 · 应用商店列表页 512×512 px。<br>
+    全部由矢量图直接导出，不用重画。
+  </div>
+
+  <h2>黑白红主色阶</h2>
+  <p class="sub">只有 4 级文字灰 + 3 级背景 + 1 个红。强调靠"纯黑"和"反白"完成，不靠色相。</p>
+  <div class="swatch-row" id="palette"></div>
+
+  <h2>图表灰阶</h2>
+  <p class="sub">分类占比图按金额从大到小映射到深→浅，越次要越淡。红色不进图表，只留给标志。</p>
+  <div class="swatch-row" id="chartRamp"></div>
+
+  <h2>分类图标（16）</h2>
+  <p class="sub">统一 24×24 视图框、1.5 线宽、圆头圆角、无填充。只画轮廓，不做细节堆砌。</p>
+  <div class="grid3" id="catIcons"></div>
+
+  <h2>功能图标（9）</h2>
+  <p class="sub">同一套规范，用于设置页、底部导航与数据操作。</p>
+  <div class="grid3" id="fnIcons"></div>
+
+  <h2>标志技术参数</h2>
+  <table>
+    <tr><th>项目</th><th>值</th></tr>
+    <tr><td>视图框</td><td><code>0 0 455 944</code>（宽高比 0.482）</td></tr>
+    <tr><td>路径构成</td><td>主体 1 条 + 火焰 1 条，均为偶奇填充</td></tr>
+    <tr><td>锚点数</td><td>约 133 个（描摹自动优化为贝塞尔曲线）</td></tr>
+    <tr><td>填充规则</td><td><code>evenodd</code> —— 不可改为 nonzero</td></tr>
+    <tr><td>主体色</td><td><code>#14161A</code>（深色底改 <code>#FFFFFF</code>）</td></tr>
+    <tr><td>火焰色</td><td><code>#D93A2C</code>（深色底改 <code>#E8493A</code>）</td></tr>
+    <tr><td>图标内缩放</td><td><code>translate(35.68,16) scale(0.080508)</code></td></tr>
+  </table>
+
+</div>
+
+<script>
+const MARK_PATH  = "M 225 9.741 C 225 21.678, 218.573 39.955, 209.461 53.932 C 202.944 63.930, 200.588 82.094, 204.648 91.051 C 209.596 101.966, 217.435 107.342, 228.500 107.409 C 237.288 107.463, 242.592 104.896, 247.476 98.226 C 252.094 91.919, 254.003 86.009, 253.985 78.072 C 253.965 69.288, 252.052 61.685, 246.568 48.602 C 244.056 42.609, 241.955 36.534, 241.900 35.102 C 241.845 33.671, 241.474 31.375, 241.076 30 L 240.351 27.500 238.275 30.851 C 235.899 34.686, 236.158 35.135, 233.469 22.500 C 231.688 14.125, 229.229 8.265, 226.573 6.061 C 225.178 4.903, 225 5.320, 225 9.741 M 225.500 110.572 C 221.650 111.314, 214.726 111.854, 210.113 111.772 C 201.860 111.626, 201.680 111.675, 198.863 114.827 C 195.684 118.385, 195.267 121.682, 197.460 125.923 C 198.810 128.533, 199.284 141.831, 199.041 170.250 L 199 175 128.500 175 L 58 175 58 187.500 L 58 200 61.750 200.014 C 63.813 200.021, 66.512 200.299, 67.750 200.630 L 70 201.233 70 260.700 C 70 293.407, 70.338 320.017, 70.750 319.833 C 71.162 319.650, 76.563 316.146, 82.750 312.046 L 94 304.592 94.010 291.546 C 94.076 208.700, 94.172 202.106, 95.313 201.245 C 95.979 200.743, 118.893 200.383, 147.500 200.425 L 198.500 200.500 198.762 238.738 C 199.008 274.701, 198.914 277.086, 197.188 278.812 C 195.852 280.148, 192.513 280.984, 184.926 281.882 C 160.371 284.788, 137.773 291.725, 111.345 304.471 C 93.538 313.059, 85.069 318.364, 71.642 329.342 C 56.643 341.606, 46.587 354.367, 38.639 371.225 C 34.260 380.513, 32.418 381.701, 20.266 383.082 C 15.515 383.622, 11.037 384.555, 10.314 385.154 C 8.875 386.348, 8.400 407.536, 9.765 409.624 C 10.169 410.242, 15.212 411.292, 20.970 411.957 C 26.729 412.621, 32.187 413.565, 33.100 414.054 C 34.014 414.542, 36.656 418.768, 38.972 423.443 C 47.683 441.027, 62.981 457.697, 83.868 472.363 C 95.360 480.432, 116.233 491.764, 129.016 496.875 C 143.388 502.620, 168.937 508.403, 193.757 511.528 L 199.015 512.190 198.757 574.845 L 198.500 637.500 146.500 637.500 L 94.500 637.500 94.244 563.840 L 93.987 490.179 84.049 483.084 C 78.583 479.182, 73.749 475.429, 73.306 474.744 C 72.862 474.060, 72.275 510.400, 72 555.500 L 71.500 637.500 64.750 637.796 L 58 638.091 58 648.932 L 58 659.773 61.250 660.306 C 63.037 660.599, 70.800 660.841, 78.500 660.844 C 86.200 660.847, 116.389 660.883, 145.588 660.925 L 198.676 661 199.287 779.408 L 199.899 897.816 212.069 916.658 C 218.763 927.021, 224.792 936.089, 225.466 936.810 C 226.454 937.866, 227.850 936.319, 232.680 928.810 C 235.973 923.689, 241.900 914.501, 245.850 908.390 L 253.033 897.281 253.073 790.890 C 253.094 732.376, 253.370 679.212, 253.685 672.750 L 254.257 661 324.128 661 L 394 661 394 650 L 394 639 389.250 638.985 C 386.637 638.976, 383.872 638.572, 383.105 638.086 C 381.921 637.337, 381.822 624.960, 382.450 556.102 C 382.976 498.318, 382.879 475, 382.111 475 C 381.518 475, 377.538 477.515, 373.266 480.589 C 368.995 483.664, 364.262 486.825, 362.750 487.615 L 360 489.051 360 563.526 L 360 638 306.992 638 L 253.985 638 254.242 575.294 L 254.500 512.588 265.500 510.945 C 309.413 504.384, 343.199 491.771, 371.725 471.289 C 381.046 464.596, 385.665 460.421, 395.832 449.498 C 404.822 439.841, 408.161 435.073, 414.015 423.538 C 419.773 412.190, 421.701 410.928, 434.314 410.243 C 439.366 409.969, 444.063 409.297, 444.750 408.750 C 445.611 408.065, 446 404.407, 446 397 C 446 389.589, 445.611 385.938, 444.750 385.259 C 444.063 384.716, 440.350 383.992, 436.500 383.649 C 432.650 383.306, 427.475 382.444, 425 381.733 C 420.664 380.488, 420.311 380.083, 415.341 370.651 C 404.280 349.664, 388.752 332.934, 366.635 318.174 C 338.014 299.073, 315.806 290.571, 274.560 282.925 C 260.300 280.281, 258.502 279.009, 257.540 270.884 C 257.189 267.923, 257.037 250.875, 257.201 233 L 257.500 200.500 308.750 200.241 L 360 199.982 360 252.424 C 360 303.876, 360.038 304.877, 361.987 305.496 C 363.080 305.843, 368.008 309.023, 372.939 312.563 C 377.869 316.104, 382.146 319, 382.443 319 C 382.741 319, 383.100 292.337, 383.242 259.750 L 383.500 200.500 389 200 L 394.500 199.500 394.500 188 L 394.500 176.500 326.407 176.728 L 258.313 176.956 257.633 154.140 C 256.992 132.641, 257.068 131.069, 258.954 126.912 C 262.362 119.400, 261.415 114.175, 256.288 112.201 C 247.692 108.891, 237.130 108.333, 225.500 110.572 M 214.238 321.110 C 196.418 324.079, 177.365 335.273, 166.419 349.207 C 160.112 357.234, 152.757 372.006, 150.025 382.132 C 148.133 389.144, 147.839 392.279, 148.208 401.499 C 148.593 411.113, 149.160 413.973, 152.701 424.184 C 157.653 438.461, 162.113 446.602, 169.362 454.597 C 176.631 462.613, 185.246 468.097, 198.294 473.014 C 217.885 480.397, 235.868 480.541, 254.268 473.465 C 279.391 463.802, 296.029 445.080, 303.112 418.500 C 305.836 408.277, 306.095 389.795, 303.656 379.719 C 296.840 351.566, 271.164 326.901, 243.140 321.586 C 234.167 319.884, 222.729 319.696, 214.238 321.110 M 314.644 327.149 C 315.115 327.892, 317.843 332.015, 320.707 336.312 C 327.660 346.745, 330.352 352.672, 333.939 365.445 C 342.721 396.720, 339.036 431.147, 324.210 456.335 C 321.406 461.101, 319.386 465, 319.723 465 C 321.221 465, 338.291 455.201, 346.150 449.830 C 358.399 441.459, 366.952 433.271, 373.404 423.742 C 379.147 415.260, 386 399.928, 386 395.563 C 386 392.075, 379.429 377.526, 374.905 371 C 364.180 355.526, 347.385 341.609, 327.500 331.719 C 316.758 326.376, 313.397 325.181, 314.644 327.149 M 127.869 331.903 C 113.372 339.257, 100.473 348.344, 90.951 357.911 C 80.910 367.999, 75.994 375.173, 70.685 387.487 L 66.810 396.474 69.941 403.987 C 80.429 429.153, 95.316 444.350, 125.299 460.496 C 130.139 463.102, 134.334 464.999, 134.621 464.712 C 134.909 464.424, 134.034 462.429, 132.676 460.279 C 119.737 439.782, 114.314 418.847, 115.292 393.166 C 116.252 367.978, 122.751 348.856, 136.132 331.856 C 141.113 325.528, 140.428 325.532, 127.869 331.903";
+const FLAME_PATH = "M 225 9.741 C 225 21.678, 218.573 39.955, 209.461 53.932 C 202.944 63.930, 200.588 82.094, 204.648 91.051 C 209.596 101.966, 217.435 107.342, 228.500 107.409 C 237.288 107.463, 242.592 104.896, 247.476 98.226 C 252.094 91.919, 254.003 86.009, 253.985 78.072 C 253.965 69.288, 252.052 61.685, 246.568 48.602 C 244.056 42.609, 241.955 36.534, 241.900 35.102 C 241.845 33.671, 241.474 31.375, 241.076 30 L 240.351 27.500 238.275 30.851 C 235.899 34.686, 236.158 35.135, 233.469 22.500 C 231.688 14.125, 229.229 8.265, 226.573 6.061 C 225.178 4.903, 225 5.320, 225 9.741 M 226 110.500 C 219.769 111.704, 220.244 111.757, 237.500 111.775 C 254.902 111.794, 255.301 111.750, 249.500 110.441 C 242.237 108.802, 234.689 108.821, 226 110.500";
+
+const markSVG = (fg, red, h)=>`<svg viewBox="0 0 455 944" height="${h}" style="width:auto;display:block">
+  <path d="${MARK_PATH}" fill="${fg}" fill-rule="evenodd"/>
+  <path d="${FLAME_PATH}" fill="${red}" fill-rule="evenodd"/></svg>`;
+
+document.getElementById('markRow').innerHTML = [
+  ['#14161A','#D93A2C','浅色底 · 黑标红焰',''],
+  ['#FFFFFF','#E8493A','深色底 · 白标红焰','dk'],
+  ['#D93A2C','#D93A2C','单色红（仅特殊场合）',''],
+  ['#14161A','#14161A','纯黑单色（印刷 / 刻印）','']
+].map(([fg,red,label,cls])=>
+  `<div class="markcell ${cls}">${markSVG(fg,red,150)}<span>${label}</span></div>`).join('');
+
+const launcher = (size,dark,mask)=>{
+  const bg = dark?'#14161A':'#FFFFFF', fg = dark?'#FFFFFF':'#14161A', red = dark?'#E8493A':'#D93A2C';
+  const r = mask==='circle'?'50%':mask==='square'?'0':'23.5%';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 108 108" style="border-radius:${r};background:${bg};display:block">
+    <g transform="translate(35.68,16) scale(0.080508)">
+      <path d="${MARK_PATH}" fill="${fg}" fill-rule="evenodd"/>
+      <path d="${FLAME_PATH}" fill="${red}" fill-rule="evenodd"/>
+    </g></svg>`;
+};
+document.getElementById('appIcons').innerHTML = [[96,false],[96,true],[64,false],[48,true]]
+  .map(([s,d])=>`<div class="iconcell">
+    <div style="box-shadow:0 2px 10px rgba(20,22,26,.12);border-radius:23.5%">${launcher(s,d)}</div>
+    <span>${d?'深色':'浅色'} · ${s}px</span></div>`).join('');
+
+document.getElementById('maskDemo').innerHTML = ['square','rounded','circle'].map(m=>{
+  const label = m==='square'?'方形遮罩':m==='rounded'?'圆角方形（主流）':'圆形遮罩（Android 原生）';
+  return `<div class="iconcell">
+    <div style="box-shadow:0 2px 10px rgba(20,22,26,.12)">${launcher(76,false,m)}</div>
+    <span>${label}</span></div>`;
+}).join('');
+
+const MAIN = [
+  ['#14161A','黑 · 主体','#fff'],['#5C626B','次级灰 · 收入','#fff'],
+  ['#9AA0A8','辅助灰','#fff'],['#C4C9CF','占位灰','#14161A'],
+  ['#E8EAEC','分割线','#14161A'],['#F4F5F6','卡片底','#14161A'],
+  ['#FFFFFF','页面底','#14161A'],['#D93A2C','红 · 火焰 / 深底超支','#fff'],
+  ['#A3231A','深红 · 浅底超支警示','#fff']
+];
+document.getElementById('palette').innerHTML = MAIN.map(([hex,label,fg])=>
+  `<div class="sw" style="background:${hex};color:${fg}">
+    <b style="font-weight:500;font-size:11.5px">${label}</b>
+    <span style="opacity:.7;margin-top:2px">${hex}</span></div>`).join('');
+
+const RAMP = ['#14161A','#2E343C','#474E58','#616874','#7B8390','#949CA8','#AAB1BC','#BCC2CC','#CDD2D8','#DCE0E4'];
+document.getElementById('chartRamp').innerHTML = RAMP.map((hex,i)=>
+  `<div class="sw" style="background:${hex};color:${i<4?'#fff':'#14161A'}">
+    <span style="opacity:.75">${String(i+1).padStart(2,'0')}</span>
+    <span style="opacity:.55;margin-top:2px">${hex}</span></div>`).join('');
+
+const ICONS = {
+  food:'<path d="M5 13h14a7 7 0 0 1-14 0z"/><path d="M9.5 9.6V6.4M12 9.6V5.4M14.5 9.6V6.4"/>',
+  transport:'<rect x="5" y="3.6" width="14" height="13" rx="3"/><path d="M5 11h14"/><circle cx="9" cy="13.6" r="1"/><circle cx="15" cy="13.6" r="1"/><path d="M8.6 16.6L7 20.2M15.4 16.6L17 20.2"/>',
+  shopping:'<path d="M5.6 8h12.8l-1.1 11.4a1.5 1.5 0 0 1-1.5 1.4H8.2a1.5 1.5 0 0 1-1.5-1.4z"/><path d="M9 8V6.3a3 3 0 0 1 6 0V8"/>',
+  home:'<path d="M4 10.8L12 4.4l8 6.4"/><path d="M6.4 9.7V20h11.2V9.7"/><path d="M10.2 20v-5.2h3.6V20"/>',
+  fun:'<path d="M9.5 17.2V5.9l8.5-1.9v10.8"/><circle cx="7" cy="17.2" r="2.5"/><circle cx="15.5" cy="14.8" r="2.5"/>',
+  medical:'<rect x="3.5" y="7.5" width="17" height="12" rx="2.5"/><path d="M9 7.5V6a1.8 1.8 0 0 1 1.8-1.8h2.4A1.8 1.8 0 0 1 15 6v1.5"/><path d="M12 11.2v5.4M9.3 13.9h5.4"/>',
+  study:'<path d="M12 7.4S9.8 5.2 5 5.2v11.2c4.8 0 7 2.2 7 2.2s2.2-2.2 7-2.2V5.2c-4.8 0-7 2.2-7 2.2z"/><path d="M12 7.4v11.2"/>',
+  comm:'<rect x="7" y="2.9" width="10" height="18.2" rx="2.6"/><path d="M10.8 18.1h2.4"/>',
+  gift:'<rect x="4" y="8.6" width="16" height="11.9" rx="1.6"/><path d="M3 8.6h18M12 8.6v11.9"/><path d="M12 8.6C11 5.9 9.3 4.4 7.8 5.3 6.3 6.2 7.6 8.6 12 8.6zM12 8.6c1-2.7 2.7-4.2 4.2-3.3 1.5.9.2 3.3-4.2 3.3z"/>',
+  more:'<circle cx="6" cy="12" r="1.25"/><circle cx="12" cy="12" r="1.25"/><circle cx="18" cy="12" r="1.25"/>',
+  salary:'<rect x="2.8" y="6.6" width="18.4" height="10.8" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.4 9.9v.01M17.6 14.1v.01"/>',
+  bonus:'<circle cx="12" cy="9.3" r="5.5"/><path d="M8.6 13.8L7 20.5l5-2.6 5 2.6-1.6-6.7"/>',
+  parttime:'<rect x="3" y="7.2" width="18" height="12.3" rx="2"/><path d="M9 7.2V5.8a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.4"/><path d="M3 12.3h18"/>',
+  invest:'<path d="M3.5 16.6l5-5 3.5 3.5 8-8"/><path d="M15 7.1h5v5"/>',
+  redpacket:'<rect x="5" y="3.6" width="14" height="16.8" rx="2.4"/><path d="M5 3.6a7 7 0 0 1 14 0"/><circle cx="12" cy="11.2" r="1.8"/>',
+  upload:'<path d="M12 15.5V4.6"/><path d="M7.6 8.6L12 4.2l4.4 4.4"/><path d="M4.4 15.4v2.8a2 2 0 0 0 2 2h11.2a2 2 0 0 0 2-2v-2.8"/>',
+  download:'<path d="M12 4.5v10.9"/><path d="M7.6 11.2L12 15.6l4.4-4.4"/><path d="M4.4 15.4v2.8a2 2 0 0 0 2 2h11.2a2 2 0 0 0 2-2v-2.8"/>',
+  lock:'<rect x="4.6" y="10.4" width="14.8" height="9.8" rx="2.2"/><path d="M8.2 10.4V7.6a3.8 3.8 0 0 1 7.6 0v2.8"/>',
+  tag:'<path d="M11.4 3.6H20v8.6l-8.6 8.6-8.6-8.6z"/><circle cx="16" cy="7.6" r="1.4"/>',
+  bell:'<path d="M6.4 10.2a5.6 5.6 0 1 1 11.2 0c0 4 1.6 5.4 1.6 5.4H4.8s1.6-1.4 1.6-5.4z"/><path d="M10.2 18.6a2 2 0 0 0 3.6 0"/>',
+  coin:'<circle cx="12" cy="12" r="8.4"/><path d="M12 7.4v9.2M14.6 9.4H10.3a1.9 1.9 0 0 0 0 3.8h3.4a1.9 1.9 0 0 1 0 3.8H9.4"/>',
+  moon:'<path d="M20.2 14.2A8.6 8.6 0 0 1 9.8 3.8a8.8 8.8 0 1 0 10.4 10.4z"/>',
+  doc:'<path d="M6.4 4.6a2 2 0 0 1 2-2h5.4l4.8 4.8v11.6a2 2 0 0 1-2 2H8.4a2 2 0 0 1-2-2z"/><path d="M13.6 2.6v5h5"/><path d="M9.6 12.6h6M9.6 16h4"/>',
+  info:'<circle cx="12" cy="12" r="8.6"/><path d="M12 11.2v5.2M12 7.9v.01"/>'
+};
+const svgIcon=(k,s=22)=>`<svg class="li" width="${s}" height="${s}" viewBox="0 0 24 24">${ICONS[k]}</svg>`;
+const CATS=[['food','餐饮'],['transport','交通'],['shopping','购物'],['home','居住'],['fun','娱乐'],
+  ['medical','医疗'],['study','学习'],['comm','通讯'],['gift','人情'],['more','其他'],
+  ['salary','工资'],['bonus','奖金'],['parttime','兼职'],['invest','理财'],['redpacket','红包']];
+const FNS=[['upload','导出'],['download','导入'],['lock','备份'],['tag','分类'],
+  ['bell','提醒'],['coin','币种'],['moon','深色'],['doc','隐私'],['info','关于']];
+const tile=([k,l])=>`<div class="tile"><div class="box">${svgIcon(k,22)}</div><span>${l}</span><i>${k}</i></div>`;
+document.getElementById('catIcons').innerHTML = CATS.map(tile).join('');
+document.getElementById('fnIcons').innerHTML = FNS.map(tile).join('');
+</script>
+</body>
+</html>

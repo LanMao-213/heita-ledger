@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 桌面图标下显示的应用名。改名只需要动这一处（以及 lib/app.dart 的 kAppName） -->
+    <string name="app_name">黑塔消费日记</string>
+</resources>
