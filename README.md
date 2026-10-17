@@ -36,9 +36,14 @@ V1.0 的 P0 功能已全部打通，能当一个真正的账本用：
 前置：Flutter SDK（本机验证版本 3.47.7 / Dart 3.13.5）、Android Studio（含 SDK 与 JDK）、一台开了 USB 调试的手机或模拟器。
 
 ```bash
-flutter pub get
+./tools/pub_get.sh          # 装依赖（固定国内源，见下）
 flutter run                 # 连上手机或模拟器后直接跑
 ```
+
+> **别直接跑 `flutter pub get`**：`pubspec.lock` 是用镜像 `pub.flutter-io.cn` 解析的，
+> 而 pub 会按当前源的地址重写 lock 里每个包的 `url` 字段 —— 版本一个不变，却多出
+> 87 行脏改动。`tools/pub_get.sh` 只是替你设了 `PUB_HOSTED_URL` 再调 pub，
+> 想手工跑就自己带上这个变量。约定：lock 的**版本**变化要提交，纯 `url` 变化不提交。
 
 第一次跑 Android 要下载 Gradle 与依赖，几分钟到十几分钟不等。国内网络建议挂镜像，具体见交接说明。
 
@@ -56,6 +61,27 @@ flutter build apk --release --split-per-abi   # 出包（分 ABI，体积更小�
 
 测试会真的把界面渲染成 PNG，输出在 `build/visual/`，可以直接核对视觉效果；
 布局溢出（文字撑破卡片一类）会在测试里抛异常，比肉眼可靠。
+
+## 真机走查
+
+```bash
+adb devices                  # 设备在列表里才算通了；显示 unauthorized 是手机上没点「允许」
+flutter run --release        # 直接装到手机上跑（首次编译慢，之后改代码热重载）
+```
+
+不想插线就出包再拷到手机：
+
+```bash
+flutter build apk --release --split-per-abi
+# 产物：build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+```
+
+> release 用的是 **debug keystore**（`android/app/build.gradle` 里 `signingConfig = debug`）。
+> 换台电脑打的包签名不同，手机上有旧版会装不上、必须先卸载 —— **本地账目会跟着一起没**，
+> 动手前先「我的 → 导出 Excel」备份。同一台电脑重新打的包签名一致，可以直接覆盖安装，数据保留。
+
+> 沙箱 / CI 里跑不了 `flutter devices`（它要调 `reg query` 读浏览器版本，可能被安全策略拦），
+> 但 `adb devices` 不受影响，排查设备以它为准。
 
 ## 目录结构
 
