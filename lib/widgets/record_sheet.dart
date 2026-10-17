@@ -348,7 +348,9 @@ class _RecordSheetState extends State<RecordSheet> {
           ),
           _AmountDisplay(input: _amountInput, type: _type),
           const Divider(height: 1, color: C.line),
-          Expanded(
+          // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
+          // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
+          Flexible(
             child: SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: S.sm),
               child: Column(
@@ -548,7 +550,8 @@ class _MetaRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: S.lg),
+      // 上面紧挨着分隔线，留 12 的呼吸位；下面接备注框，收 8 免得两处叠成一大块
+      padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
       child: Row(
         children: [
           Expanded(
