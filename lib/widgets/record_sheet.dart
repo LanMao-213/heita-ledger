@@ -645,6 +645,7 @@ class _Keypad extends StatelessWidget {
           Expanded(
             flex: 1,
             child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: canSave ? onSave : null,
               child: Container(
                 height: 196,
@@ -673,6 +674,11 @@ class _Keypad extends StatelessWidget {
   Widget _key(String k) {
     final isDel = k == 'del';
     return GestureDetector(
+      // ★ 必须显式 opaque：默认的 deferToChild 会把命中区交给子节点，
+      //   而这里的子节点只是 SizedBox + Center + Text，只有数字字形那一小块
+      //   能被点中，整格其余地方全是死区 —— 表现就是「键盘很不灵敏」，
+      //   手指要精准按在笔画上才有反应。
+      behavior: HitTestBehavior.opaque,
       onTap: () => onKey(k),
       child: SizedBox(
         height: 49,

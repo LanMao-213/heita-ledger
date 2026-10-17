@@ -47,6 +47,8 @@ class CategoryGrid extends StatelessWidget {
           final c = cats[i];
           final on = c.id == selected;
           return GestureDetector(
+            // 同理：整格可点，而不是只有图标方块和文字笔画
+            behavior: HitTestBehavior.opaque,
             onTap: () => onSelect(c.id),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
