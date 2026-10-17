@@ -28,15 +28,27 @@ Future<void> _loadChineseFont() async {
     r'C:\Windows\Fonts\Deng.ttf',
     r'C:\Windows\Fonts\simhei.ttf',
   ];
+  // Cupertino 的滚轮（CupertinoPicker）用的是它自己的默认字族，不是 Roboto。
+  // 只注册 Roboto 的话，双轮盘截图里的中文会变成方块。
+  const families = [
+    'Roboto',
+    'CupertinoSystemText',
+    'CupertinoSystemDisplay',
+    '.SF Pro Text',
+  ];
   for (final path in candidates) {
     final file = File(path);
     if (!file.existsSync()) continue;
     final bytes = file.readAsBytesSync();
-    final loader = FontLoader('Roboto')
-      ..addFont(Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)));
-    await loader.load();
+    for (final family in families) {
+      final loader = FontLoader(family)
+        ..addFont(
+          Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)),
+        );
+      await loader.load();
+    }
     // ignore: avoid_print
-    print('已加载中文字体：$path');
+    print('已加载中文字体：$path（$families）');
     return;
   }
   // ignore: avoid_print
@@ -152,6 +164,14 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 600));
     await _shot(tester, 'build/visual/shot_5_record.png');
     expect(tester.takeException(), isNull, reason: '记一笔面板有布局溢出');
+
+    // ---- 分类 + 名目双轮盘 ----
+    await tester.tap(find.text('选名目，或自己写备注'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_11_note_wheel.png');
+    expect(tester.takeException(), isNull, reason: '双轮盘有布局溢出');
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
 
     // ---- 筛选面板 ----
     // 先点遮罩把记一笔关掉（面板占了下半屏，顶部遮罩还能点到）

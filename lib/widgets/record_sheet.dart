@@ -7,7 +7,7 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import 'common.dart';
-import 'pickers.dart';
+import 'picker_wheels.dart';
 
 /// 打开「记一笔」面板。传入 [editing] 则为编辑模式。
 /// 返回 true 表示保存成功。
@@ -36,6 +36,9 @@ class _RecordSheetState extends State<RecordSheet> {
   late int? _accountId;
   late String _date;
   late TextEditingController _note;
+
+  /// 双轮盘里选了「自定义…」时，把焦点交给备注框
+  final _noteFocus = FocusNode();
 
   /// 正在输入的金额，直接存字符串便于按键操作（避免浮点误差累积）
   String _amountInput = '';
@@ -84,7 +87,25 @@ class _RecordSheetState extends State<RecordSheet> {
   @override
   void dispose() {
     _note.dispose();
+    _noteFocus.dispose();
     super.dispose();
+  }
+
+  /// 双轮盘：左选分类、右选名目。选「自定义…」就把焦点交回备注框。
+  Future<void> _pickCategoryNote() async {
+    final pick = await showCategoryNoteWheel(
+      context,
+      cats: _cats,
+      categoryId: _categoryId,
+      type: _type,
+      note: _note.text,
+    );
+    if (pick == null || !mounted) return;
+    setState(() {
+      _categoryId = pick.categoryId;
+      if (pick.note != null) _note.text = pick.note!;
+    });
+    if (pick.note == null) _noteFocus.requestFocus();
   }
 
   void _pressKey(String k) {
@@ -344,10 +365,10 @@ class _RecordSheetState extends State<RecordSheet> {
               padding: const EdgeInsets.only(bottom: S.sm),
               child: Column(
                 children: [
-                  CategoryGrid(
-                    cats: _cats,
-                    selected: _categoryId,
-                    onSelect: (id) => setState(() => _categoryId = id),
+                  _CategoryNoteRow(
+                    category: Store.i.categoryOf(_categoryId),
+                    note: _note,
+                    onTap: _pickCategoryNote,
                   ),
                   const Divider(height: 1, color: C.line),
                   _MetaRow(
@@ -357,7 +378,7 @@ class _RecordSheetState extends State<RecordSheet> {
                     accountIcon: Store.i.accountOf(_accountId)?.icon ?? 'wallet',
                     onPickAccount: _pickAccount,
                   ),
-                  _NoteField(controller: _note),
+                  _NoteField(controller: _note, focusNode: _noteFocus),
                 ],
               ),
             ),
@@ -568,10 +589,89 @@ class _Chip extends StatelessWidget {
   }
 }
 
+/// 分类 + 名目的一行摘要，点它打开双轮盘。
+///
+/// 原来这里是一个 5 列九宫格：选分类要点一下，写名目要再点备注框打字。
+/// 换成一行摘要 + 双轮盘之后，分类和名目在同一次操作里定完。
+class _CategoryNoteRow extends StatelessWidget {
+  const _CategoryNoteRow({
+    required this.category,
+    required this.note,
+    required this.onTap,
+  });
+
+  final Category? category;
+  final TextEditingController note;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedBuilder(
+        // 备注在下方输入框里改动时，这里要跟着显示
+        animation: note,
+        builder: (context, _) {
+          final text = note.text.trim();
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.md, S.md),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: C.bg2,
+                    borderRadius: BorderRadius.circular(R.md),
+                  ),
+                  child: Center(
+                    child: LineIcon(
+                      category?.icon ?? 'more',
+                      size: 20,
+                      color: C.ink2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: S.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category?.name ?? '选择分类',
+                        style: T.body.copyWith(fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        text.isEmpty ? '选名目，或自己写备注' : text,
+                        style: T.caption,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.keyboard_arrow_right_rounded,
+                  size: 20,
+                  color: C.ink4,
+                ),
+                const SizedBox(width: S.sm),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _NoteField extends StatelessWidget {
-  const _NoteField({required this.controller});
+  const _NoteField({required this.controller, this.focusNode});
 
   final TextEditingController controller;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -579,6 +679,7 @@ class _NoteField extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
       child: TextField(
         controller: controller,
+        focusNode: focusNode,
         style: T.body,
         maxLength: 60,
         inputFormatters: [LengthLimitingTextInputFormatter(60)],
