@@ -346,7 +346,7 @@ class _RecordSheetState extends State<RecordSheet> {
               });
             },
           ),
-          _AmountDisplay(input: _amountInput, type: _type),
+          _AmountDisplay(input: _amountInput),
           const Divider(height: 1, color: C.line),
           // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
           // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
@@ -469,62 +469,48 @@ class _TypeSwitch extends StatelessWidget {
 }
 
 class _AmountDisplay extends StatelessWidget {
-  const _AmountDisplay({required this.input, required this.type});
+  const _AmountDisplay({required this.input});
 
   final String input;
-  final TxnType type;
 
   @override
   Widget build(BuildContext context) {
     final cents = Calc.cents(input);
-    // 收支决定这笔记账的方向；金额本身带负号时符号自然翻转
-    // （支出 −20 = 净流入 20，显示成 +20.00）
-    final signed = cents == null ? 0 : (type.isIncome ? cents : -cents);
-    // 金额还是 0 的时候，符号只能由收支类型决定（支出显示 −、收入显示 +）
-    final sign = (cents == null || cents == 0)
-        ? (type.isIncome ? '+' : '-')
-        : (signed > 0 ? '+' : '-');
+    // 收支由上方切换表示，这里不再画固定的 ± 前缀，也不画 ¥。
+    // 只保留用户自己敲的负号 —— 那是「净额」信息，不能吞掉。
     final amountText = cents == null
         ? '0'
-        : Fmt.money(signed.abs(), trimZero: true);
+        : '${cents < 0 ? '-' : ''}${Fmt.money(cents.abs(), trimZero: true)}';
 
     return Padding(
       // 顶部多了一排模板，这里收一点，保证键盘在首屏里露全
-      padding: const EdgeInsets.fromLTRB(S.lg, S.xs, S.lg, S.xs),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
         children: [
-          // 有运算才显示算式行，纯数字时不浪费高度
-          SizedBox(
-            height: 16,
-            child: Calc.hasOperator(input)
-                ? Text(
-                    Calc.pretty(input),
-                    style: T.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  )
-                : null,
+          // 左边留给算式，纯数字时是空的
+          Expanded(
+            flex: 3,
+            child: Text(
+              Calc.hasOperator(input) ? Calc.pretty(input) : '',
+              style: T.caption,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                sign,
-                style: T.hero.copyWith(fontSize: 24, color: C.ink3),
+          const SizedBox(width: S.sm),
+          // 数字靠右贴边；太长时等比缩小，不折行也不溢出
+          Expanded(
+            flex: 2,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(amountText, style: T.hero.copyWith(fontSize: 44)),
               ),
-              const SizedBox(width: 3),
-              Text('¥', style: T.hero.copyWith(fontSize: 24, color: C.ink2)),
-              const SizedBox(width: 5),
-              Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(amountText, style: T.hero.copyWith(fontSize: 40)),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -556,6 +542,7 @@ class _MetaRow extends StatelessWidget {
         children: [
           Expanded(
             child: _Chip(
+              key: const ValueKey('record_date_chip'),
               icon: 'rec',
               label: Fmt.friendly(date),
               onTap: onPickDate,
@@ -564,6 +551,7 @@ class _MetaRow extends StatelessWidget {
           const SizedBox(width: S.md),
           Expanded(
             child: _Chip(
+              key: const ValueKey('record_account_chip'),
               icon: accountIcon,
               label: accountName,
               onTap: onPickAccount,
@@ -576,7 +564,7 @@ class _MetaRow extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip({required this.icon, required this.label, required this.onTap});
+  const _Chip({super.key, required this.icon, required this.label, required this.onTap});
 
   final String icon;
   final String label;

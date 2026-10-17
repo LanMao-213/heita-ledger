@@ -173,6 +173,22 @@ void main() {
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
 
+    // ---- 日期选择 ----
+    await tester.tap(find.byKey(const ValueKey('record_date_chip')));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    await _shot(tester, 'build/visual/shot_12_date_picker.png');
+    expect(tester.takeException(), isNull, reason: '日期选择有布局溢出');
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    // ---- 账户选择 ----
+    await tester.tap(find.byKey(const ValueKey('record_account_chip')));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_13_account_sheet.png');
+    expect(tester.takeException(), isNull, reason: '账户选择有布局溢出');
+    await tester.tapAt(const Offset(195, 80));
+    await tester.pumpAndSettle();
+
     // ---- 筛选面板 ----
     // 先点遮罩把记一笔关掉（面板占了下半屏，顶部遮罩还能点到）
     await tester.tapAt(const Offset(195, 60));
