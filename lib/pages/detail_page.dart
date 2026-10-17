@@ -57,12 +57,9 @@ class DetailPage extends StatelessWidget {
   List<Widget> _dayGroups(BuildContext context, Store s) {
     final out = <Widget>[];
     for (final (date, items) in s.groupedVisibleByDay) {
-      final dayExpense = items
-          .where((t) => t.type.isExpense)
-          .fold<int>(0, (a, t) => a + t.amountCents);
-      final dayIncome = items
-          .where((t) => t.type.isIncome)
-          .fold<int>(0, (a, t) => a + t.amountCents);
+      // 交叉归集：支出里的负数计入收入，收入里的负数计入支出
+      final dayExpense = sumBySide(items, TxnType.expense);
+      final dayIncome = sumBySide(items, TxnType.income);
 
       out.add(Padding(
         padding: const EdgeInsets.fromLTRB(S.xl, S.lg, S.xl, S.sm),

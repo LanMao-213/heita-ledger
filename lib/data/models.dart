@@ -390,6 +390,25 @@ class Txn {
       );
 }
 
+/// 某一侧（支出 / 收入）的合计，口径是**交叉归集**：
+/// 支出里记的负数算进收入，收入里记的负数算进支出。
+///
+/// 这是产品定的规则，语义是「这笔钱的方向反了，不是这一侧变少了」——
+/// 代购代付后对方多给的钱，记成支出 −20，统计上应该体现为收入多了 20。
+/// 转账两侧都不参与。
+int sumBySide(Iterable<Txn> txns, TxnType side) {
+  if (side == TxnType.transfer) return 0;
+  var sum = 0;
+  for (final t in txns) {
+    if (t.type == TxnType.transfer) continue;
+    final sameSide = t.type == side;
+    if (sameSide ? t.amountCents >= 0 : t.amountCents < 0) {
+      sum += t.amountCents.abs();
+    }
+  }
+  return sum;
+}
+
 /// 明细筛选条件。字段为 null 表示「这一项没设」，全部为 null 即「未筛选」。
 ///
 /// ★ 刻意**不提供** `copyWith` + `clearXxx` 那一套：本轮的交互是「面板

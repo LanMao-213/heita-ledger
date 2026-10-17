@@ -216,10 +216,11 @@ class Store extends ChangeNotifier {
   List<Txn> get visibleTxns => filtering ? filteredTxns : monthTxns;
 
   /// 筛选结果的支出合计（不含转账，与 monthTotals 同口径）
-  int get filteredExpenseCents => _sum(filteredTxns, TxnType.expense);
+  /// 筛选结果的支出合计。负数按交叉归集：支出里的负数算收入，反之亦然
+  int get filteredExpenseCents => sumBySide(filteredTxns, TxnType.expense);
 
-  /// 筛选结果的收入合计（不含转账）
-  int get filteredIncomeCents => _sum(filteredTxns, TxnType.income);
+  /// 筛选结果的收入合计（同上口径，转账两侧都不参与）
+  int get filteredIncomeCents => sumBySide(filteredTxns, TxnType.income);
 
   /// 应用筛选。空条件等价于「清空筛选」。
   ///
@@ -246,10 +247,6 @@ class Store extends ChangeNotifier {
     filteredTxns = [];
     filterTruncated = false;
   }
-
-  int _sum(List<Txn> txns, TxnType type) => txns
-      .where((t) => t.type == type)
-      .fold<int>(0, (a, t) => a + t.amountCents);
 
   /// 把当前月明细按日期分组（日期倒序，组内 id 倒序）
   List<(String date, List<Txn> items)> get groupedByDay => _group(monthTxns);

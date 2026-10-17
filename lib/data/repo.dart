@@ -357,9 +357,16 @@ class Repo {
   ) async {
     final db = await Db.open();
     final r = await db.rawQuery(
+      // 负数交叉归集：支出里的负数算进收入，收入里的负数算进支出
       'SELECT '
-      "  COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS exp,"
-      "  COALESCE(SUM(CASE WHEN type = 'income'  THEN amount_cents ELSE 0 END), 0) AS inc,"
+      '  COALESCE(SUM(CASE '
+      "    WHEN type = 'expense' AND amount_cents >= 0 THEN amount_cents "
+      "    WHEN type = 'income'  AND amount_cents <  0 THEN -amount_cents "
+      '    ELSE 0 END), 0) AS exp, '
+      '  COALESCE(SUM(CASE '
+      "    WHEN type = 'income'  AND amount_cents >= 0 THEN amount_cents "
+      "    WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
+      '    ELSE 0 END), 0) AS inc, '
       '  COUNT(*) AS cnt '
       'FROM txn WHERE ledger_id = ? AND date BETWEEN ? AND ?',
       [ledgerId, monthStart(month), monthEnd(month)],
@@ -379,17 +386,24 @@ class Repo {
     required TxnType type,
   }) async {
     final db = await Db.open();
+    // 对侧类型：支出饼要吸收「收入里的负数」，反之亦然
+    final other = type == TxnType.income ? TxnType.expense : TxnType.income;
     final rows = await db.rawQuery(
+      // 本侧的正数 + 对侧的负数（金额取绝对值）—— 与 monthTotals 的口径保持一致，
+      // 否则饼图分项之和会跟合计对不上
       'SELECT t.category_id AS cid, '
       "  COALESCE(c.name, '未分类') AS name, "
       "  COALESCE(c.icon, 'more')  AS icon, "
-      '  SUM(t.amount_cents) AS total, '
+      '  SUM(CASE WHEN t.amount_cents < 0 THEN -t.amount_cents'
+      '          ELSE t.amount_cents END) AS total, '
       '  COUNT(*) AS cnt '
       'FROM txn t LEFT JOIN category c ON c.id = t.category_id '
-      'WHERE t.ledger_id = ? AND t.type = ? AND t.date BETWEEN ? AND ? '
+      'WHERE t.ledger_id = ? AND t.date BETWEEN ? AND ? '
+      '  AND ((t.type = ? AND t.amount_cents >= 0)'
+      '    OR (t.type = ? AND t.amount_cents < 0)) '
       'GROUP BY t.category_id '
       'ORDER BY total DESC',
-      [ledgerId, type.code, monthStart(month), monthEnd(month)],
+      [ledgerId, monthStart(month), monthEnd(month), type.code, other.code],
     );
     return rows
         .map((m) => CatStat(
@@ -410,8 +424,14 @@ class Repo {
     final db = await Db.open();
     final rows = await db.rawQuery(
       'SELECT date, '
-      "  COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS exp,"
-      "  COALESCE(SUM(CASE WHEN type = 'income'  THEN amount_cents ELSE 0 END), 0) AS inc "
+      '  COALESCE(SUM(CASE '
+      "    WHEN type = 'expense' AND amount_cents >= 0 THEN amount_cents "
+      "    WHEN type = 'income'  AND amount_cents <  0 THEN -amount_cents "
+      '    ELSE 0 END), 0) AS exp, '
+      '  COALESCE(SUM(CASE '
+      "    WHEN type = 'income'  AND amount_cents >= 0 THEN amount_cents "
+      "    WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
+      '    ELSE 0 END), 0) AS inc '
       'FROM txn WHERE ledger_id = ? AND date BETWEEN ? AND ? '
       'GROUP BY date ORDER BY date',
       [ledgerId, monthStart(month), monthEnd(month)],
