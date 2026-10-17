@@ -49,6 +49,11 @@ class Store extends ChangeNotifier {
   // 当前月明细
   List<Txn> monthTxns = [];
 
+  // 明细筛选。筛选生效时明细页看 filteredTxns，否则看 monthTxns
+  TxnFilter filter = TxnFilter.none;
+  List<Txn> filteredTxns = [];
+  bool filterTruncated = false;
+
   /// 当前月每日汇总（日期升序），供趋势图使用
   List<(String date, int expense, int income)> dailyTotals = [];
 
@@ -124,6 +129,8 @@ class Store extends ChangeNotifier {
 
   Future<void> switchLedger(int id) async {
     ledgerId = id;
+    // 分类 ID 属于账本：带着旧条件切过去只会筛出空结果或错数据
+    _resetFilter();
     await Repo.setSetting('current_ledger_id', '$id');
     await loadAll();
   }
@@ -133,6 +140,8 @@ class Store extends ChangeNotifier {
     accounts = await Repo.listAccounts();
     netWorthCents = await Repo.totalBalanceCents();
     await loadMonth();
+    // 筛选态下必须重跑，否则删掉的记录还会挂在结果里
+    if (filtering) await applyFilter(filter);
   }
 
   /// 删除一笔（会同时回滚账户余额，由 Repo 负责）
@@ -188,10 +197,59 @@ class Store extends ChangeNotifier {
     return null;
   }
 
+  // ------------------------------------------------------------------ 筛选
+
+  bool get filtering => filter.isNotEmpty;
+
+  /// 明细页的展示源：筛选生效时看筛选结果，否则看当月全部
+  List<Txn> get visibleTxns => filtering ? filteredTxns : monthTxns;
+
+  /// 筛选结果的支出合计（不含转账，与 monthTotals 同口径）
+  int get filteredExpenseCents => _sum(filteredTxns, TxnType.expense);
+
+  /// 筛选结果的收入合计（不含转账）
+  int get filteredIncomeCents => _sum(filteredTxns, TxnType.income);
+
+  /// 应用筛选。空条件等价于「清空筛选」。
+  ///
+  /// 先查库再改状态：查询抛错时 Store 保持原样，不会留下「条件条说已经
+  /// 筛选、列表却是空的」这种假态。
+  Future<void> applyFilter(TxnFilter f) async {
+    if (f.isEmpty) {
+      _resetFilter();
+      notifyListeners();
+      return;
+    }
+    final (items, truncated) =
+        await Repo.searchTxns(ledgerId: ledgerId, filter: f);
+    filter = f;
+    filteredTxns = items;
+    filterTruncated = truncated;
+    notifyListeners();
+  }
+
+  Future<void> clearFilter() => applyFilter(TxnFilter.none);
+
+  void _resetFilter() {
+    filter = TxnFilter.none;
+    filteredTxns = [];
+    filterTruncated = false;
+  }
+
+  int _sum(List<Txn> txns, TxnType type) => txns
+      .where((t) => t.type == type)
+      .fold<int>(0, (a, t) => a + t.amountCents);
+
   /// 把当前月明细按日期分组（日期倒序，组内 id 倒序）
-  List<(String date, List<Txn> items)> get groupedByDay {
+  List<(String date, List<Txn> items)> get groupedByDay => _group(monthTxns);
+
+  /// 筛选态下的按日分组，与 groupedByDay 同构
+  List<(String date, List<Txn> items)> get groupedVisibleByDay =>
+      _group(visibleTxns);
+
+  List<(String date, List<Txn> items)> _group(List<Txn> txns) {
     final map = <String, List<Txn>>{};
-    for (final t in monthTxns) {
+    for (final t in txns) {
       map.putIfAbsent(t.date, () => []).add(t);
     }
     final keys = map.keys.toList()..sort((a, b) => b.compareTo(a));
@@ -201,6 +259,7 @@ class Store extends ChangeNotifier {
   /// 重新开库（清空数据之后用）
   Future<void> reboot() async {
     await Db.close();
+    _resetFilter();
     await boot();
   }
 }

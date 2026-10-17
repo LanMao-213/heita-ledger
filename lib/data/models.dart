@@ -390,6 +390,77 @@ class Txn {
       );
 }
 
+/// 明细筛选条件。字段为 null 表示「这一项没设」，全部为 null 即「未筛选」。
+///
+/// ★ 刻意**不提供** `copyWith` + `clearXxx` 那一套：本轮的交互是「面板
+///   整体返回一个新的 TxnFilter」+ `clearFilter()`，没有任何逐项清除的
+///   调用点。六个字段配四个 clear 标志的手写 copyWith 是全方案最容易写错
+///   的地方，没有调用点就先不写，等真需要时再加。
+class TxnFilter {
+  const TxnFilter({
+    this.type,
+    this.categoryId,
+    this.accountId,
+    this.minCents,
+    this.maxCents,
+    this.dateFrom,
+    this.dateTo,
+  });
+
+  /// 收支类型，null = 不限。转账记录不参与收支两档
+  final TxnType? type;
+
+  /// 分类。只会是支出分类（收入不按分类筛）
+  final int? categoryId;
+
+  /// 账户。转账两端都算命中（`account_id` 或 `to_account_id`）
+  final int? accountId;
+
+  final int? minCents;
+  final int? maxCents;
+
+  /// `YYYY-MM-DD`，两端都含
+  final String? dateFrom;
+  final String? dateTo;
+
+  /// 未筛选
+  static const none = TxnFilter();
+
+  bool get isEmpty =>
+      type == null &&
+      categoryId == null &&
+      accountId == null &&
+      minCents == null &&
+      maxCents == null &&
+      dateFrom == null &&
+      dateTo == null;
+
+  bool get isNotEmpty => !isEmpty;
+
+  /// 金额区间的短标签，如「¥50–200」「≥ ¥50」「≤ ¥200」。
+  ///
+  /// 分类名、账户名不在这里拼：模型层拿不到 Store 里的分类/账户字典，
+  /// 那部分由页面负责。
+  String? get amountLabel {
+    if (minCents == null && maxCents == null) return null;
+    final lo = minCents == null ? null : Fmt.money(minCents!, trimZero: true);
+    final hi = maxCents == null ? null : Fmt.money(maxCents!, trimZero: true);
+    if (lo != null && hi != null) return '¥$lo–$hi';
+    if (lo != null) return '≥ ¥$lo';
+    return '≤ ¥$hi';
+  }
+
+  /// 时间段的短标签，如「10-01 至 10-15」
+  String? get dateLabel {
+    if (dateFrom == null && dateTo == null) return null;
+    if (dateFrom != null && dateTo != null) {
+      return '${Fmt.md(dateFrom!)} 至 ${Fmt.md(dateTo!)}';
+    }
+    if (dateFrom != null) return '${Fmt.md(dateFrom!)} 起';
+    return '截至 ${Fmt.md(dateTo!)}';
+  }
+}
+
 /// 预算：`categoryId == null` 表示该账本该月的**总预算**
 class Budget {
   const Budget({

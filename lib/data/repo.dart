@@ -283,21 +283,71 @@ class Repo {
     return rows.map(Txn.fromMap).toList();
   }
 
-  /// 跨月搜索（关键词命中备注）
-  static Future<List<Txn>> searchTxns({
+  /// 跨月检索：关键词（备注）+ 多条件筛选，全部 AND 组合。
+  ///
+  /// 返回 `(结果, 是否被上限截断)`。多查一条来判定截断 —— 只返回列表的话，
+  /// 「正好 500 条」和「500 条之外还有」在调用方无法区分，界面上那句
+  /// 「仅显示前 500 条」就落不了地。
+  static const int searchLimit = 500;
+
+  static Future<(List<Txn>, bool)> searchTxns({
     required int ledgerId,
-    required String keyword,
-    int limit = 200,
+    String? keyword,
+    TxnFilter? filter,
+    int limit = searchLimit,
   }) async {
+    final where = <String>['ledger_id = ?'];
+    final args = <Object?>[ledgerId];
+
+    final k = keyword?.trim() ?? '';
+    if (k.isNotEmpty) {
+      where.add('note LIKE ?');
+      args.add('%$k%');
+    }
+    if (filter?.type != null) {
+      where.add('type = ?');
+      args.add(filter!.type!.code);
+    }
+    if (filter?.categoryId != null) {
+      where.add('category_id = ?');
+      args.add(filter!.categoryId);
+    }
+    final accountId = filter?.accountId;
+    if (accountId != null) {
+      // 转账的转出与转入都算「涉及该账户」；漏掉 to_account_id 会让转账记录凭空消失
+      where.add('(account_id = ? OR to_account_id = ?)');
+      args
+        ..add(accountId)
+        ..add(accountId);
+    }
+    if (filter?.minCents != null) {
+      where.add('amount_cents >= ?');
+      args.add(filter!.minCents);
+    }
+    if (filter?.maxCents != null) {
+      where.add('amount_cents <= ?');
+      args.add(filter!.maxCents);
+    }
+    if (filter?.dateFrom != null) {
+      where.add('date >= ?');
+      args.add(filter!.dateFrom);
+    }
+    if (filter?.dateTo != null) {
+      where.add('date <= ?');
+      args.add(filter!.dateTo);
+    }
+
     final db = await Db.open();
     final rows = await db.query(
       'txn',
-      where: 'ledger_id = ? AND note LIKE ?',
-      whereArgs: [ledgerId, '%${keyword.trim()}%'],
+      where: where.join(' AND '),
+      whereArgs: args,
       orderBy: 'date DESC, id DESC',
-      limit: limit,
+      limit: limit + 1, // 多取一条，只为判断有没有被截断
     );
-    return rows.map(Txn.fromMap).toList();
+    final truncated = rows.length > limit;
+    final page = truncated ? rows.sublist(0, limit) : rows;
+    return (page.map(Txn.fromMap).toList(), truncated);
   }
 
   /// 月收支合计

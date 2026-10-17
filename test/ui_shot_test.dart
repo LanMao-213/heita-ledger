@@ -152,6 +152,44 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 600));
     await _shot(tester, 'build/visual/shot_5_record.png');
     expect(tester.takeException(), isNull, reason: '记一笔面板有布局溢出');
+
+    // ---- 筛选面板 ----
+    // 先点遮罩把记一笔关掉（面板占了下半屏，顶部遮罩还能点到）
+    await tester.tapAt(const Offset(195, 60));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.tune_rounded));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    await _shot(tester, 'build/visual/shot_8_filter_sheet.png');
+    expect(tester.takeException(), isNull, reason: '筛选面板有布局溢出');
+
+    // ---- 筛选生效后的明细页 ----
+    // 面板里的实时计数会走真实数据库（假时钟里 await 不到），这里直接从
+    // Store 应用条件，专门验证明细页筛选态的版式：条件条 + 结果摘要 + 列表
+    await tester.tapAt(const Offset(195, 40));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      final cats = await Repo.listCategories(
+        Store.i.ledgerId,
+        type: TxnType.expense,
+      );
+      final food = cats.firstWhere((c) => c.name == '餐饮').id;
+      await Store.i.applyFilter(TxnFilter(
+        categoryId: food,
+        minCents: 2000,
+        maxCents: 20000,
+      ));
+    });
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_9_filter_result.png');
+    expect(tester.takeException(), isNull, reason: '筛选结果页有布局溢出');
+
+    // ---- 筛选空结果态 ----
+    await tester.runAsync(() async {
+      await Store.i.applyFilter(const TxnFilter(minCents: 999999900));
+    });
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_10_filter_empty.png');
+    expect(tester.takeException(), isNull, reason: '筛选空结果页有布局溢出');
   });
 }
 

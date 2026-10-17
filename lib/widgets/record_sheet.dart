@@ -7,6 +7,7 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import 'common.dart';
+import 'pickers.dart';
 
 /// 打开「记一笔」面板。传入 [editing] 则为编辑模式。
 /// 返回 true 表示保存成功。
@@ -343,7 +344,7 @@ class _RecordSheetState extends State<RecordSheet> {
               padding: const EdgeInsets.only(bottom: S.sm),
               child: Column(
                 children: [
-                  _CategoryGrid(
+                  CategoryGrid(
                     cats: _cats,
                     selected: _categoryId,
                     onSelect: (id) => setState(() => _categoryId = id),
@@ -483,82 +484,6 @@ class _AmountDisplay extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CategoryGrid extends StatelessWidget {
-  const _CategoryGrid({
-    required this.cats,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final List<Category> cats;
-  final int? selected;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    if (cats.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: S.xl),
-        child: Text('还没有分类，请先到「我的 → 分类管理」添加', style: T.caption),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, 0),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 5,
-          mainAxisSpacing: S.sm,
-          crossAxisSpacing: S.sm,
-          childAspectRatio: 0.86,
-        ),
-        itemCount: cats.length,
-        itemBuilder: (context, i) {
-          final c = cats[i];
-          final on = c.id == selected;
-          return GestureDetector(
-            onTap: () => onSelect(c.id),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: on ? C.ink : C.bg2,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Center(
-                    child: LineIcon(
-                      c.icon,
-                      size: 21,
-                      color: on ? C.bg : C.ink2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  c.name,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: on ? C.ink : C.ink2,
-                    fontWeight: on ? FontWeight.w500 : FontWeight.w400,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }
