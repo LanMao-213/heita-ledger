@@ -17,6 +17,18 @@ class StatsPage extends StatefulWidget {
 class _StatsPageState extends State<StatsPage> {
   TxnType _type = TxnType.expense;
 
+  /// 点趋势图某天 → 明细页只看那天。
+  ///
+  /// 直接复用筛选那套（TxnFilter + applyFilter），不另造一条「按日查看」的通路，
+  /// 这样条件条、清空、与搜索共存等行为都跟手动筛选完全一致。
+  Future<void> _openDay(int day) async {
+    final s = Store.i;
+    final date = '${s.month}-${day.toString().padLeft(2, '0')}';
+    // 先切页再查库：切页是即时的，查询要走一次 SQL，先切能少一拍空等
+    s.switchTab(0);
+    await s.applyFilter(TxnFilter(dateFrom: date, dateTo: date));
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
@@ -150,7 +162,7 @@ class _StatsPageState extends State<StatsPage> {
 
               if (_type.isExpense) ...[
                 const SectionTitle('每日支出'),
-                const SectionCard(child: _DailyTrend()),
+                SectionCard(child: _DailyTrend(onDayTap: _openDay)),
               ],
             ],
           ],
@@ -161,7 +173,9 @@ class _StatsPageState extends State<StatsPage> {
 }
 
 class _DailyTrend extends StatelessWidget {
-  const _DailyTrend();
+  const _DailyTrend({required this.onDayTap});
+
+  final ValueChanged<int> onDayTap;
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +194,20 @@ class _DailyTrend extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DailyBars(dayCount: dayCount, values: values, highlightDay: today),
+        DailyBars(
+          dayCount: dayCount,
+          values: values,
+          highlightDay: today,
+          onDayTap: (d) {
+            // 点空白天没必要跳过去看一个空列表
+            final v = values[d] ?? 0;
+            if (v <= 0) {
+              showToast(context, '这天没有支出');
+              return;
+            }
+            onDayTap(d);
+          },
+        ),
         const SizedBox(height: S.sm),
         Row(
           children: [

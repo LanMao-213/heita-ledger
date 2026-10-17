@@ -22,7 +22,6 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  int _index = 0;
   bool _recurringNotified = false;
 
   static const _tabs = [
@@ -57,25 +56,29 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: C.bg,
-      body: SafeArea(
-        bottom: false,
-        child: IndexedStack(
-          index: _index,
-          children: const [
-            DetailPage(),
-            StatsPage(),
-            PlanPage(),
-            MinePage(),
-          ],
+    final store = Store.i;
+    return AnimatedBuilder(
+      animation: store,
+      builder: (context, _) => Scaffold(
+        backgroundColor: C.bg,
+        body: SafeArea(
+          bottom: false,
+          child: IndexedStack(
+            index: store.tabIndex,
+            children: const [
+              DetailPage(),
+              StatsPage(),
+              PlanPage(),
+              MinePage(),
+            ],
+          ),
         ),
-      ),
-      bottomNavigationBar: _TabBar(
-        index: _index,
-        tabs: _tabs,
-        onSelect: (i) => setState(() => _index = i),
-        onRecord: _openRecord,
+        bottomNavigationBar: _TabBar(
+          index: store.tabIndex,
+          tabs: _tabs,
+          onSelect: store.switchTab,
+          onRecord: _openRecord,
+        ),
       ),
     );
   }

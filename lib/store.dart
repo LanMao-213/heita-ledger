@@ -14,6 +14,17 @@ class Store extends ChangeNotifier {
 
   bool ready = false;
 
+  /// 底部导航当前页：0 明细 / 1 图表 / 2 计划 / 3 我的。
+  /// 放在 Store 里是为了让统计页「点某天看明细」能跨页切 Tab，
+  /// 而不用给 HomeShell 开一个谁都能调的全局 key。
+  int tabIndex = 0;
+
+  void switchTab(int i) {
+    if (tabIndex == i) return;
+    tabIndex = i;
+    notifyListeners();
+  }
+
   // 账本
   List<Ledger> ledgers = [];
   int ledgerId = 0;

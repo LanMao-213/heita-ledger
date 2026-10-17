@@ -106,6 +106,7 @@ class DailyBars extends StatelessWidget {
     required this.values,
     this.height = 76,
     this.highlightDay,
+    this.onDayTap,
   });
 
   final int dayCount;
@@ -113,9 +114,12 @@ class DailyBars extends StatelessWidget {
   final double height;
   final int? highlightDay;
 
+  /// 点了第几天（1 起）。给了回调才接手势，否则保持纯展示。
+  final ValueChanged<int>? onDayTap;
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final chart = SizedBox(
       height: height,
       child: CustomPaint(
         painter: _BarsPainter(
@@ -125,6 +129,22 @@ class DailyBars extends StatelessWidget {
         ),
         size: Size.infinite,
       ),
+    );
+    if (onDayTap == null) return chart;
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: (d) {
+            if (dayCount <= 0 || c.maxWidth <= 0) return;
+            final slot = c.maxWidth / dayCount;
+            final day = (d.localPosition.dx / slot).floor() + 1;
+            if (day >= 1 && day <= dayCount) onDayTap!(day);
+          },
+          child: chart,
+        );
+      },
     );
   }
 }
