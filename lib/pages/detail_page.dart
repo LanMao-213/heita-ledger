@@ -490,9 +490,19 @@ class _Metric extends StatelessWidget {
       children: [
         Text(label, style: T.caption),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: T.hero.copyWith(fontSize: emphasize ? 30 : 24),
+        // 金额到五位数（比如房租 1,953,500.00）会超出半张卡片的宽度，
+        // 原来会折成「1,953,500.」+「00」两行 —— 用 FittedBox 等比缩一点，
+        // 始终单行显示。数字短时 scaleDown 不会放大，字号不变。
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: align == CrossAxisAlignment.end
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: T.hero.copyWith(fontSize: emphasize ? 30 : 24),
+          ),
         ),
       ],
     );

@@ -43,6 +43,8 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   final _minCtrl = TextEditingController();
   final _maxCtrl = TextEditingController();
+  final _minFocus = FocusNode();
+  final _maxFocus = FocusNode();
 
   Timer? _debounce;
   int _count = 0;
@@ -68,6 +70,8 @@ class _FilterSheetState extends State<_FilterSheet> {
     _debounce?.cancel();
     _minCtrl.dispose();
     _maxCtrl.dispose();
+    _minFocus.dispose();
+    _maxFocus.dispose();
     super.dispose();
   }
 
@@ -394,37 +398,51 @@ class _FilterSheetState extends State<_FilterSheet> {
       padding: const EdgeInsets.symmetric(horizontal: S.lg),
       child: Row(
         children: [
-          Expanded(child: _amountField(_minCtrl, '起')),
+          Expanded(child: _amountField(_minCtrl, _minFocus, '起')),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: S.sm),
             child: Text('—', style: TextStyle(color: C.ink4)),
           ),
-          Expanded(child: _amountField(_maxCtrl, '止')),
+          Expanded(child: _amountField(_maxCtrl, _maxFocus, '止')),
         ],
       ),
     );
   }
 
-  Widget _amountField(TextEditingController ctrl, String hint) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-      ],
-      style: T.body,
-      onChanged: (_) => _scheduleCount(),
-      decoration: InputDecoration(
-        isDense: true,
-        hintText: hint,
-        hintStyle: const TextStyle(color: C.ink4, fontSize: 14.5),
-        filled: true,
-        fillColor: C.bg2,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: S.md, vertical: 12),
-        border: OutlineInputBorder(
+  Widget _amountField(
+    TextEditingController ctrl,
+    FocusNode focus,
+    String hint,
+  ) {
+    // 触摸目标撑到 48dp（原来 isDense + 上下 12 的 padding 只有 40dp 左右，
+    // 点起来发飘），并且整格都能聚焦：灰底之外那圈空白也接手势，
+    // 手指偏差个十几像素也不会点空。
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (!focus.hasFocus) focus.requestFocus();
+      },
+      child: Container(
+        height: 48,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: S.md),
+        decoration: BoxDecoration(
+          color: C.bg2,
           borderRadius: BorderRadius.circular(R.md),
-          borderSide: BorderSide.none,
+        ),
+        child: TextField(
+          controller: ctrl,
+          focusNode: focus,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          style: T.body,
+          onChanged: (_) => _scheduleCount(),
+          decoration: InputDecoration.collapsed(
+            hintText: hint,
+            hintStyle: const TextStyle(color: C.ink4, fontSize: 14.5),
+          ),
         ),
       ),
     );
