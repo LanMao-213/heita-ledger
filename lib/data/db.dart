@@ -20,7 +20,7 @@ class Db {
   static String fileName = _fileName;
 
   /// 2：`txn_template` 增加 `use_count` / `last_used_at`（模板按使用频率排序）
-  static const _version = 2;
+  static const _version = 3;
 
   static Future<Database> open() async {
     if (_db != null) return _db!;
@@ -44,6 +44,10 @@ class Db {
           await db.execute(
             'ALTER TABLE txn_template ADD COLUMN last_used_at TEXT',
           );
+        }
+        if (oldVersion < 3) {
+          // 补后加的种子分类。用户自己建过同名的就不插，避免出现两个「提成」
+          await _addMissingIncomeCategories(db);
         }
       },
     );
@@ -248,6 +252,7 @@ class Db {
     const income = [
       ('工资', 'salary'),
       ('奖金', 'bonus'),
+      ('提成', 'bonus'),
       ('兼职', 'parttime'),
       ('理财', 'invest'),
       ('红包', 'redpacket'),
@@ -275,6 +280,85 @@ class Db {
         'sort_order': order++,
         'archived': 0,
       });
+    }
+  }
+
+  /// 老用户升级时补齐后来新增的收入分类。
+  ///
+  /// 三条纪律：
+  /// 1. **按「账本 + 类型 + 名称」查重**：用户可能早早自建了同名分类，
+  ///    直接 insert 会出现两个「提成」，在筛选和统计里各算一半。
+  /// 2. **紧跟「奖金」**：工资 / 奖金 / 提成 都属于劳动所得，视觉上应该相邻。
+  ///    插到末尾会跟「兼职 / 理财 / 红包」混在一起，看起来像另一类东西。
+  /// 3. **实在找不到锚点就排到最后**：收入分类的 sort_order 是独立编号的
+  ///    （expense / income 各自从 0 开始，同账本内有重复值），所以 UPDATE
+  ///    必须限定 type，否则会把支出分类一起往后推。
+  static Future<void> _addMissingIncomeCategories(Database db) async {
+    // 迁移链是多版本叠加的：从 v1 直接升上来时，中间版本建的表不一定齐
+    // （单测里就有只建 txn_template 的库）。缺表就跳过，别让整个升级抛异常
+    // —— 那会让 App 在启动阶段直接打不开，比少一个分类严重得多。
+    final hasTable = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ledger'",
+    );
+    if (hasTable.isEmpty) return;
+
+    const added = [('提成', 'bonus')];
+    final ledgers = await db.query('ledger', columns: ['id']);
+    for (final row in ledgers) {
+      final ledgerId = row['id'] as int;
+      for (final (name, icon) in added) {
+        final dup = await db.query(
+          'category',
+          columns: ['id'],
+          where: 'ledger_id = ? AND type = ? AND name = ?',
+          whereArgs: [ledgerId, 'income', name],
+          limit: 1,
+        );
+        if (dup.isNotEmpty) continue;
+
+        // 锚点：奖金（插在它后面）> 其他（插在它前面）> 末尾
+        int? anchor;
+        for (final (key, after) in const [('奖金', true), ('其他', false)]) {
+          final hit = await db.query(
+            'category',
+            columns: ['sort_order'],
+            where: 'ledger_id = ? AND type = ? AND name = ?',
+            whereArgs: [ledgerId, 'income', key],
+            limit: 1,
+          );
+          if (hit.isNotEmpty) {
+            anchor = (hit.first['sort_order'] as int) + (after ? 1 : 0);
+            break;
+          }
+        }
+
+        final int order;
+        if (anchor != null) {
+          // 「其他」当前占着这个位子，往后让一格；提到奖金后面时同理
+          order = anchor;
+          await db.execute(
+            "UPDATE category SET sort_order = sort_order + 1 "
+            "WHERE ledger_id = ? AND type = 'income' AND sort_order >= ?",
+            [ledgerId, anchor],
+          );
+        } else {
+          final maxRow = await db.rawQuery(
+            "SELECT MAX(sort_order) AS m FROM category "
+            "WHERE ledger_id = ? AND type = 'income'",
+            [ledgerId],
+          );
+          order = ((maxRow.first['m'] as int?) ?? -1) + 1;
+        }
+
+        await db.insert('category', {
+          'ledger_id': ledgerId,
+          'type': 'income',
+          'name': name,
+          'icon': icon,
+          'sort_order': order,
+          'archived': 0,
+        });
+      }
     }
   }
 }
