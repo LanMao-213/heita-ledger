@@ -89,7 +89,8 @@ class _CalendarPicker extends StatefulWidget {
 class _CalendarPickerState extends State<_CalendarPicker> {
   /// 每个月的块高固定 —— 只有定高，`initialScrollOffset` 才能一次算准，
   /// 否则要在首帧之后才知道要滚多远，打开时会闪一下。
-  static const _blockH = 278.0;
+  /// 内容是 275 左右，留 10 的余量给「系统字体放大」那种情况。
+  static const _blockH = 286.0;
 
   late final List<String> _months;
   late final ScrollController _ctl;
