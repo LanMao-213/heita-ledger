@@ -144,7 +144,7 @@ class _NoteWheelSheetState extends State<_NoteWheelSheet> {
                     itemExtent: 40,
                     onSelectedItemChanged: _onCatChanged,
                     selectionOverlay: const CupertinoPickerDefaultSelectionOverlay(
-                      background: Color(0x0F14161A),
+                      background: C.inkWash,
                     ),
                     children: [
                       for (var i = 0; i < cats.length; i++)
@@ -161,7 +161,7 @@ class _NoteWheelSheetState extends State<_NoteWheelSheet> {
                     itemExtent: 40,
                     onSelectedItemChanged: (i) => setState(() => _hintIndex = i),
                     selectionOverlay: const CupertinoPickerDefaultSelectionOverlay(
-                      background: Color(0x0F14161A),
+                      background: C.inkWash,
                     ),
                     children: [
                       for (var i = 0; i < hints.length; i++)

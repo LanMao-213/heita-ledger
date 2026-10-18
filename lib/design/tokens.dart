@@ -17,6 +17,9 @@ abstract final class C {
   /// 占位 / 弱分割
   static const ink4 = Color(0xFFC4C9CF);
 
+  /// 轮盘类选择器的选中行遮罩（ink 的 6% 叠色）
+  static const inkWash = Color(0x0F14161A);
+
   static const bg = Color(0xFFFFFFFF);
 
   /// 卡片 / 输入底色
