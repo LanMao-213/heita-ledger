@@ -35,27 +35,45 @@ void main() {
 
   group('cycleRange', () {
     test('账单日当天算新一期（不是前一天）', () {
-      expect(cycleRange(DateTime(2026, 10, 15), 15), ('2026-10-15', '2026-11-14'));
+      expect(cycleRange(DateTime(2026, 10, 15), 15), (
+        '2026-10-15',
+        '2026-11-14',
+      ));
     });
 
     test('账单日前一天算上一期', () {
-      expect(cycleRange(DateTime(2026, 10, 14), 15), ('2026-09-15', '2026-10-14'));
+      expect(cycleRange(DateTime(2026, 10, 14), 15), (
+        '2026-09-15',
+        '2026-10-14',
+      ));
     });
 
     test('账单日为 1 时完全等于自然月（老用户零感知的前提）', () {
-      expect(cycleRange(DateTime(2026, 10, 17), 1), ('2026-10-01', '2026-10-31'));
+      expect(cycleRange(DateTime(2026, 10, 17), 1), (
+        '2026-10-01',
+        '2026-10-31',
+      ));
       expect(cycleRange(DateTime(2026, 2, 1), 1), ('2026-02-01', '2026-02-28'));
     });
 
     test('12 月的期跨年', () {
-      expect(cycleRange(DateTime(2026, 12, 20), 15), ('2026-12-15', '2027-01-14'));
+      expect(cycleRange(DateTime(2026, 12, 20), 15), (
+        '2026-12-15',
+        '2027-01-14',
+      ));
     });
 
     test('2 月被收拢后仍能正常成期', () {
       // 2026 年 2 月的账单日 31 → 28 号；下一期从 3-31 起
-      expect(cycleRange(DateTime(2026, 2, 28), 31), ('2026-02-28', '2026-03-30'));
+      expect(cycleRange(DateTime(2026, 2, 28), 31), (
+        '2026-02-28',
+        '2026-03-30',
+      ));
       // 2 月 27 日还留在上一期（1-31 ~ 2-27）
-      expect(cycleRange(DateTime(2026, 2, 27), 31), ('2026-01-31', '2026-02-27'));
+      expect(cycleRange(DateTime(2026, 2, 27), 31), (
+        '2026-01-31',
+        '2026-02-27',
+      ));
     });
   });
 
@@ -144,6 +162,11 @@ void main() {
       expect(cycleLabel('2026-10-15', '2026-11-14'), '10-15 → 11-14');
     });
 
+    test('概览卡文案用点分 + en dash，不用箭头', () {
+      expect(periodLabel('2026-10-01', '2026-10-31'), '10.01 – 10.31');
+      expect(dotYmd('2026-09-05'), '09.05');
+    });
+
     test('判断是否本期', () {
       const from = '2026-10-15';
       const to = '2026-11-14';
@@ -151,6 +174,26 @@ void main() {
       expect(isCurrentCycle(from, to, now: DateTime(2026, 10, 14)), isFalse);
       expect(isCurrentCycle(from, to, now: DateTime(2026, 11, 14)), isTrue);
       expect(isCurrentCycle(from, to, now: DateTime(2026, 11, 15)), isFalse);
+    });
+  });
+
+  group('日历范围', () {
+    test('范围以今天为基准，不是写死的上下限', () {
+      // 2026-10 打开：往前 23 个月、往后 3 个月
+      final a = calendarRange('2026-10', now: DateTime(2026, 10, 18));
+      expect(a.$1, '2024-11');
+      expect(a.$2, '2027-01');
+
+      // 到了 2027-02 再打开，上界自己推到 2027-05 —— 不会停在「只到 1 月」
+      final b = calendarRange('2027-02', now: DateTime(2027, 2, 5));
+      expect(b.$1, '2025-03');
+      expect(b.$2, '2027-05');
+    });
+
+    test('翻到很早的账时，下界跟着 anchor 一起往前挪', () {
+      final r = calendarRange('2023-01', now: DateTime(2026, 10, 18));
+      expect(r.$1, '2021-02');
+      expect(r.$2, '2027-01');
     });
   });
 }

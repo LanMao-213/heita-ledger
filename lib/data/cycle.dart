@@ -103,3 +103,26 @@ String dotYmd(String ymd) {
   final p = ymd.split('-');
   return p.length == 3 ? '${p[1]}.${p[2]}' : ymd;
 }
+
+/// 日历能翻的范围（`YYYY-MM`，含两端）。
+///
+/// 上下界都是以**今天**为基准往前/往后数的，不是写死的某一年：
+/// 2026-10 打开是 2023-11…2027-01，到了 2027-02 再打开就是 2024-03…2027-05。
+/// 所以「只能翻到 27 年 1 月」不是上限，是这个月的上限。
+///
+/// [anchorYm] 是打开时要停住的那个月，必须落在范围里 —— 翻到很旧的账
+/// （比如账单日是两年前某月）时，下界会跟着 [anchorYm] 一起往前挪。
+(String, String) calendarRange(
+  String anchorYm, {
+  DateTime? now,
+  int back = 23,
+  int forward = 3,
+}) {
+  final thisYm = Fmt.month(now ?? DateTime.now());
+  final earlier = thisYm.compareTo(anchorYm) < 0 ? thisYm : anchorYm;
+  final later = thisYm.compareTo(anchorYm) > 0 ? thisYm : anchorYm;
+  final oldest = Fmt.shiftMonth(earlier, -back);
+  var newest = Fmt.shiftMonth(later, forward);
+  if (newest.compareTo(anchorYm) < 0) newest = anchorYm;
+  return (oldest, newest);
+}

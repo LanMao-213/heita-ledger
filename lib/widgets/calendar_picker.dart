@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
 import '../design/tokens.dart';
@@ -101,8 +102,8 @@ class _CalendarPickerState extends State<_CalendarPicker> {
   static const _dot = 30.0;
 
   late final String _anchorYm;
-  late final String _oldestYm;
-  late final String _newestYm;
+  late String _oldestYm;
+  late String _newestYm;
 
   /// 第一格（最早那个月上月里的周日）—— 所有行号都相对它算
   late final DateTime _base;
@@ -128,11 +129,12 @@ class _CalendarPickerState extends State<_CalendarPicker> {
   void initState() {
     super.initState();
     _anchorYm = _monthOf(widget.initialMonth ?? widget.from);
-    final thisYm = Fmt.month(DateTime.now());
 
-    // 往下多留一个月（「下面是下月」），往前留两年（够翻回老账）
-    _newestYm = _later(Fmt.shiftMonth(thisYm, 1), _anchorYm);
-    _oldestYm = Fmt.shiftMonth(_earlier(thisYm, _anchorYm), -23);
+    // 范围跟着「今天」走（往前两年、往后三个月），不是写死的上下限 ——
+    // 到 2027 年 2 月再打开，上界自己就变成 2027-05
+    final range = calendarRange(_anchorYm);
+    _oldestYm = range.$1;
+    _newestYm = range.$2;
 
     // 整条日历的起止：最早月 1 号所在周的周日 → 最晚月最后一天所在周的周六。
     // 用 UTC 做日加减，避免夏令时把「差几天」算错（国内没有，但别留坑）
@@ -165,10 +167,6 @@ class _CalendarPickerState extends State<_CalendarPicker> {
 
   static String _monthOf(String ymd) =>
       ymd.length >= 7 ? ymd.substring(0, 7) : Fmt.month(DateTime.now());
-
-  static String _later(String a, String b) => a.compareTo(b) > 0 ? a : b;
-
-  static String _earlier(String a, String b) => a.compareTo(b) < 0 ? a : b;
 
   /// 第 [i] 格是哪天
   String _dateAt(int i) => Fmt.date(_base.add(Duration(days: i)));
@@ -242,7 +240,10 @@ class _CalendarPickerState extends State<_CalendarPicker> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final h = (media.size.height * 0.58).clamp(320.0, 470.0);
+    // 高度只给「当月 + 上下各一行」：多出来的行只是灰色上/下月，
+    // 占着屏幕不干活。月行数 4–6 不等，所以高度跟着当月走，不是写死的
+    final rows = _rowOf(Fmt.shiftMonth(_anchorYm, 1)) - _rowOf(_anchorYm);
+    final h = ((rows + 2) * _rowH).clamp(260.0, 470.0);
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewPadding.bottom),
       child: Container(
@@ -267,7 +268,9 @@ class _CalendarPickerState extends State<_CalendarPicker> {
               height: h,
               child: LayoutBuilder(
                 builder: (context, cons) {
-                  _topPad = cons.maxHeight * 0.22;
+                  // 上下各留一行：滚到最早/最晚的那一端时，那个月刚好完整停住，
+                  // 只多出一行灰的邻月 —— 和打开时的样子对称，不会露出半屏空白
+                  _topPad = _rowH;
                   _scheduleJump();
                   return Stack(
                     children: [
@@ -277,10 +280,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
                         controller: _ctl,
                         itemExtent: _rowH,
                         itemCount: _rowCount,
-                        padding: EdgeInsets.only(
-                          top: _topPad,
-                          bottom: cons.maxHeight * 0.58,
-                        ),
+                        padding: EdgeInsets.only(top: _topPad, bottom: _rowH),
                         itemBuilder: (context, i) => _weekRow(i),
                       ),
                     ],

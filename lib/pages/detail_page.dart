@@ -323,21 +323,21 @@ class _PeriodHead extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        height: 34,
+        height: 36,
         child: Row(
           children: [
             const Text(
               '本期支出',
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: 15,
                 fontWeight: FontWeight.w500,
                 color: C.ink2,
                 height: 1.2,
               ),
             ),
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6),
-              child: Text('·', style: TextStyle(fontSize: 13, color: C.ink4)),
+              padding: EdgeInsets.symmetric(horizontal: 7),
+              child: Text('·', style: TextStyle(fontSize: 14, color: C.ink4)),
             ),
             Flexible(
               child: Text(
