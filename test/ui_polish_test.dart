@@ -18,6 +18,7 @@ import 'package:ledger/data/cycle.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/design/tokens.dart';
 import 'package:ledger/pages/detail_page.dart';
 import 'package:ledger/pages/mine_page.dart';
 import 'package:ledger/store.dart';
@@ -56,36 +57,42 @@ void main() {
       accId = s.accounts.first.id;
 
       final now = Fmt.today();
-      await Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: ledgerId,
-        type: TxnType.expense,
-        amountCents: 1200,
-        date: now,
-        categoryId: foodId,
-        accountId: accId,
-        note: '午饭',
-      ));
-      await Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: ledgerId,
-        type: TxnType.expense,
-        amountCents: 800,
-        date: now,
-        categoryId: foodId,
-        accountId: accId,
-        note: '咖啡',
-      ));
-      await Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: ledgerId,
-        type: TxnType.income,
-        amountCents: 500000,
-        date: now,
-        categoryId: salaryId,
-        accountId: accId,
-        note: '工资',
-      ));
+      await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.expense,
+          amountCents: 1200,
+          date: now,
+          categoryId: foodId,
+          accountId: accId,
+          note: '午饭',
+        ),
+      );
+      await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.expense,
+          amountCents: 800,
+          date: now,
+          categoryId: foodId,
+          accountId: accId,
+          note: '咖啡',
+        ),
+      );
+      await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.income,
+          amountCents: 500000,
+          date: now,
+          categoryId: salaryId,
+          accountId: accId,
+          note: '工资',
+        ),
+      );
       await s.loadCycle();
       await s.loadStats();
       // Store 是单例：上一个测试留下的筛选状态会带过来，
@@ -152,13 +159,13 @@ void main() {
     final s = Store.i;
 
     // 周期还在
-    expect(find.text(cycleLabel(s.cycleFrom, s.cycleTo)), findsOneWidget);
+    expect(find.text(periodLabel(s.cycleFrom, s.cycleTo)), findsOneWidget);
     // 但没有左右箭头 —— 翻期交给日历
     expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
     expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
 
     // 点这行日期文字 → 日历卡片（上下滚动，不是左右翻月）
-    await tester.tap(find.text(cycleLabel(s.cycleFrom, s.cycleTo)));
+    await tester.tap(find.text(periodLabel(s.cycleFrom, s.cycleTo)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -176,20 +183,55 @@ void main() {
     await pumpDetail(tester);
     final s = Store.i;
 
-    await tester.tap(find.text(cycleLabel(s.cycleFrom, s.cycleTo)));
+    await tester.tap(find.text(periodLabel(s.cycleFrom, s.cycleTo)));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     final thisYear = DateTime.now().year;
     expect(find.text('$thisYear'), findsOneWidget);
 
-    // 往前滑 12 个月（块高 342），年份必须跟着变 —— 而不是一直显示今年。
-    // 页面里还有别的 ListView，所以从月份标签上起手拖
-    await tester.dragFrom(
-      tester.getCenter(find.text('${DateTime.now().month} 月')),
-      const Offset(0, -342.0 * 12),
-    );
+    // 整条日历按周铺开（一行 52 高），12 个月约 52 行。
+    // 手指下移 = 回到更早的月份；页面里还有明细的 ListView，
+    // 从日历这一层（后插入的那个）起手
+    await tester.drag(find.byType(ListView).last, const Offset(0, 52.0 * 52));
     await tester.pumpAndSettle();
     expect(find.text('$thisYear'), findsNothing);
     expect(find.text('${thisYear - 1}'), findsOneWidget);
+  });
+
+  testWidgets('日历滚到下个月，黑的那一档跟着换过去', (tester) async {
+    await seed(tester);
+    await pumpDetail(tester);
+    final s = Store.i;
+
+    await tester.tap(find.text(periodLabel(s.cycleFrom, s.cycleTo)));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    // 往下滚 5 行（一行 52）≈ 跨进下个月。按「画面里格数最多的月」判当月，
+    // 不能按视口中心那一格：跨月行（29 30 | 1 2 3 4 5）的第 4 格其实是下月，
+    // 中心点一落进去，整屏就跟着反了
+    await tester.drag(find.byType(ListView).last, const Offset(0, -260));
+    await tester.pumpAndSettle();
+
+    Color? colorOf(String date) => tester
+        .widget<Text>(
+          find
+              .descendant(
+                of: find.byKey(ValueKey('cal-$date')),
+                matching: find.byType(Text),
+              )
+              .first,
+        )
+        .style
+        ?.color;
+
+    final now = DateTime.now();
+    final nextMonth = DateTime(now.year, now.month + 1, 15);
+    // 下个月整月都在本期之外，用 ink2 —— 深灰，和「不在当月」的 ink4 拉开
+    expect(colorOf(Fmt.date(nextMonth)), C.ink2, reason: '当月要压得住非当月');
+    expect(
+      colorOf(Fmt.date(DateTime(now.year, now.month + 1, 0))),
+      C.ink4,
+      reason: '已经划走的上个月要退到最淡',
+    );
   });
 
   testWidgets('日历里点上个月的 1 号 → 明细跳到那一期', (tester) async {
@@ -197,22 +239,19 @@ void main() {
     await pumpDetail(tester);
     final s = Store.i;
 
-    await tester.tap(find.text(cycleLabel(s.cycleFrom, s.cycleTo)));
+    await tester.tap(find.text(periodLabel(s.cycleFrom, s.cycleTo)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    // 列表最新在上：第 0 块是本月，第 1 块是上月。
-    // 每个月是一段 Column（不再是 GridView），按年月标签定位第 1 块。
+    // 上月 1 号在初始视口上方（打开时只露出上月末两行多），
+    // 先往回滚一点让它进入可点范围，再按日期 key 精确点名 ——
+    // 同屏有上月末、本月、下月初三个「1」，靠文字找不准
     final prev = DateTime(DateTime.now().year, DateTime.now().month - 1, 1);
-    final prevYm =
-        '${prev.year}-${prev.month.toString().padLeft(2, '0')}';
-    await tester.tap(find.descendant(
-      of: find.ancestor(
-        of: find.text('${prev.month} 月'),
-        matching: find.byType(Column),
-      ).first,
-      matching: find.text('1'),
-    ));
+    final prevYm = '${prev.year}-${prev.month.toString().padLeft(2, '0')}';
+
+    await tester.drag(find.byType(ListView).last, const Offset(0, 300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('cal-$prevYm-01')));
     await settle(tester);
 
     expect(s.cycleFrom, '$prevYm-01');

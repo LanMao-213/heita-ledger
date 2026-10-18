@@ -12,6 +12,11 @@ import '../store.dart';
 /// 眼睛还要重新定位。上下滚动把时间直接铺成一条线，一次滑动就能跨半年，
 /// 而且「往上=更早、往下=更近」是所有人都熟悉的方向感。
 ///
+/// 为什么是**一条连续的周列表**而不是一个个月块：
+/// 按月分块时，块与块之间必然夹着「上月末半行空位 + 本月首半行空位」，
+/// 同一个星期会被画两遍，日期读起来是断的。改成整条日历按周铺开之后，
+/// 10 月 31 日（周六）下面紧接着就是 11 月 1 日（周日），中间不留缝。
+///
 /// 顶上是**真正吸顶**的两行（年份 + 周几）：它们不在滚动区里，滑多远都在。
 Future<String?> showCalendarPicker(
   BuildContext context, {
@@ -24,11 +29,8 @@ Future<String?> showCalendarPicker(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.35),
-    builder: (_) => _CalendarPicker(
-      from: from,
-      to: to,
-      initialMonth: initialMonth,
-    ),
+    builder: (_) =>
+        _CalendarPicker(from: from, to: to, initialMonth: initialMonth),
   );
 }
 
@@ -91,61 +93,63 @@ class _CalendarPicker extends StatefulWidget {
 }
 
 class _CalendarPickerState extends State<_CalendarPicker> {
-  /// 每个月的块高固定 —— 只有定高，`initialScrollOffset` 才能一次算准，
-  /// 否则要在首帧之后才知道要滚多远，打开时会闪一下。
-  /// 34（月份标签带）+ 6 行 × 50 + 8 余量。
-  static const _blockH = 342.0;
+  /// 一行的固定高度。每格「日期 + 金额」都按这个高度绝对定位，
+  /// 所以某个日期下面有没有金额，都不会把日期本身顶上去。
+  static const _rowH = 52.0;
 
-  late final List<String> _months;
+  /// 日历格子的边长（今天的实心圆就是这个尺寸）
+  static const _dot = 30.0;
+
+  late final String _anchorYm;
+  late final String _oldestYm;
+  late final String _newestYm;
+
+  /// 第一格（最早那个月上月里的周日）—— 所有行号都相对它算
+  late final DateTime _base;
+  late final int _rowCount;
+
   late final ScrollController _ctl;
-  late final int _initialIndex;
 
-  /// 吸顶那一行显示哪一年 —— 跟着滚动走，不是写死的今年
-  late String _visibleYm;
+  /// 当前「当月」：滚动中心落在哪个月，哪个月就是黑的，其余灰
+  late String _activeYm;
+
+  /// 首帧跳转只做一次
+  bool _jumped = false;
+
+  /// ListView 上留白：让最早/最晚的月份也能滚到中间，不然首尾贴边
+  double _topPad = 0;
 
   /// 日 → 当日支出（分）。打开后一次查完，滚动时只读不发请求
   Map<String, int> _daily = const {};
 
+  final String _today = Fmt.today();
+
   @override
   void initState() {
     super.initState();
-    final anchor = _monthOf(widget.initialMonth ?? widget.from);
-    final thisMonth = Fmt.month(DateTime.now());
+    _anchorYm = _monthOf(widget.initialMonth ?? widget.from);
+    final thisYm = Fmt.month(DateTime.now());
 
-    // 往后留一个月（提前看下期），往前留两年（够翻回老账）
-    final newest = _newer(thisMonth, anchor);
-    final oldest = _older(thisMonth, anchor, 23);
+    // 往下多留一个月（「下面是下月」），往前留两年（够翻回老账）
+    _newestYm = _later(Fmt.shiftMonth(thisYm, 1), _anchorYm);
+    _oldestYm = Fmt.shiftMonth(_earlier(thisYm, _anchorYm), -23);
 
-    _months = [];
-    var ym = newest;
-    while (ym.compareTo(oldest) >= 0) {
-      _months.add(ym);
-      ym = _shiftYm(ym, -1);
-    }
-    _initialIndex = _months.indexOf(anchor).clamp(0, _months.length - 1);
-    _visibleYm = _months[_initialIndex];
-    _ctl = ScrollController(initialScrollOffset: _initialIndex * _blockH)
-      ..addListener(_onScroll);
-    _loadDaily();
-  }
-
-  void _onScroll() {
-    final i = (_ctl.offset / _blockH).round().clamp(0, _months.length - 1);
-    final ym = _months[i];
-    if (ym != _visibleYm) setState(() => _visibleYm = ym);
-  }
-
-  /// 一次把这两年多的每日支出取完：一次查询，滚动时不再发请求
-  Future<void> _loadDaily() async {
-    final ledgerId = Store.i.ledgerId;
-    final rows = await Repo.rangeDailyTotals(
-      ledgerId,
-      Repo.monthStart(_months.last),
-      Repo.monthEnd(_months.first),
-      basis: DateBasis.date,
+    // 整条日历的起止：最早月 1 号所在周的周日 → 最晚月最后一天所在周的周六。
+    // 用 UTC 做日加减，避免夏令时把「差几天」算错（国内没有，但别留坑）
+    final firstDay = _utcOf(_oldestYm);
+    final lastMonth = _utcOf(_newestYm);
+    final lastDay = DateTime.utc(
+      lastMonth.year,
+      lastMonth.month,
+      Fmt.daysInMonth(lastMonth.year, lastMonth.month),
     );
-    if (!mounted) return;
-    setState(() => _daily = {for (final r in rows) r.$1: r.$2});
+    _base = firstDay.subtract(Duration(days: firstDay.weekday % 7));
+    final end = lastDay.add(Duration(days: 6 - lastDay.weekday % 7));
+    _rowCount = end.difference(_base).inDays ~/ 7 + 1;
+
+    _activeYm = _anchorYm;
+    _ctl = ScrollController()..addListener(_syncActive);
+    _loadDaily();
   }
 
   @override
@@ -154,26 +158,91 @@ class _CalendarPickerState extends State<_CalendarPicker> {
     super.dispose();
   }
 
+  static DateTime _utcOf(String ym) => DateTime.utc(
+    int.parse(ym.substring(0, 4)),
+    int.parse(ym.substring(5, 7)),
+  );
+
   static String _monthOf(String ymd) =>
       ymd.length >= 7 ? ymd.substring(0, 7) : Fmt.month(DateTime.now());
 
-  static String _shiftYm(String ym, int delta) {
-    final y = int.parse(ym.substring(0, 4));
-    final m = int.parse(ym.substring(5, 7));
-    final d = DateTime(y, m + delta);
-    return '${d.year}-${d.month.toString().padLeft(2, '0')}';
+  static String _later(String a, String b) => a.compareTo(b) > 0 ? a : b;
+
+  static String _earlier(String a, String b) => a.compareTo(b) < 0 ? a : b;
+
+  /// 第 [i] 格是哪天
+  String _dateAt(int i) => Fmt.date(_base.add(Duration(days: i)));
+
+  /// 某月 1 号落在第几行
+  int _rowOf(String ym) => _utcOf(ym).difference(_base).inDays ~/ 7;
+
+  /// 一次把这两年多的每日支出取完：一次查询，滚动时不再发请求
+  Future<void> _loadDaily() async {
+    final ledgerId = Store.i.ledgerId;
+    final rows = await Repo.rangeDailyTotals(
+      ledgerId,
+      Repo.monthStart(_oldestYm),
+      Repo.monthEnd(_newestYm),
+      basis: DateBasis.date,
+    );
+    if (!mounted) return;
+    setState(() => _daily = {for (final r in rows) r.$1: r.$2});
   }
 
-  static String _newer(String a, String b) => a.compareTo(b) > 0 ? a : b;
+  /// 视口里**格数最多**的那个月算当月。
+  ///
+  /// 不用「视口中心点落在哪」—— 滑到月界那一瞬间，中心点可能正好压在
+  /// 下个月的第一天，可画面里九成还是上个月，结果整屏都是灰的、
+  /// 只有露出五个格的下个月是黑的，读起来完全反了。按格数投票才跟眼睛一致。
+  void _syncActive() {
+    if (!_ctl.hasClients) return;
+    final vh = _ctl.position.viewportDimension;
+    if (vh <= 0) return;
 
-  static String _older(String a, String b, int months) {
-    final base = a.compareTo(b) < 0 ? a : b;
-    return _shiftYm(base, -months);
+    final first = ((_ctl.offset - _topPad) / _rowH).floor();
+    final last = ((_ctl.offset + vh - _topPad) / _rowH).ceil();
+    final counts = <String, int>{};
+    for (var r = first; r <= last; r++) {
+      if (r < 0 || r >= _rowCount) continue;
+      for (var c = 0; c < 7; c++) {
+        final ym = _dateAt(r * 7 + c).substring(0, 7);
+        counts[ym] = (counts[ym] ?? 0) + 1;
+      }
+    }
+    if (counts.isEmpty) return;
+
+    var bestYm = _activeYm;
+    var best = 0;
+    for (final e in counts.entries) {
+      if (e.value > best) {
+        best = e.value;
+        bestYm = e.key;
+      }
+    }
+    if (bestYm != _activeYm) setState(() => _activeYm = bestYm);
+  }
+
+  /// 首帧把打开那个月摆到视口正中：上面露出上月末、下面露出下月头，
+  /// 当月占满中间那一段，才能一眼看出「哪几行是黑的」。
+  void _scheduleJump() {
+    if (_jumped) return;
+    _jumped = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_ctl.hasClients) return;
+      final vh = _ctl.position.viewportDimension;
+      // 当月占的行区间是 [r0, r1)，取中点对齐视口中心
+      final r0 = _rowOf(_anchorYm);
+      final r1 = _rowOf(Fmt.shiftMonth(_anchorYm, 1));
+      final target = _topPad + ((r0 + r1) / 2) * _rowH - vh / 2;
+      _ctl.jumpTo(target.clamp(0.0, _ctl.position.maxScrollExtent));
+      _syncActive();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final h = (media.size.height * 0.58).clamp(320.0, 470.0);
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewPadding.bottom),
       child: Container(
@@ -194,16 +263,29 @@ class _CalendarPickerState extends State<_CalendarPicker> {
               ),
             ),
             _stickyHead(),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: (media.size.height * 0.58).clamp(320.0, 470.0),
-              ),
-              child: ListView.builder(
-                controller: _ctl,
-                itemExtent: _blockH,
-                itemCount: _months.length,
-                padding: EdgeInsets.zero,
-                itemBuilder: (context, i) => _monthBlock(_months[i]),
+            SizedBox(
+              height: h,
+              child: LayoutBuilder(
+                builder: (context, cons) {
+                  _topPad = cons.maxHeight * 0.22;
+                  _scheduleJump();
+                  return Stack(
+                    children: [
+                      // 水印在最底层，日期画在它上面
+                      _watermark(),
+                      ListView.builder(
+                        controller: _ctl,
+                        itemExtent: _rowH,
+                        itemCount: _rowCount,
+                        padding: EdgeInsets.only(
+                          top: _topPad,
+                          bottom: cons.maxHeight * 0.58,
+                        ),
+                        itemBuilder: (context, i) => _weekRow(i),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -212,13 +294,14 @@ class _CalendarPickerState extends State<_CalendarPicker> {
     );
   }
 
-  /// 吸顶头：年份 + 周几。两行都在滚动区外，滑到哪一年都看得见
+  /// 吸顶头：年份 + 周几。两行都在滚动区外，滑到哪一年都看得见。
+  /// 月份不再写成文字 —— 它由背后那个大水印和「当月变黑」共同表达。
   Widget _stickyHead() {
-    final year = _visibleYm.substring(0, 4);
+    final year = _activeYm.substring(0, 4);
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, 4),
+          padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, 2),
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -240,10 +323,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
               for (final w in const ['日', '一', '二', '三', '四', '五', '六'])
                 Expanded(
                   child: Center(
-                    child: Text(
-                      w,
-                      style: T.caption.copyWith(fontSize: 11),
-                    ),
+                    child: Text(w, style: T.caption.copyWith(fontSize: 11)),
                   ),
                 ),
             ],
@@ -255,125 +335,154 @@ class _CalendarPickerState extends State<_CalendarPicker> {
     );
   }
 
-  Widget _monthBlock(String ym) {
-    final y = int.parse(ym.substring(0, 4));
-    final m = int.parse(ym.substring(5, 7));
-    final totalDays = Fmt.daysInMonth(y, m);
-    // 周日开头：DateTime.weekday 是 1(一)…7(日)
-    final offset = DateTime(y, m, 1).weekday % 7;
-    final today = Fmt.today();
-    final cells = <int>[
-      ...List.filled(offset, 0),
-      for (var d = 1; d <= totalDays; d++) d,
-    ];
-    while (cells.length < 42) {
-      cells.add(0);
-    }
-
-    return SizedBox(
-      height: _blockH,
-      child: Stack(
-        children: [
-          // 月份做背景：整块铺一个超大淡字，日期压在上面。
-          // 2% 的浓度只提供「现在是几月」的空间感，不参与读数。
-          Positioned.fill(
-            child: Center(
-              child: Text(
-                '$m',
-                style: const TextStyle(
-                  fontSize: 190,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0x0814161A),
-                  height: 1,
-                ),
-              ),
-            ),
-          ),
-          Column(
-            children: [
-              SizedBox(
-                height: 34,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(S.lg, 14, S.lg, 0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '$m 月',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: C.ink2,
-                        letterSpacing: 0.5,
+  /// 背景月份：整块铺一个超大淡字。
+  ///
+  /// 不引外部字体 —— 系统字体换一套就跟着变，反而不好控。靠三件事把它做「胖」：
+  /// 字重 w900、横向拉伸 18%、两位数字之间收负字距。浓度从 3% 提到 7.5%，
+  /// 手机屏幕小、灰度层次本来就压缩，3% 基本看不见。
+  ///
+  /// 跟着当月区块走，而不是钉在屏幕中间：钉死的话它会同时压在上下两个月身上，
+  /// 那些本来就淡（ink4）的日期被水印一盖就糊成一片。
+  Widget _watermark() {
+    final m = '${int.parse(_activeYm.substring(5, 7))}';
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _ctl,
+          builder: (context, _) {
+            if (!_ctl.hasClients) return const SizedBox.shrink();
+            final vh = _ctl.position.viewportDimension;
+            if (vh <= 0) return const SizedBox.shrink();
+            final r0 = _rowOf(_activeYm);
+            final r1 = _rowOf(Fmt.shiftMonth(_activeYm, 1));
+            // 当月占 [r0, r1) 行，区块中心的 y 再补半行；
+            // 数字字形的视觉重心比文字盒偏上，再往下压 16 才是「看着居中」
+            final cy =
+                _topPad + (r0 + r1) / 2 * _rowH + _rowH / 2 - _ctl.offset + 16;
+            return Stack(
+              children: [
+                Positioned(
+                  top: cy - 100,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 240),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      child: Transform(
+                        key: ValueKey(m),
+                        alignment: Alignment.center,
+                        transform: Matrix4.diagonal3Values(1.18, 1, 1),
+                        child: Text(
+                          m,
+                          style: const TextStyle(
+                            fontSize: 216,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0x0F14161A),
+                            height: 0.92,
+                            letterSpacing: -6,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              for (var w = 0; w < 6; w++)
-                Row(
-                  children: [
-                    for (var i = 0; i < 7; i++)
-                      Expanded(
-                        child: cells[w * 7 + i] == 0
-                            ? const SizedBox(height: 50)
-                            : _dayCell(ym, cells[w * 7 + i], today),
-                      ),
-                  ],
-                ),
-            ],
-          ),
-        ],
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _dayCell(String ym, int day, String today) {
-    final date = '$ym-${day.toString().padLeft(2, '0')}';
-    final isToday = date == today;
-    // 这一期之外的日子用浅一档的字色：不给整片涂底，也能看出期从哪天起
+  Widget _weekRow(int row) {
+    return Row(
+      children: [
+        for (var c = 0; c < 7; c++)
+          Expanded(child: _dayCell(_dateAt(row * 7 + c))),
+      ],
+    );
+  }
+
+  Widget _dayCell(String date) {
+    final day = int.parse(date.substring(8, 10));
+    final ym = date.substring(0, 7);
+    final isToday = date == _today;
+    final isActive = ym == _activeYm;
+    // 这一期之外的日子再浅一档：不给整片涂底，也能看出期从哪天起
     final inPeriod =
         date.compareTo(widget.from) >= 0 && date.compareTo(widget.to) <= 0;
     final cents = _daily[date] ?? 0;
 
-    return SizedBox(
-      height: 50,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => Navigator.pop(context, date),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: isToday
-                  ? const BoxDecoration(color: C.ink, shape: BoxShape.circle)
-                  : null,
+    // 三档灰度：当月+当期最黑 → 当月但不在期（深灰，仍读得出「这个月」）
+    // → 不在当月（最淡）。当月那一档要压得住非当月，否则滚过月界时整屏
+    // 会一起变浅，看不出「换月了」
+    final Color fg;
+    if (isToday) {
+      fg = C.bg;
+    } else if (!isActive) {
+      fg = C.ink4;
+    } else if (!inPeriod) {
+      fg = C.ink2;
+    } else {
+      fg = C.ink;
+    }
+
+    return GestureDetector(
+      // 带上日期的 key：同屏有上月末、本月、下月初三个「1」，
+      // 测试（和将来的自动化）只能靠这个精确点名
+      key: ValueKey('cal-$date'),
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.pop(context, date),
+      child: Stack(
+        children: [
+          // 日期固定在行高顶部：下面有没有金额，它都在同一个位置
+          Positioned(
+            top: 2,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: _dot,
+                height: _dot,
+                alignment: Alignment.center,
+                decoration: isToday
+                    ? const BoxDecoration(color: C.ink, shape: BoxShape.circle)
+                    : null,
+                child: Text(
+                  '$day',
+                  style: TextStyle(
+                    fontSize: 17.5,
+                    height: 1,
+                    letterSpacing: -0.4,
+                    fontWeight: isToday ? FontWeight.w600 : FontWeight.w500,
+                    color: fg,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (cents > 0)
+            Positioned(
+              top: 34,
+              left: 0,
+              right: 0,
               child: Text(
-                '$day',
+                amountLabel(cents),
+                textAlign: TextAlign.center,
+                maxLines: 1,
                 style: TextStyle(
-                  fontSize: 16.5,
+                  fontSize: 10.5,
                   height: 1.1,
-                  fontWeight: isToday ? FontWeight.w600 : FontWeight.w500,
-                  color: isToday ? C.bg : (inPeriod ? C.ink : C.ink3),
+                  fontWeight: FontWeight.w600,
+                  color: isActive ? C.ink3 : C.ink4,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ),
-            if (cents > 0)
-              Text(
-                amountLabel(cents),
-                maxLines: 1,
-                style: const TextStyle(
-                  fontSize: 9.5,
-                  height: 1.3,
-                  color: C.ink4,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }

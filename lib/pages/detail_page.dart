@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/pacing.dart';
 import '../data/repo.dart';
@@ -66,70 +67,72 @@ class DetailPage extends StatelessWidget {
       final dayExpense = sumBySide(items, TxnType.expense);
       final dayIncome = sumBySide(items, TxnType.income);
 
-      out.add(Container(
-        margin: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
-        decoration: BoxDecoration(
-          color: C.bg,
-          borderRadius: BorderRadius.circular(R.card),
-          border: Border.all(color: C.line),
-          // 极淡的投影：白卡叠在白底上只靠 1px 描边，看起来还是一条长列表；
-          // 一点点投影就够让它「浮」起来，不至于抢走顶部概览卡的分量
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0A14161A),
-              blurRadius: 10,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // 日期是这张卡的头，放在卡里 —— 挂在卡外面的话，
-            // 一屏几张卡会读成一串「小标题 + 列表」，不像卡片
-            Padding(
-              padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
-              child: Row(
-                children: [
-                  // 日期让出剩余宽度：某天既有收入又有支出、数字又长时，
-                  // 三个 Text 并排会顶出屏幕（真机上表现为右侧被裁掉一截）
-                  Expanded(
-                    child: Text(
-                      Fmt.friendly(date),
-                      style: T.caption.copyWith(
-                        color: C.ink2,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (dayIncome > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(right: S.sm),
-                      child: Text(
-                        '收入 ${Fmt.money(dayIncome)}',
-                        style: T.caption.copyWith(color: C.ink2),
-                      ),
-                    ),
-                  if (dayExpense > 0)
-                    Text('支出 ${Fmt.money(dayExpense)}', style: T.caption),
-                ],
+      out.add(
+        Container(
+          margin: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
+          decoration: BoxDecoration(
+            color: C.bg,
+            borderRadius: BorderRadius.circular(R.card),
+            border: Border.all(color: C.line),
+            // 极淡的投影：白卡叠在白底上只靠 1px 描边，看起来还是一条长列表；
+            // 一点点投影就够让它「浮」起来，不至于抢走顶部概览卡的分量
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A14161A),
+                blurRadius: 10,
+                offset: Offset(0, 2),
               ),
-            ),
-            const Divider(height: 1, thickness: 1, color: C.line),
-            for (var i = 0; i < items.length; i++) ...[
-              if (i > 0)
-                const Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: C.line,
-                  indent: 56,
-                ),
-              _TxnRow(txn: items[i]),
             ],
-          ],
+          ),
+          child: Column(
+            children: [
+              // 日期是这张卡的头，放在卡里 —— 挂在卡外面的话，
+              // 一屏几张卡会读成一串「小标题 + 列表」，不像卡片
+              Padding(
+                padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
+                child: Row(
+                  children: [
+                    // 日期让出剩余宽度：某天既有收入又有支出、数字又长时，
+                    // 三个 Text 并排会顶出屏幕（真机上表现为右侧被裁掉一截）
+                    Expanded(
+                      child: Text(
+                        Fmt.friendly(date),
+                        style: T.caption.copyWith(
+                          color: C.ink2,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (dayIncome > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(right: S.sm),
+                        child: Text(
+                          '收入 ${Fmt.money(dayIncome)}',
+                          style: T.caption.copyWith(color: C.ink2),
+                        ),
+                      ),
+                    if (dayExpense > 0)
+                      Text('支出 ${Fmt.money(dayExpense)}', style: T.caption),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, thickness: 1, color: C.line),
+              for (var i = 0; i < items.length; i++) ...[
+                if (i > 0)
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: C.line,
+                    indent: 56,
+                  ),
+                _TxnRow(txn: items[i]),
+              ],
+            ],
+          ),
         ),
-      ));
+      );
     }
     return out;
   }
@@ -146,15 +149,16 @@ class _TopBar extends StatelessWidget {
       child: Row(
         children: [
           const SizedBox(width: S.xl),
-          Text(
-            s.currentLedger?.name ?? '账本',
-            style: T.title,
-          ),
+          Text(s.currentLedger?.name ?? '账本', style: T.title),
           const SizedBox(width: S.sm),
           if (s.ledgers.length > 1)
             GestureDetector(
               onTap: () => _pickLedger(context),
-              child: const Icon(Icons.expand_more_rounded, size: 18, color: C.ink3),
+              child: const Icon(
+                Icons.expand_more_rounded,
+                size: 18,
+                color: C.ink3,
+              ),
             ),
           const Spacer(),
           IconButton(
@@ -224,8 +228,10 @@ class _TopBar extends StatelessWidget {
       delegate: _SearchDelegate(),
     );
     if (keyword == null || keyword.trim().isEmpty) return;
-    final (hits, truncated) =
-        await Repo.searchTxns(ledgerId: s.ledgerId, keyword: keyword);
+    final (hits, truncated) = await Repo.searchTxns(
+      ledgerId: s.ledgerId,
+      keyword: keyword,
+    );
     if (!context.mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -244,7 +250,8 @@ class _TopBar extends StatelessWidget {
                   : ListView.builder(
                       controller: controller,
                       itemCount: hits.length,
-                      itemBuilder: (c, i) => _TxnRow(txn: hits[i], showDate: true),
+                      itemBuilder: (c, i) =>
+                          _TxnRow(txn: hits[i], showDate: true),
                     ),
             ),
           ],
@@ -257,18 +264,18 @@ class _TopBar extends StatelessWidget {
 class _SearchDelegate extends SearchDelegate<String> {
   @override
   List<Widget>? buildActions(BuildContext context) => [
-        if (query.isNotEmpty)
-          IconButton(
-            onPressed: () => query = '',
-            icon: const Icon(Icons.close_rounded),
-          ),
-      ];
+    if (query.isNotEmpty)
+      IconButton(
+        onPressed: () => query = '',
+        icon: const Icon(Icons.close_rounded),
+      ),
+  ];
 
   @override
   Widget? buildLeading(BuildContext context) => IconButton(
-        onPressed: () => close(context, ''),
-        icon: const Icon(Icons.arrow_back_rounded),
-      );
+    onPressed: () => close(context, ''),
+    icon: const Icon(Icons.arrow_back_rounded),
+  );
 
   @override
   Widget buildResults(BuildContext context) => const SizedBox.shrink();
@@ -278,16 +285,16 @@ class _SearchDelegate extends SearchDelegate<String> {
 
   @override
   ThemeData appBarTheme(BuildContext context) => Theme.of(context).copyWith(
-        appBarTheme: const AppBarTheme(
-          backgroundColor: C.bg,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: InputBorder.none,
-          hintStyle: TextStyle(color: C.ink4),
-        ),
-      );
+    appBarTheme: const AppBarTheme(
+      backgroundColor: C.bg,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+    ),
+    inputDecorationTheme: const InputDecorationTheme(
+      border: InputBorder.none,
+      hintStyle: TextStyle(color: C.ink4),
+    ),
+  );
 }
 
 /// 首页概览卡。
@@ -295,6 +302,63 @@ class _SearchDelegate extends SearchDelegate<String> {
 /// 浅灰底（`C.bg2`）+ 描边，和下方白底明细卡正好反过来：
 /// 一个「压下去」的汇总区，配一组「浮上来」的记录卡。之前是纯黑 hero，
 /// 在满屏黑白灰里太重，一进页面眼睛只能看到这块黑。
+/// 概览卡的抬头：「本期支出 · 10.01 – 10.31」，整行可点，点了弹日历。
+///
+/// 日期从独立一行降成标签的注脚，是这张卡从「标题 + 数字」变成
+/// 「一个数字 + 它的限定条件」的关键 —— 第一眼只剩金额。
+class _PeriodHead extends StatelessWidget {
+  const _PeriodHead({
+    required this.from,
+    required this.to,
+    required this.onTap,
+  });
+
+  final String from;
+  final String to;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        height: 34,
+        child: Row(
+          children: [
+            const Text(
+              '本期支出',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+                color: C.ink2,
+                height: 1.2,
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6),
+              child: Text('·', style: TextStyle(fontSize: 13, color: C.ink4)),
+            ),
+            Flexible(
+              child: Text(
+                periodLabel(from, to),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: C.ink3,
+                  letterSpacing: 0.1,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard();
 
@@ -335,25 +399,18 @@ class _SummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            height: 38,
-            child: filtering
-                ? const _FilterHead()
-                : Align(
-                    alignment: Alignment.centerLeft,
-                    // 只有这一颗：不提供左右翻期，点它弹日历挑日期
-                    child: PeriodChip(
-                      from: s.cycleFrom,
-                      to: s.cycleTo,
-                      onTap: () => showCalendarAndGo(context),
-                    ),
-                  ),
-          ),
-          const SizedBox(height: S.sm),
-          Text(
-            filtering ? '筛选支出' : '本期支出',
-            style: TextStyle(fontSize: 12, color: faint),
-          ),
+          // 顶上不再有一条独立的日期：日期只是「本期支出」的注脚，
+          // 和标签排在同一行，层级自然低一档
+          if (filtering) ...[
+            const _FilterHead(),
+            const SizedBox(height: S.md),
+            Text('筛选支出', style: TextStyle(fontSize: 12, color: faint)),
+          ] else
+            _PeriodHead(
+              from: s.cycleFrom,
+              to: s.cycleTo,
+              onTap: () => showCalendarAndGo(context),
+            ),
           const SizedBox(height: 2),
           // 金额到六位数时用 FittedBox 收一点，保证永远单行
           FittedBox(
@@ -369,7 +426,9 @@ class _SummaryCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Expanded(child: _HeroStat(label: '收入', value: Fmt.money(income))),
+              Expanded(
+                child: _HeroStat(label: '收入', value: Fmt.money(income)),
+              ),
               const SizedBox(width: S.md),
               Expanded(
                 child: _HeroStat(
@@ -620,7 +679,10 @@ class _FilterBar extends StatelessWidget {
             behavior: HitTestBehavior.opaque,
             onTap: () => s.clearFilter(),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: S.sm, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: S.sm,
+                vertical: 4,
+              ),
               child: Text(
                 '重置',
                 style: T.caption.copyWith(
@@ -635,8 +697,6 @@ class _FilterBar extends StatelessWidget {
     );
   }
 }
-
-
 
 /// 单条交易。点按进入编辑，长按删除。
 class _TxnRow extends StatelessWidget {
@@ -673,11 +733,7 @@ class _TxnRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Center(
-                child: LineIcon(
-                  cat?.icon ?? 'more',
-                  size: 19,
-                  color: C.ink,
-                ),
+                child: LineIcon(cat?.icon ?? 'more', size: 19, color: C.ink),
               ),
             ),
             const SizedBox(width: S.md),

@@ -123,7 +123,7 @@ void main() {
     expect(tester.takeException(), isNull, reason: '明细页有布局溢出');
 
     // ---- 日历卡片（上下滚动，没有左右翻月）----
-    await tester.tap(find.text(cycleLabel(Store.i.cycleFrom, Store.i.cycleTo)));
+    await tester.tap(find.text(periodLabel(Store.i.cycleFrom, Store.i.cycleTo)));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     // 每日金额是一次异步查询回填的：假时钟里查库永远等不到，必须让出真实事件循环
     await tester.runAsync(
