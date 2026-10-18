@@ -436,6 +436,76 @@ class Repo {
     return out;
   }
 
+  /// 全量备份涉及的业务表，按**父表在前**的顺序排列。
+  ///
+  /// 清空时反向遍历（子表先删），回填时正向插入；ID 一律原样保留，
+  /// 这样 `txn.category_id` / `account_id` 这些软关联恢复后仍然成立。
+  static const backupTables = <String>[
+    'ledger',
+    'account',
+    'category',
+    'txn',
+    'budget',
+    'saving_goal',
+    'recurring',
+    'txn_template',
+    'setting',
+  ];
+
+  /// 把 9 张表整个读出来（备份用）。行是原始 map，交给上层序列化。
+  static Future<Map<String, List<Map<String, Object?>>>> dumpTables() async {
+    final db = await Db.open();
+    final out = <String, List<Map<String, Object?>>>{};
+    for (final t in backupTables) {
+      out[t] = await db.query(t);
+    }
+    return out;
+  }
+
+  /// 整库覆盖式回填，返回每张表写入的行数。
+  ///
+  /// **必须在事务里**：中途任何一张表失败都要整体回滚，
+  /// 否则会留下「记账记录已经清了、分类还没回来」的半截库。
+  ///
+  /// [keepSettings] 是不跟着备份走、但也不该被清掉的设置项
+  /// （应用名、实验开关这类「这台机器的状态」），在同一个事务里补回去。
+  static Future<Map<String, int>> replaceTables(
+    Map<String, List<Map<String, Object?>>> data, {
+    Map<String, String> keepSettings = const {},
+  }) async {
+    final db = await Db.open();
+    final counts = <String, int>{};
+    await db.transaction((txn) async {
+      for (final t in backupTables.reversed) {
+        await txn.delete(t);
+      }
+      for (final t in backupTables) {
+        final rows = <Map<String, Object?>>[...?data[t]];
+        counts[t] = rows.length;
+        if (t == 'setting' && keepSettings.isNotEmpty) {
+          for (final e in keepSettings.entries) {
+            rows.add({'k': e.key, 'v': e.value});
+          }
+        }
+        final batch = txn.batch();
+        for (final row in rows) {
+          batch.insert(t, row, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        await batch.commit(noResult: true);
+      }
+    });
+    return counts;
+  }
+
+  /// 读出全部设置项（键值对），恢复时用来保留机器状态
+  static Future<Map<String, String>> listSettings() async {
+    final db = await Db.open();
+    final rows = await db.query('setting');
+    return {
+      for (final r in rows) r['k'] as String: r['v'] as String,
+    };
+  }
+
   /// 月收支合计
   static Future<(int expense, int income, int count)> monthTotals(
     int ledgerId,

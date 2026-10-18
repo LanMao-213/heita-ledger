@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../data/backup_service.dart';
 import '../data/db.dart';
 import '../data/excel_service.dart';
 import '../data/models.dart';
@@ -96,6 +97,21 @@ class MinePage extends StatelessWidget {
                   title: '从 Excel 导入账单',
                   subtitle: '按导出格式即可批量导入',
                   onTap: () => _import(context),
+                ),
+                const Divider(height: 1, color: C.line, indent: 52),
+                // Excel 只带账单；下面这两行才是「换手机能原样搬过去」
+                SettingRow(
+                  icon: 'upload',
+                  title: '备份全部数据',
+                  subtitle: 'JSON，含预算、目标、模板、账户余额',
+                  onTap: () => _backup(context),
+                ),
+                const Divider(height: 1, color: C.line, indent: 52),
+                SettingRow(
+                  icon: 'download',
+                  title: '从备份恢复',
+                  subtitle: '会覆盖当前全部数据，覆盖前自动留快照',
+                  onTap: () => _restore(context),
                 ),
               ],
             ),
@@ -217,6 +233,118 @@ class MinePage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // ------------------------------------------------------------------ 备份
+
+  static Future<void> _backup(BuildContext context) async {
+    try {
+      final path = await BackupService.writeToTempFile();
+      if (!context.mounted) return;
+      await BackupService.share(path);
+    } catch (e) {
+      if (context.mounted) showToast(context, '备份失败：$e');
+    }
+  }
+
+  // ------------------------------------------------------------------ 恢复
+
+  static Future<void> _restore(BuildContext context) async {
+    final s = Store.i;
+
+    // 1. 选文件 + 读出来校验（校验失败不会碰数据库）
+    final Map<String, Object?> payload;
+    final BackupSummary summary;
+    try {
+      final picked = await BackupService.pickFile();
+      if (picked == null) return; // 用户取消
+      payload = picked.$1;
+      summary = BackupService.summarize(payload);
+    } on BackupException catch (e) {
+      if (context.mounted) showToast(context, e.message);
+      return;
+    }
+    if (!context.mounted) return;
+
+    // 2. 二次确认 —— 这是覆盖式写入，必须让人看清要拿什么换什么
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('从备份恢复？', style: T.section),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('这份备份里有：', style: T.caption),
+            const SizedBox(height: S.xs),
+            Text(summary.text, style: T.body),
+            const SizedBox(height: S.md),
+            const Text(
+              '恢复会**覆盖**当前的全部数据。\n覆盖前会自动存一份当前数据的快照，'
+              '万一恢复错了还能再导回来。',
+              style: T.body2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消', style: TextStyle(color: C.ink2)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('覆盖并恢复', style: TextStyle(color: C.over)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    // 3. 先留快照，再覆盖
+    String snapshot;
+    try {
+      snapshot = await BackupService.writeSnapshot();
+    } catch (e) {
+      if (context.mounted) showToast(context, '没能生成快照，已取消：$e');
+      return;
+    }
+
+    try {
+      final counts = await BackupService.restore(payload);
+      await s.reloadAfterRestore();
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('恢复完成', style: T.section),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${counts['txn'] ?? 0} 笔记录 · ${counts['account'] ?? 0} 个账户 · '
+                '${counts['category'] ?? 0} 个分类',
+                style: T.body,
+              ),
+              const SizedBox(height: S.md),
+              const Text('覆盖前的数据已存到：', style: T.caption),
+              const SizedBox(height: S.xs),
+              Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
+              const SizedBox(height: S.sm),
+              const Text('如果这次恢复的结果不对，可以把这份快照再导回来。', style: T.caption),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('知道了', style: TextStyle(color: C.ink)),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) showToast(context, '恢复失败，数据未改动：$e');
+    }
   }
 
   // ------------------------------------------------------------------ 清空

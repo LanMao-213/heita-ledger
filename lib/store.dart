@@ -123,6 +123,17 @@ class Store extends ChangeNotifier {
     await loadMonth();
   }
 
+  /// 整库被替换（从备份恢复）之后重读一遍。
+  ///
+  /// 比 loadAll 多做两件事：`current_ledger_id` 可能也变了要重取；
+  /// 筛选条件里引用的分类/账户可能已经不存在，直接清掉。
+  Future<void> reloadAfterRestore() async {
+    ledgerId = await Repo.currentLedgerId();
+    _resetFilter();
+    await loadAll();
+    notifyListeners();
+  }
+
   Future<void> loadTemplates() async {
     templates = await Repo.listTemplates(ledgerId);
     recentTemplates = await Repo.recentTemplates(ledgerId);

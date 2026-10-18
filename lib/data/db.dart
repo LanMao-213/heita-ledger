@@ -22,6 +22,9 @@ class Db {
   /// 2：`txn_template` 增加 `use_count` / `last_used_at`（模板按使用频率排序）
   static const _version = 3;
 
+  /// 当前 schema 版本。备份文件里会记下来，恢复时用来判断兼容性。
+  static int get schemaVersion => _version;
+
   static Future<Database> open() async {
     if (_db != null) return _db!;
     final dir = await getDatabasesPath();

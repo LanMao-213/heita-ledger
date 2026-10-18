@@ -18,6 +18,7 @@ import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/pages/detail_page.dart';
+import 'package:ledger/pages/mine_page.dart';
 import 'package:ledger/store.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -169,5 +170,21 @@ void main() {
     expect(s.filter.dateFrom, today);
     expect(s.filter.dateTo, today);
     expect(s.filteredTxns.length, 3); // 三笔都在今天
+  });
+
+  testWidgets('我的页有备份与恢复两个入口', (tester) async {
+    await seed(tester);
+    tester.view.physicalSize = const Size(390 * 2, 1600 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: MinePage())),
+    );
+    await tester.pump();
+
+    // 这两行是全量备份的入口，删了就等于「换手机只能丢数据」
+    expect(find.text('备份全部数据'), findsOneWidget);
+    expect(find.text('从备份恢复'), findsOneWidget);
   });
 }
