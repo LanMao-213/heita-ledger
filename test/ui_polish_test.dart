@@ -85,7 +85,8 @@ void main() {
         accountId: accId,
         note: '工资',
       ));
-      await s.loadMonth();
+      await s.loadCycle();
+      await s.loadStats();
       // Store 是单例：上一个测试留下的筛选状态会带过来，
       // 不清掉的话首页会停在「筛选结果」态，日历按钮就不在树里了
       await s.clearFilter();

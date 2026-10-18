@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/calc.dart';
+import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
 import '../design/icons.dart';
@@ -49,7 +50,20 @@ class _RecordSheetState extends State<RecordSheet> {
   /// 从模板填进来的那一笔。保存时会把 template_id 记到账目上并累加使用次数。
   TxnTemplate? _applied;
 
+  /// 「这笔算下一期」的手动开关。null = 跟着分类白名单走默认值。
+  /// 白名单只给初值，最终值必须能听用户的（设计 §5.2）。
+  bool? _liftOverride;
+
   bool get _isEdit => widget.editing != null;
+
+  /// 只有收入、且这笔真的落在「同月账单日之前」时，抬期开关才有意义
+  bool get _showLift =>
+      _type.isIncome && liftable(_date, Store.i.cycleStartDay);
+
+  /// 当前开关状态：手动拨过就听手动的，否则按分类白名单
+  bool get _liftOn =>
+      _liftOverride ??
+      (_categoryId != null && Store.i.liftableCatIds.contains(_categoryId));
 
   @override
   void initState() {
@@ -68,6 +82,12 @@ class _RecordSheetState extends State<RecordSheet> {
     }
     // 编辑时若原记录没分类，落到该类型的第一个分类
     _categoryId ??= _firstCategoryId();
+
+    // 反推「计入下期」开关：归属期跟真实日期所在期不一致，就是当时拨开了
+    if (e != null && e.periodStart != null) {
+      _liftOverride =
+          e.periodStart != periodStartOf(e.date, s.cycleStartDay);
+    }
   }
 
   /// 分 → 输入框里的字符串：「1200」显示成「12」，避免一串 .00 干扰输入
@@ -239,7 +259,7 @@ class _RecordSheetState extends State<RecordSheet> {
           recurringId: old.recurringId,
           createdAt: old.createdAt,
         );
-        await Repo.updateTxn(old, now);
+        await Repo.updateTxn(old, now, liftToNext: _liftOverride);
       } else {
         await Repo.insertTxn(Txn(
           id: 0,
@@ -251,7 +271,7 @@ class _RecordSheetState extends State<RecordSheet> {
           accountId: _accountId,
           note: note,
           templateId: tplId,
-        ));
+        ), liftToNext: _liftOverride);
         if (tplId != null) {
           await Repo.touchTemplate(tplId);
           await store.afterTemplateChange();
@@ -381,6 +401,16 @@ class _RecordSheetState extends State<RecordSheet> {
                   accountIcon: Store.i.accountOf(_accountId)?.icon ?? 'wallet',
                   onPickAccount: _pickAccount,
                 ),
+                if (_showLift)
+                  _LiftRow(
+                    on: _liftOn,
+                    periodLabel: periodStartOf(
+                      _date,
+                      Store.i.cycleStartDay,
+                      liftToNext: _liftOn,
+                    ),
+                    onChanged: (v) => setState(() => _liftOverride = v),
+                  ),
                 _NoteField(
                   controller: _note,
                   focusNode: _noteFocus,
@@ -783,3 +813,60 @@ class _NoteField extends StatelessWidget {
   }
 }
 
+/// 「这笔算 X 起的这期」——手动抬期的唯一入口。
+///
+/// 为什么必须有这个开关：R1 抬期是**自动**的，用户看不见发生了什么。
+/// 10 号发的工资悄悄算进 15 号那期，用户会以为账错了。给一行小字 + 拨动开关，
+/// 让它可见、可改、可复原（不写设置，只作用于当前这一笔）。
+class _LiftRow extends StatelessWidget {
+  const _LiftRow({
+    required this.on,
+    required this.periodLabel,
+    required this.onChanged,
+  });
+
+  final bool on;
+  final String periodLabel;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '这笔算 $periodLabel 起的这期',
+              style: T.caption.copyWith(color: C.ink2),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onChanged(!on),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 44,
+              height: 26,
+              padding: const EdgeInsets.all(3),
+              alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+              decoration: BoxDecoration(
+                color: on ? C.ink : C.line,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(
+                  color: C.bg,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

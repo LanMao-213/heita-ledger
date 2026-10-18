@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/ui_flags.dart';
 import '../design/icons.dart';
@@ -147,6 +148,84 @@ class SegTabs extends StatelessWidget {
 }
 
 /// 月份选择栏
+/// 周期条：「10-15 → 11-14」，左右箭头翻一期。
+///
+/// 与 [MonthBar] 并存，用途严格分开：
+/// - 明细页 / 计划页看**期**（周期归集后的唯一口径）
+/// - 统计页按用户切换在两者间换，幅度文案也不同（近 6 期 / 近 6 个月）
+///
+/// 标签显示两个具体日期而不是「10 月」—— 一期跨越两个月时，月份文案会骗人。
+class CycleBar extends StatelessWidget {
+  const CycleBar({
+    super.key,
+    required this.from,
+    required this.to,
+    required this.onPrev,
+    required this.onNext,
+    this.onTapLabel,
+    this.onDark = false,
+    this.trailing,
+  });
+
+  final String from;
+  final String to;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  final VoidCallback? onTapLabel;
+
+  /// 放在深色卡里时用（首页 hero）
+  final bool onDark;
+
+  /// 右侧附加按钮（首页放「日历」入口）
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = onDark ? C.bg : C.ink;
+    final arrow = onDark ? C.bg.withValues(alpha: 0.72) : C.ink2;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _barArrow(Icons.chevron_left_rounded, onPrev, arrow),
+        // 标签比月份条长（「10-15 → 11-14」），窄屏或带右侧按钮时会被挤爆：
+        // 交给 Flexible + FittedBox 收字号，宁可小一点也不要黄黑条。
+        Flexible(
+          child: GestureDetector(
+            onTap: onTapLabel,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  cycleLabel(from, to),
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: label,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        _barArrow(Icons.chevron_right_rounded, onNext, arrow),
+        if (trailing != null) ...[const Spacer(), trailing!],
+      ],
+    );
+  }
+}
+
+Widget _barArrow(IconData icon, VoidCallback onTap, Color color) => IconButton(
+      onPressed: onTap,
+      icon: Icon(icon, size: 22, color: color),
+      splashRadius: 20,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      padding: EdgeInsets.zero,
+    );
+
 class MonthBar extends StatelessWidget {
   const MonthBar({
     super.key,

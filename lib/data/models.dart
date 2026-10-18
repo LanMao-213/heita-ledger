@@ -118,6 +118,16 @@ enum TxnType {
   bool get isIncome => this == TxnType.income;
 }
 
+/// 归集口径。
+///
+/// - [period]：按**归属期**（`txn.period_start`）—— 明细、计划、预算用这个，
+///   一笔 10 号到账的工资会被算进 15 号开始的那一期。
+/// - [date]：按**真实发生日**（`txn.date`）—— 统计页的「月份」视图用这个，
+///   它回答的是「10 月这一个月到底花了多少」，跟账单日无关。
+///
+/// 两个口径的数字会不一样，这是设计，不是 bug：切换按钮的文案要把这件事说清。
+enum DateBasis { period, date }
+
 /// 账户类型
 enum AccountKind {
   cash('cash', '现金', 'wallet'),
@@ -510,14 +520,19 @@ class Budget {
   const Budget({
     required this.id,
     required this.ledgerId,
-    required this.month,
+    required this.periodStart,
     this.categoryId,
     required this.amountCents,
   });
 
   final int id;
   final int ledgerId;
-  final String month; // YYYY-MM
+
+  /// 归属期第一天（`YYYY-MM-DD`）。
+  ///
+  /// 预算按「期」存（v5 起，D13 改为预算也按周期）。账单日默认 1 时它就等于月初，
+  /// 与老的自然月预算一一对应。
+  final String periodStart;
   final int? categoryId;
   final int amountCents;
 
@@ -526,7 +541,7 @@ class Budget {
   factory Budget.fromMap(Map<String, Object?> m) => Budget(
         id: m['id'] as int,
         ledgerId: m['ledger_id'] as int,
-        month: m['month'] as String,
+        periodStart: m['period_start'] as String,
         categoryId: m['category_id'] as int?,
         amountCents: (m['amount_cents'] as int?) ?? 0,
       );
@@ -534,7 +549,7 @@ class Budget {
   Map<String, Object?> toMap() => {
         if (id > 0) 'id': id,
         'ledger_id': ledgerId,
-        'month': month,
+        'period_start': periodStart,
         'category_id': categoryId,
         'amount_cents': amountCents,
       };

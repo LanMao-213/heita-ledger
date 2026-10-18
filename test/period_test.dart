@@ -10,6 +10,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ledger/data/cycle.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
@@ -318,6 +319,64 @@ void main() {
           columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
       expect(after.first['period_start'], '2026-10-15',
           reason: '变成工资类收入后就该抬期');
+    });
+
+    test('手动关掉抬期：工资留在真实日期那一期', () async {
+      await Repo.setSetting(Repo.cycleStartDayKey, '15');
+      final id = await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.income,
+          amountCents: 800000,
+          date: '2026-10-10',
+          categoryId: catSalary,
+        ),
+        liftToNext: false,
+      );
+      final db = await Db.open();
+      final row = await db.query('txn',
+          columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
+      expect(row.first['period_start'], '2026-09-15',
+          reason: '用户明确说「不算下期」，就不该被白名单强行抬走');
+    });
+
+    test('手动打开抬期：兼职也能算进下一期', () async {
+      await Repo.setSetting(Repo.cycleStartDayKey, '15');
+      final id = await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.income,
+          amountCents: 30000,
+          date: '2026-10-10',
+          categoryId: catParttime,
+        ),
+        liftToNext: true,
+      );
+      final db = await Db.open();
+      final row = await db.query('txn',
+          columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
+      expect(row.first['period_start'], '2026-10-15');
+    });
+
+    test('手动开关能反推回来（编辑旧记录时面板要知道它开着）', () async {
+      await Repo.setSetting(Repo.cycleStartDayKey, '15');
+      final id = await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.income,
+          amountCents: 50000,
+          date: '2026-10-10',
+          categoryId: catParttime,
+        ),
+        liftToNext: true,
+      );
+      final row = await byId(id);
+      expect(row.periodStart, '2026-10-15');
+      // 真实日期所在期是 09-15，与落库的 10-15 不同 → 反推为「开着」
+      expect(row.periodStart != periodStartOf(row.date, 15), isTrue);
     });
 
     test('所有记录都有 period_start，没有漏网的 NULL', () async {

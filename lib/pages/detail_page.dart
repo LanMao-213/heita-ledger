@@ -8,11 +8,12 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/calendar_sheet.dart';
+import '../widgets/period_sheet.dart';
 import '../widgets/common.dart';
 import '../widgets/filter_sheet.dart';
 import '../widgets/record_sheet.dart';
 
-/// 明细页（首页）：按月看每一笔。
+/// 明细页（首页）：按周期看每一笔。
 class DetailPage extends StatelessWidget {
   const DetailPage({super.key});
 
@@ -278,22 +279,23 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Store.i;
     // 筛选态下这张卡整体换口径：月份条换成结果摘要，数字改成筛选结果合计，
-    // 预算进度条收起（预算按月，跟跨月筛选没有关系）
+    // 预算进度条收起（预算按本期，跟跨期筛选没有关系）
     final filtering = s.filtering;
-    final expense = filtering ? s.filteredExpenseCents : s.monthExpenseCents;
-    final income = filtering ? s.filteredIncomeCents : s.monthIncomeCents;
+    final expense = filtering ? s.filteredExpenseCents : s.expenseCents;
+    final income = filtering ? s.filteredIncomeCents : s.incomeCents;
     // 笔数也用聚合里的真实值：列表可能被截到 500 条，但「共几笔」不该跟着少算
-    final count = filtering ? s.filterCount : s.monthTxnCount;
+    final count = filtering ? s.filterCount : s.txnCount;
 
     final dim = C.bg.withValues(alpha: 0.62);
     final budget = s.totalBudgetCents;
 
-    // 预算节奏只在「按月看」时算：跨月筛选的合计和月度预算本来就不是一回事
+    // 预算节奏只在「按本期看」时算：跨期筛选的合计和一期预算不是一回事
     final pacing = !filtering && budget != null
-        ? Pacing.of(
-            month: s.month,
+        ? Pacing.ofRange(
+            from: s.cycleFrom,
+            to: s.cycleTo,
             totalCents: budget,
-            usedCents: s.monthExpenseCents,
+            usedCents: s.expenseCents,
           )
         : null;
 
@@ -311,10 +313,12 @@ class _SummaryCard extends StatelessWidget {
             height: 44,
             child: filtering
                 ? const _FilterHead(onDark: true)
-                : MonthBar(
-                    month: s.month,
-                    onPrev: () => s.shiftMonth(-1),
-                    onNext: () => s.shiftMonth(1),
+                : CycleBar(
+                    from: s.cycleFrom,
+                    to: s.cycleTo,
+                    onPrev: () => s.shiftCycle(-1),
+                    onNext: () => s.shiftCycle(1),
+                    onTapLabel: () => showPeriodPicker(context),
                     onDark: true,
                     trailing: _CalButton(
                       onTap: () => showMonthCalendar(context),
@@ -322,7 +326,7 @@ class _SummaryCard extends StatelessWidget {
                   ),
           ),
           Text(
-            filtering ? '筛选支出' : '本月支出',
+            filtering ? '筛选支出' : '本期支出',
             style: TextStyle(fontSize: 12, color: dim),
           ),
           const SizedBox(height: 2),
@@ -365,7 +369,7 @@ class _SummaryCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  '本月预算 ${Fmt.money(s.monthExpenseCents)} / '
+                  '本期预算 ${Fmt.money(s.expenseCents)} / '
                   '${Fmt.money(budget!)}',
                   style: TextStyle(fontSize: 12, color: dim),
                 ),

@@ -17,13 +17,17 @@ class Pacing {
     required this.passedDays,
     required this.remainDays,
     required this.finished,
+    this.label = '本期',
   });
+
+  /// 文案里的时间单位：周期视图用「本期」，自然月用「本月」
+  final String label;
 
   /// 预算总额；null 表示这个月没设预算
   final int? totalCents;
   final int usedCents;
 
-  /// 本月总天数
+  /// 这一期的总天数（周期视图下是 28–31 天不等）
   final int totalDays;
 
   /// 已经过去的天数（含今天）
@@ -40,25 +44,46 @@ class Pacing {
     required int? totalCents,
     required int usedCents,
     String? today,
+    String label = '本月',
   }) {
-    final now = today ?? Fmt.today();
     final year = int.parse(month.substring(0, 4));
     final mon = int.parse(month.substring(5, 7));
     final totalDays = Fmt.daysInMonth(year, mon);
-    // 日期一律 'YYYY-MM-DD' 字符串，字典序即时间序（与库里一致）
-    final start = '$month-01';
-    final end = '$month-${totalDays.toString().padLeft(2, '0')}';
+    return Pacing.ofRange(
+      from: '$month-01',
+      to: '$month-${totalDays.toString().padLeft(2, '0')}',
+      totalCents: totalCents,
+      usedCents: usedCents,
+      today: today,
+      label: label,
+    );
+  }
+
+  /// 按任意区间算节奏（周期归集后，一期是 28–31 天且不固定）。
+  ///
+  /// [from] / [to] 含两端，期长现算 —— 不能写死 31 天，否则 2 月那期会算出
+  /// 「还剩 -3 天」这种数字。
+  factory Pacing.ofRange({
+    required String from,
+    required String to,
+    required int? totalCents,
+    required int usedCents,
+    String? today,
+    String label = '本期',
+  }) {
+    final now = today ?? Fmt.today();
+    final totalDays = _daysBetween(from, to) + 1;
 
     int passed;
     bool finished = false;
-    if (now.compareTo(start) < 0) {
-      // 还没开始的月份：一天没过，整月都还可用
+    if (now.compareTo(from) < 0) {
+      // 还没开始的一期：一天没过，整期都还可用
       passed = 0;
-    } else if (now.compareTo(end) > 0) {
+    } else if (now.compareTo(to) > 0) {
       passed = totalDays;
       finished = true;
     } else {
-      passed = _daysBetween(start, now) + 1; // 含今天
+      passed = _daysBetween(from, now) + 1; // 含今天
     }
     final remain = finished ? 0 : (passed == 0 ? totalDays : totalDays - passed + 1);
 
@@ -69,6 +94,7 @@ class Pacing {
       passedDays: passed,
       remainDays: remain,
       finished: finished,
+      label: label,
     );
   }
 
@@ -117,17 +143,17 @@ class Pacing {
     }
     if (finished) {
       return leftCents >= 0
-          ? '本月已结束，预算还剩 ${Fmt.money(leftCents)}。'
-          : '本月已结束，超支 ${Fmt.money(overCents)}。';
+          ? '$label已结束，预算还剩 ${Fmt.money(leftCents)}。'
+          : '$label已结束，超支 ${Fmt.money(overCents)}。';
     }
     if (leftCents < 0) {
       return '已经超支 ${Fmt.money(overCents)}，接下来 $remainDays 天要悠着点。';
     }
     if (projectedOverCents > 0 && perDayRealCents > perDayBudgetCents) {
-      return '按现在的节奏，本月大概会超支 ${Fmt.money(projectedOverCents)}。'
+      return '按现在的节奏，$label大概会超支 ${Fmt.money(projectedOverCents)}。'
           '往后每天控制在 ${Fmt.money(canSpendPerDayCents)} 以内就没事。';
     }
-    return '节奏正常，本月还剩 ${Fmt.money(leftCents)}，'
+    return '节奏正常，$label还剩 ${Fmt.money(leftCents)}，'
         '平均每天可以花 ${Fmt.money(canSpendPerDayCents)}。';
   }
 }

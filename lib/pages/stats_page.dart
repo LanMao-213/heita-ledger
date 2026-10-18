@@ -24,7 +24,10 @@ class _StatsPageState extends State<StatsPage> {
   /// 这样条件条、清空、与搜索共存等行为都跟手动筛选完全一致。
   Future<void> _openDay(int day) async {
     final s = Store.i;
-    final date = '${s.month}-${day.toString().padLeft(2, '0')}';
+    // day 是「区间内第几天」，不是「几号」—— 周期可以跨月，按 1 号起算会错
+    final date = Fmt.date(
+      DateTime.parse(s.statFrom).add(Duration(days: day - 1)),
+    );
     // 先切页再查库：切页是即时的，查询要走一次 SQL，先切能少一拍空等
     s.switchTab(0);
     await s.applyFilter(TxnFilter(dateFrom: date, dateTo: date));
@@ -35,10 +38,10 @@ class _StatsPageState extends State<StatsPage> {
     final s = Store.i;
     // 金额允许为负（净额记账），某分类合计可能 ≤0 —— 饼图和排行榜画不出负扇区，
     // 这类分类直接不参与，明细里仍然照常显示
-    final stats = (_type.isExpense ? s.expenseStats : s.incomeStats)
+    final stats = (_type.isExpense ? s.statExpenseStats : s.statIncomeStats)
         .where((e) => e.totalCents > 0)
         .toList();
-    final total = _type.isExpense ? s.monthExpenseCents : s.monthIncomeCents;
+    final total = _type.isExpense ? s.statExpenseCents : s.statIncomeCents;
     final maxV = stats.isEmpty
         ? 1
         : stats.map((e) => e.totalCents).reduce((a, b) => a > b ? a : b);
@@ -51,11 +54,22 @@ class _StatsPageState extends State<StatsPage> {
           children: [
             Padding(
               padding: const EdgeInsets.only(top: S.md),
-              child: MonthBar(
-                month: s.month,
-                onPrev: () => s.shiftMonth(-1),
-                onNext: () => s.shiftMonth(1),
-              ),
+              child: _BasisSwitch(),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: S.xl),
+              child: s.statBasis == StatBasis.period
+                  ? CycleBar(
+                      from: s.statFrom,
+                      to: s.statTo,
+                      onPrev: () => s.shiftStat(-1),
+                      onNext: () => s.shiftStat(1),
+                    )
+                  : MonthBar(
+                      month: s.month,
+                      onPrev: () => s.shiftStat(-1),
+                      onNext: () => s.shiftStat(1),
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: S.xl, vertical: S.sm),
@@ -66,9 +80,9 @@ class _StatsPageState extends State<StatsPage> {
             ),
 
             if (stats.isEmpty)
-              const EmptyHint(
+              EmptyHint(
                 icon: 'pie',
-                text: '本月还没有数据',
+                text: s.statBasis == StatBasis.period ? '本期还没有数据' : '本月还没有数据',
                 hint: '记几笔之后这里会出现占比图',
               )
             else ...[
@@ -168,16 +182,18 @@ class _StatsPageState extends State<StatsPage> {
             ],
 
             // 下面两块和「支出/收入」切换无关，放在最后
-            const SectionTitle('近 6 个月'),
+            SectionTitle(
+              s.statBasis == StatBasis.period ? '近 6 期' : '近 6 个月',
+            ),
             SectionCard(
-              child: s.trendMonths.isEmpty
+              child: s.statTrend.isEmpty
                   ? const SizedBox(
                       height: 90,
                       child: Center(
                         child: Text('还没有历史数据', style: T.caption),
                       ),
                     )
-                  : _MonthlyTrend(rows: s.trendMonths),
+                  : _MonthlyTrend(rows: s.statTrend),
             ),
 
             const SectionTitle('账户资产'),
@@ -185,6 +201,50 @@ class _StatsPageState extends State<StatsPage> {
           ],
         );
       },
+    );
+  }
+}
+
+/// 「本期 / 本月」切换。
+///
+/// 两个口径的数字本来就会不同：账单日 15 时，10-10 的工资算本期（10-15 起）
+/// 还是算 10 月，答案不一样。给按钮就是让用户自己选看哪一种，别偷偷替他决定。
+class _BasisSwitch extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+
+    Widget item(StatBasis b, String label) {
+      final on = s.statBasis == b;
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => s.setStatBasis(b),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: on ? C.ink : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: on ? C.ink : C.line),
+          ),
+          child: Text(
+            label,
+            style: T.caption.copyWith(
+              color: on ? C.bg : C.ink2,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        item(StatBasis.period, '本期'),
+        const SizedBox(width: S.sm),
+        item(StatBasis.month, '本月'),
+      ],
     );
   }
 }
@@ -197,14 +257,17 @@ class _DailyTrend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
+    final from = DateTime.parse(s.statFrom);
+    final to = DateTime.parse(s.statTo);
+    final dayCount = to.difference(from).inDays + 1;
     final values = <int, int>{};
-    for (final r in s.dailyTotals) {
-      final d = int.tryParse(r.$1.split('-').last);
-      if (d != null) values[d] = r.$2;
+    for (final r in s.statDailyTotals) {
+      final idx = DateTime.parse(r.$1).difference(from).inDays + 1;
+      if (idx >= 1 && idx <= dayCount) values[idx] = r.$2;
     }
-    final p = s.month.split('-');
-    final dayCount = Fmt.daysInMonth(int.parse(p[0]), int.parse(p[1]));
-    final today = s.monthIsCurrent ? DateTime.now().day : null;
+    final todayStr = Fmt.today();
+    final todayIdx = DateTime.parse(todayStr).difference(from).inDays + 1;
+    final today = (todayIdx >= 1 && todayIdx <= dayCount) ? todayIdx : null;
     final maxV =
         values.values.isEmpty ? 0 : values.values.reduce((a, b) => a > b ? a : b);
 
@@ -228,11 +291,11 @@ class _DailyTrend extends StatelessWidget {
         const SizedBox(height: S.sm),
         Row(
           children: [
-            Text('1日', style: T.caption),
+            Text(s.statFrom.substring(5), style: T.caption),
             const Spacer(),
             Text('单日最高 ${Fmt.money(maxV)}', style: T.caption),
             const Spacer(),
-            Text('$dayCount日', style: T.caption),
+            Text(s.statTo.substring(5), style: T.caption),
           ],
         ),
       ],
@@ -247,7 +310,8 @@ class _DailyTrend extends StatelessWidget {
 class _MonthlyTrend extends StatelessWidget {
   const _MonthlyTrend({required this.rows});
 
-  final List<(String month, int expense, int income)> rows;
+  /// 月视图的 key 是 `2026-10`，周期视图是 `2026-10-15`
+  final List<(String label, int expense, int income)> rows;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +352,9 @@ class _MonthlyTrend extends StatelessWidget {
                     ),
                     const SizedBox(height: S.sm),
                     Text(
-                      '${int.parse(r.$1.substring(5))}月',
+                      r.$1.length == 7
+                          ? '${int.parse(r.$1.substring(5))}月'
+                          : r.$1.substring(5),
                       style: T.caption.copyWith(fontSize: 10.5),
                     ),
                   ],

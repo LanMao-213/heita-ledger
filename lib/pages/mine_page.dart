@@ -80,6 +80,16 @@ class MinePage extends StatelessWidget {
               ],
             ),
           ),
+          const SectionTitle('记账周期'),
+          SectionCard(
+            padding: EdgeInsets.zero,
+            child: SettingRow(
+              icon: 'card',
+              title: '账单日',
+              subtitle: '每月 ${s.cycleStartDay} 号起算一期，到下月该日前一天',
+              onTap: () => _pickCycleStartDay(context),
+            ),
+          ),
           const SectionTitle('数据'),
           SectionCard(
             padding: EdgeInsets.zero,
@@ -169,13 +179,55 @@ class MinePage extends StatelessWidget {
     );
   }
 
+  // -------------------------------------------------------------- 账单日
+
+  /// 选账单日。改完要把全部记录的归属期重算一遍，所以必须先说清楚再动手。
+  static Future<void> _pickCycleStartDay(BuildContext context) async {
+    final s = Store.i;
+    final day = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => _CycleDaySheet(current: s.cycleStartDay),
+    );
+    if (day == null || day == s.cycleStartDay) return;
+    if (!context.mounted) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: C.bg,
+        title: const Text('改账单日？'),
+        content: const Text(
+          '会按新的账单日重算全部记账算在哪一期，并把已有预算挪到新的期上。'
+          '金额一笔都不会动，变的只是「算在哪一期」。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    await s.applyCycleStartDay(day);
+    if (context.mounted) showToast(context, '账单日已改为 $day 号');
+  }
+
   // ------------------------------------------------------------------ 导出
 
   static Future<void> _export(BuildContext context) async {
     final s = Store.i;
-    if (s.monthTxns.isEmpty) {
-      final all = await Repo.monthTotals(s.ledgerId, s.month);
-      if (all.$3 == 0) {
+    if (s.txns.isEmpty) {
+      // 本期没有不等于整个账本没有：导出是全量的，别因为这一期空就拦下来
+      final months = await Repo.monthsWithData(s.ledgerId);
+      if (months.isEmpty) {
         if (context.mounted) showToast(context, '还没有记录可以导出');
         return;
       }
@@ -688,6 +740,82 @@ class _NetWorthCard extends StatelessWidget {
                 ),
               ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 账单日选择面板：1–31 号，短月自动收拢到月末（D14）。
+class _CycleDaySheet extends StatelessWidget {
+  const _CycleDaySheet({required this.current});
+
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: C.bg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
+      ),
+      padding: const EdgeInsets.only(top: S.md, bottom: S.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: C.line,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.xl, S.md, S.xl, S.sm),
+            child: Row(
+              children: [
+                Text('账单日', style: T.section),
+                const Spacer(),
+                const Text('1–31 号，短月自动取月末', style: T.caption),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: S.md),
+            child: GridView.count(
+              crossAxisCount: 7,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+              children: [
+                for (var d = 1; d <= 31; d++)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.pop(context, d),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: d == current ? C.ink : Colors.transparent,
+                        border: Border.all(
+                          color: d == current ? C.ink : C.line,
+                        ),
+                        borderRadius: BorderRadius.circular(R.sm),
+                      ),
+                      child: Text(
+                        '$d',
+                        style: T.body.copyWith(
+                          color: d == current ? C.bg : C.ink,
+                          fontWeight:
+                              d == current ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );

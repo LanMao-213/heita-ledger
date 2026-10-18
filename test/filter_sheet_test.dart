@@ -148,7 +148,7 @@ void main() {
 
     expect(Store.i.filteredTxns.length, 3);
     expect(Store.i.filteredTxns.any((t) => t.note == '打车'), isFalse);
-    expect(Store.i.monthTxns.any((t) => t.note == '打车'), isTrue);
+    expect(Store.i.txns.any((t) => t.note == '打车'), isTrue);
     expect(find.text('3 笔'), findsOneWidget);
   });
 }

@@ -22,7 +22,8 @@ class Db {
   /// 2：`txn_template` 增加 `use_count` / `last_used_at`（模板按使用频率排序）
   /// 3：收入分类补「提成」
   /// 4：`txn` 增加 `period_start`（归属期，F5 阶段 2 —— 加列但**不改查询**）
-  static const _version = 4;
+  /// 5：`budget` 由「自然月」改为「归属期」存储（D13 改口径，预算也按周期）
+  static const _version = 5;
 
   /// 当前 schema 版本。备份文件里会记下来，恢复时用来判断兼容性。
   static int get schemaVersion => _version;
@@ -56,6 +57,9 @@ class Db {
         }
         if (oldVersion < 4) {
           await _addPeriodStartColumn(db);
+        }
+        if (oldVersion < 5) {
+          await _moveBudgetToPeriod(db);
         }
       },
     );
@@ -149,10 +153,10 @@ class Db {
       CREATE TABLE budget (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         ledger_id    INTEGER NOT NULL,
-        month        TEXT    NOT NULL,
+        period_start TEXT    NOT NULL,
         category_id  INTEGER,
         amount_cents INTEGER NOT NULL DEFAULT 0,
-        UNIQUE (ledger_id, month, category_id)
+        UNIQUE (ledger_id, period_start, category_id)
       )''',
 
       '''
@@ -397,5 +401,39 @@ class Db {
       'CREATE INDEX IF NOT EXISTS idx_txn_ledger_period '
       'ON txn (ledger_id, period_start)',
     );
+  }
+
+  /// v4 → v5：`budget` 由自然月改成归属期（预算也按周期走）。
+  ///
+  /// 老数据是 `month`（`2026-10`），一行对应一期；账单日默认 1 时该期第一天
+  /// 就是月初，所以 `month || '-01'` 是**无损**的一对一换算，不需要按金额合并。
+  /// 结算口径变了，但钱没变、条数没变 —— 这是这次迁移唯一要保证的事。
+  ///
+  /// SQLite 不能改列名之外的约束，只能重建表：建新表 → 搬数据 → 删旧表 → 改名。
+  /// 幂等：已有 `period_start` 列就直接返回。
+  static Future<void> _moveBudgetToPeriod(Database db) async {
+    final hasTable = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'budget'",
+    );
+    if (hasTable.isEmpty) return;
+
+    final cols = await db.rawQuery('PRAGMA table_info(budget)');
+    if (cols.any((c) => c['name'] == 'period_start')) return;
+
+    await db.execute('''
+      CREATE TABLE budget_v5 (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        ledger_id    INTEGER NOT NULL,
+        period_start TEXT    NOT NULL,
+        category_id  INTEGER,
+        amount_cents INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (ledger_id, period_start, category_id)
+      )''');
+    await db.execute('''
+      INSERT INTO budget_v5 (id, ledger_id, period_start, category_id, amount_cents)
+      SELECT id, ledger_id, month || '-01', category_id, amount_cents FROM budget
+    ''');
+    await db.execute('DROP TABLE budget');
+    await db.execute('ALTER TABLE budget_v5 RENAME TO budget');
   }
 }

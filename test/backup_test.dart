@@ -78,7 +78,7 @@ void main() {
     ));
     await Repo.setBudget(
       ledgerId: s.ledgerId,
-      month: s.month,
+      periodStart: s.cycleFrom,
       categoryId: null,
       amountCents: 300000,
     );
@@ -231,7 +231,7 @@ void main() {
     await BackupService.restore(payload);
     await Store.i.reloadAfterRestore();
 
-    expect(Store.i.monthTxnCount, before.txns);
+    expect(Store.i.txnCount, before.txns);
     expect(Store.i.netWorthCents, before.netWorth);
     expect(Store.i.accounts, isNotEmpty);
     expect(Store.i.filtering, isFalse, reason: '恢复后要清掉可能失效的筛选条件');

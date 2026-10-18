@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
 import '../design/icons.dart';
@@ -155,28 +156,35 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   static const _presets = <String, String>{
     'none': '不限',
-    'month': '本月',
-    'lastMonth': '上月',
-    'quarter': '近 3 月',
+    'period': '本期',
+    'lastPeriod': '上期',
+    'quarter': '近 3 期',
     'year': '今年',
     'custom': '自定义',
   };
 
-  /// 快捷档一律以「今天」为基准，与正在浏览的月份无关 ——
-  /// 「本月」就该是现在这个月，跟着浏览月份跑会让人看不懂。
+  /// 快捷档一律以「今天」所在的那一期为基准，与正在浏览的期无关 ——
+  /// 「本期」就该是现在这一期，跟着浏览翻页跑会让人看不懂。
+  ///
+  /// 注意这里给的是**真实日期**区间：筛选始终按 `date` 筛（设计 §2.4），
+  /// 否则用户筛「10 月」会筛不到 10-10 那笔被抬期的工资。
   (String, String) _rangeOf(String key) {
+    final s = Store.i;
     final now = DateTime.now();
     final today = Fmt.today();
+    final (curFrom, curTo) = cycleRange(now, s.cycleStartDay);
     switch (key) {
-      case 'month':
-        return (Fmt.date(DateTime(now.year, now.month, 1)), today);
-      case 'lastMonth':
+      case 'period':
+        return (curFrom, curTo);
+      case 'lastPeriod':
         return (
-          Fmt.date(DateTime(now.year, now.month - 1, 1)),
-          Fmt.date(DateTime(now.year, now.month, 0)),
+          shiftCycleDate(curFrom, s.cycleStartDay, -1),
+          Fmt.date(
+            DateTime.parse(curFrom).subtract(const Duration(days: 1)),
+          ),
         );
       case 'quarter':
-        return (Fmt.date(DateTime(now.year, now.month - 2, 1)), today);
+        return (shiftCycleDate(curFrom, s.cycleStartDay, -2), curTo);
       case 'year':
         return (Fmt.date(DateTime(now.year, 1, 1)), today);
       default:

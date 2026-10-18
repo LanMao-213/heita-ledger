@@ -23,10 +23,11 @@ class PlanPage extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: S.md),
-            child: MonthBar(
-              month: s.month,
-              onPrev: () => s.shiftMonth(-1),
-              onNext: () => s.shiftMonth(1),
+            child: CycleBar(
+              from: s.cycleFrom,
+              to: s.cycleTo,
+              onPrev: () => s.shiftCycle(-1),
+              onNext: () => s.shiftCycle(1),
             ),
           ),
           const _TotalBudgetCard(),
@@ -51,11 +52,12 @@ class _TotalBudgetCard extends StatelessWidget {
     final s = Store.i;
     final budget = s.totalBudgetCents;
     final over = s.overBudget;
-    final used = budget == null || budget <= 0 ? 0.0 : s.monthExpenseCents / budget;
-    final pacing = Pacing.of(
-      month: s.month,
+    final used = budget == null || budget <= 0 ? 0.0 : s.expenseCents / budget;
+    final pacing = Pacing.ofRange(
+      from: s.cycleFrom,
+      to: s.cycleTo,
       totalCents: budget,
-      usedCents: s.monthExpenseCents,
+      usedCents: s.expenseCents,
     );
 
     return SectionCard(
@@ -66,7 +68,7 @@ class _TotalBudgetCard extends StatelessWidget {
             children: [
               const LineIcon('target', size: 18, color: C.ink2),
               const SizedBox(width: S.sm),
-              Text('本月总预算', style: T.section),
+              Text('本期总预算', style: T.section),
               const Spacer(),
               TextButton(
                 onPressed: () => _editTotal(context),
@@ -93,7 +95,7 @@ class _TotalBudgetCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text(Fmt.money(s.monthExpenseCents),
+                Text(Fmt.money(s.expenseCents),
                     style: T.hero.copyWith(fontSize: 30)),
                 Text('  /  ${Fmt.money(budget)}',
                     style: T.body2.copyWith(fontSize: 14)),
@@ -152,13 +154,13 @@ class _TotalBudgetCard extends StatelessWidget {
     final s = Store.i;
     final v = await _askAmount(
       context,
-      title: '本月总预算',
+      title: '本期总预算',
       initial: s.totalBudgetCents ?? 0,
     );
     if (v == null) return;
     await Repo.setBudget(
       ledgerId: s.ledgerId,
-      month: s.month,
+      periodStart: s.cycleFrom,
       amountCents: v,
     );
     await s.afterBudgetChange();
@@ -243,7 +245,7 @@ class _CategoryBudgets extends StatelessWidget {
     if (v == null) return;
     await Repo.setBudget(
       ledgerId: s.ledgerId,
-      month: s.month,
+      periodStart: s.cycleFrom,
       categoryId: cat.id,
       amountCents: v,
     );

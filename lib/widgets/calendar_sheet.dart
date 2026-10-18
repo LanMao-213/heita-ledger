@@ -34,7 +34,9 @@ class _MonthCalendarState extends State<_MonthCalendar> {
   @override
   void initState() {
     super.initState();
-    _month = Store.i.month;
+    // 日历仍按月展示，但起点跟当前期走：翻到 9 月那期时不该还停在 10 月
+    final from = Store.i.cycleFrom;
+    _month = from.length >= 7 ? from.substring(0, 7) : Store.i.month;
     _load();
   }
 

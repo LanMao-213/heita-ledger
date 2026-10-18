@@ -2,9 +2,16 @@
 import 'package:flutter/foundation.dart' hide Category;
 
 import 'data/db.dart';
+import 'data/cycle.dart' as cyc;
 import 'data/models.dart';
 import 'data/repo.dart';
 import 'data/ui_flags.dart';
+
+/// 统计页的归集口径。
+///
+/// 「本期」按归属期（`period_start`），「本月」按真实日期（`date`）。
+/// 账单日不是 1 时两者数字会不同 —— 这不是 bug，是切换按钮要表达的东西。
+enum StatBasis { period, month }
 
 /// 全局状态。用最朴素的 ChangeNotifier —— 这个应用的数据量很小，
 /// 引入状态管理框架反而增加理解成本。
@@ -45,21 +52,54 @@ class Store extends ChangeNotifier {
   // 储蓄目标
   List<SavingGoal> goals = [];
 
-  // 当前月份
-  String month = Fmt.month(DateTime.now());
-  bool monthIsCurrent = true;
+  // ---------------------------------------------------------------- 周期 / 月
+  //
+  // 明细页与计划页（预算）看的是**当前期**：`cycleFrom`–`cycleTo`。
+  // 统计页可以在「本期 / 本月」之间切换，所以它另有一套 `stat*` 字段 ——
+  // 两套分开存，切换统计数据时不会把明细页的数字带歪。
 
-  // 月统计
-  int monthExpenseCents = 0;
-  int monthIncomeCents = 0;
-  int monthTxnCount = 0;
+  /// 账单日（周期起始日），1–31，默认 1（= 自然月）
+  int cycleStartDay = 1;
+
+  /// 当前期首尾日期（`YYYY-MM-DD`，含两端）
+  String cycleFrom = '';
+  String cycleTo = '';
+
+  /// 当前期是否包含今天
+  bool isCurrentPeriod = true;
+
+  /// 当前期的收支与明细
+  int expenseCents = 0;
+  int incomeCents = 0;
+  int txnCount = 0;
+  List<Txn> txns = [];
+
+  /// 抬期池分类 id（工资/奖金/提成）：记一笔面板用它给开关一个默认值
+  Set<int> liftableCatIds = {};
+
+  /// 当前期的预算（预算也按周期，D13 已改）
   int? totalBudgetCents;
-  List<CatStat> expenseStats = [];
-  List<CatStat> incomeStats = [];
   List<BudgetStat> budgetStats = [];
 
-  // 当前月明细
-  List<Txn> monthTxns = [];
+  /// 统计页的归集口径
+  StatBasis statBasis = StatBasis.period;
+
+  /// 统计页当前看的区间（周期视图 = 当前期；月份视图 = 自然月）
+  String statFrom = '';
+  String statTo = '';
+
+  String month = Fmt.month(DateTime.now());
+  int statExpenseCents = 0;
+  int statIncomeCents = 0;
+  List<CatStat> statExpenseStats = [];
+  List<CatStat> statIncomeStats = [];
+  List<(String date, int expense, int income)> statDailyTotals = [];
+
+  /// 近 6 段的收支（周期视图是「期」，月份视图是「月」），按时间升序。
+  ///
+  /// 放在 Store 而不是页面里，是因为它跟当前区间绑死：换期要重查，
+  /// 页面组件只该读，不该自己管异步生命周期（否则测试里也等不到回包）。
+  List<(String label, int expense, int income)> statTrend = [];
 
   // 明细筛选。筛选生效时明细页看 filteredTxns，否则看 monthTxns
   TxnFilter filter = TxnFilter.none;
@@ -72,15 +112,6 @@ class Store extends ChangeNotifier {
   int _filterIncomeCents = 0;
   int filterCount = 0;
 
-  /// 当前月每日汇总（日期升序），供趋势图使用
-  List<(String date, int expense, int income)> dailyTotals = [];
-
-  /// 近 6 个月收支（含当前月，按月升序），统计页的「近 6 个月」用。
-  ///
-  /// 放在 Store 而不是页面里，是因为它跟 month 绑死：换月要重查，
-  /// 页面组件只该读，不该自己管异步生命周期（否则测试里也等不到回包）。
-  List<(String month, int expense, int income)> trendMonths = [];
-
   /// 启动时补记的周期账单条数（>0 时界面给一次提示）
   int recurringJustAdded = 0;
 
@@ -92,15 +123,14 @@ class Store extends ChangeNotifier {
   }
 
   int get budgetLeftCents =>
-      totalBudgetCents == null ? 0 : totalBudgetCents! - monthExpenseCents;
+      totalBudgetCents == null ? 0 : totalBudgetCents! - expenseCents;
 
   bool get overBudget =>
-      totalBudgetCents != null && monthExpenseCents > totalBudgetCents!;
+      totalBudgetCents != null && expenseCents > totalBudgetCents!;
 
-  int get overBudgetCents =>
-      overBudget ? monthExpenseCents - totalBudgetCents! : 0;
+  int get overBudgetCents => overBudget ? expenseCents - totalBudgetCents! : 0;
 
-  /// 首屏启动：建表/开库 → 补记周期账单 → 载入全部数据
+  /// 首屏启动：建表/开库 → 补归属期 → 补记周期账单 → 载入全部数据
   Future<void> boot() async {
     await Db.open();
     // v3 → v4 升级后 `period_start` 是空的，先补齐。账单日默认 1 时回填结果
@@ -109,10 +139,19 @@ class Store extends ChangeNotifier {
     // 界面实验开关（类型 chips / 空态第二行）从 setting 表读覆盖值
     await UiFlags.load();
     ledgerId = await Repo.currentLedgerId();
+    cycleStartDay = await Repo.cycleStartDay();
+    resetCycleToToday();
     recurringJustAdded = await Repo.runDueRecurring(ledgerId);
     await loadAll();
     ready = true;
     notifyListeners();
+  }
+
+  /// 把当前期拨回「今天所在的那一期」
+  void resetCycleToToday() {
+    final (from, to) = cyc.cycleRange(DateTime.now(), cycleStartDay);
+    cycleFrom = from;
+    cycleTo = to;
   }
 
   Future<void> loadAll() async {
@@ -122,8 +161,10 @@ class Store extends ChangeNotifier {
     expenseCats = await Repo.listCategories(ledgerId, type: TxnType.expense);
     incomeCats = await Repo.listCategories(ledgerId, type: TxnType.income);
     goals = await Repo.listGoals();
+    liftableCatIds = await Repo.liftableCategoryIds(ledgerId);
     await loadTemplates();
-    await loadMonth();
+    await loadCycle();
+    await loadStats();
   }
 
   /// 整库被替换（从备份恢复）之后重读一遍。
@@ -142,35 +183,114 @@ class Store extends ChangeNotifier {
     recentTemplates = await Repo.recentTemplates(ledgerId);
   }
 
-  Future<void> loadMonth() async {
-    final totals = await Repo.monthTotals(ledgerId, month);
-    monthExpenseCents = totals.$1;
-    monthIncomeCents = totals.$2;
-    monthTxnCount = totals.$3;
-    totalBudgetCents = await Repo.totalBudgetCents(ledgerId, month);
-    expenseStats =
-        await Repo.categoryStats(ledgerId: ledgerId, month: month, type: TxnType.expense);
-    incomeStats =
-        await Repo.categoryStats(ledgerId: ledgerId, month: month, type: TxnType.income);
-    budgetStats = await Repo.budgetStats(ledgerId, month);
-    monthTxns = await Repo.listTxns(ledgerId: ledgerId, month: month);
-    dailyTotals = await Repo.dailyTotals(ledgerId, month);
-    trendMonths = await Repo.recentMonths(
+  /// 载入当前期：明细页、计划页、预算都看这一份
+  Future<void> loadCycle() async {
+    final totals = await Repo.rangeTotals(ledgerId, cycleFrom, cycleTo);
+    expenseCents = totals.$1;
+    incomeCents = totals.$2;
+    txnCount = totals.$3;
+    totalBudgetCents = await Repo.totalBudgetCents(ledgerId, cycleFrom);
+    budgetStats = await Repo.budgetStats(
       ledgerId: ledgerId,
-      endMonth: month,
-      count: 6,
+      periodStart: cycleFrom,
+      from: cycleFrom,
+      to: cycleTo,
     );
-    monthIsCurrent = month == Fmt.month(DateTime.now());
+    txns = await Repo.rangeListTxns(
+      ledgerId: ledgerId,
+      from: cycleFrom,
+      to: cycleTo,
+    );
+    isCurrentPeriod = cyc.isCurrentCycle(cycleFrom, cycleTo);
     notifyListeners();
   }
 
-  Future<void> setMonth(String ym) async {
-    month = ym;
-    await loadMonth();
+  /// 载入统计页数据。口径由 [statBasis] 决定，字段也单独存（`stat*`），
+  /// 所以切换口径不会动到明细页的数字。
+  Future<void> loadStats() async {
+    final byPeriod = statBasis == StatBasis.period;
+    statFrom = byPeriod ? cycleFrom : Repo.monthStart(month);
+    statTo = byPeriod ? cycleTo : Repo.monthEnd(month);
+    final basis = byPeriod ? DateBasis.period : DateBasis.date;
+
+    final totals =
+        await Repo.rangeTotals(ledgerId, statFrom, statTo, basis: basis);
+    statExpenseCents = totals.$1;
+    statIncomeCents = totals.$2;
+    statExpenseStats = await Repo.rangeCategoryStats(
+      ledgerId: ledgerId,
+      from: statFrom,
+      to: statTo,
+      type: TxnType.expense,
+      basis: basis,
+    );
+    statIncomeStats = await Repo.rangeCategoryStats(
+      ledgerId: ledgerId,
+      from: statFrom,
+      to: statTo,
+      type: TxnType.income,
+      basis: basis,
+    );
+    statDailyTotals = await Repo.rangeDailyTotals(
+      ledgerId,
+      statFrom,
+      statTo,
+      basis: basis,
+    );
+    statTrend = byPeriod
+        ? await Repo.recentPeriods(
+            ledgerId: ledgerId,
+            endFrom: cycleFrom,
+            startDay: cycleStartDay,
+            count: 6,
+          )
+        : await Repo.recentMonths(
+            ledgerId: ledgerId,
+            endMonth: month,
+            count: 6,
+          );
+    notifyListeners();
   }
 
-  Future<void> shiftMonth(int delta) =>
-      setMonth(Fmt.shiftMonth(month, delta));
+  /// 切换统计口径（统计页的「本期 / 本月」）
+  Future<void> setStatBasis(StatBasis b) async {
+    if (statBasis == b) return;
+    statBasis = b;
+    await loadStats();
+  }
+
+  /// 统计页翻一段：周期视图翻一期，月份视图翻一个月
+  Future<void> shiftStat(int delta) async {
+    if (statBasis == StatBasis.period) {
+      await shiftCycle(delta);
+      return;
+    }
+    month = Fmt.shiftMonth(month, delta);
+    await loadStats();
+  }
+
+  /// 明细页 / 计划页翻一期
+  Future<void> shiftCycle(int delta) async {
+    cycleFrom = cyc.shiftCycleDate(cycleFrom, cycleStartDay, delta);
+    cycleTo = Fmt.date(
+      cyc
+          .shiftCycle(DateTime.parse(cycleFrom), cycleStartDay, 1)
+          .subtract(const Duration(days: 1)),
+    );
+    await loadCycle();
+    // 统计页停在周期视图时要跟着翻，否则切回图表页数字还停在上一期
+    if (statBasis == StatBasis.period) await loadStats();
+  }
+
+  /// 跳到某个日期所在的那一期（明细页日历里点某天用）
+  Future<void> goToCycleOf(String date) async {
+    final (from, to) = cyc.cycleRange(DateTime.parse(date), cycleStartDay);
+    if (from == cycleFrom && to == cycleTo) return;
+    cycleFrom = from;
+    cycleTo = to;
+    await loadCycle();
+    if (statBasis == StatBasis.period) await loadStats();
+  }
 
   Future<void> switchLedger(int id) async {
     ledgerId = id;
@@ -184,7 +304,8 @@ class Store extends ChangeNotifier {
   Future<void> afterTxnChange() async {
     accounts = await Repo.listAccounts();
     netWorthCents = await Repo.totalBalanceCents();
-    await loadMonth();
+    await loadCycle();
+    await loadStats();
     // 筛选态下必须重跑，否则删掉的记录还会挂在结果里
     if (filtering) await applyFilter(filter);
   }
@@ -198,7 +319,8 @@ class Store extends ChangeNotifier {
   Future<void> afterCategoryChange() async {
     expenseCats = await Repo.listCategories(ledgerId, type: TxnType.expense);
     incomeCats = await Repo.listCategories(ledgerId, type: TxnType.income);
-    await loadMonth();
+    await loadCycle();
+    await loadStats();
   }
 
   Future<void> afterAccountChange() async {
@@ -218,8 +340,13 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> afterBudgetChange() async {
-    totalBudgetCents = await Repo.totalBudgetCents(ledgerId, month);
-    budgetStats = await Repo.budgetStats(ledgerId, month);
+    totalBudgetCents = await Repo.totalBudgetCents(ledgerId, cycleFrom);
+    budgetStats = await Repo.budgetStats(
+      ledgerId: ledgerId,
+      periodStart: cycleFrom,
+      from: cycleFrom,
+      to: cycleTo,
+    );
     notifyListeners();
   }
 
@@ -247,7 +374,7 @@ class Store extends ChangeNotifier {
   bool get filtering => filter.isNotEmpty;
 
   /// 明细页的展示源：筛选生效时看筛选结果，否则看当月全部
-  List<Txn> get visibleTxns => filtering ? filteredTxns : monthTxns;
+  List<Txn> get visibleTxns => filtering ? filteredTxns : txns;
 
   /// 筛选结果的支出合计。
   ///
@@ -296,8 +423,8 @@ class Store extends ChangeNotifier {
     filterCount = 0;
   }
 
-  /// 把当前月明细按日期分组（日期倒序，组内 id 倒序）
-  List<(String date, List<Txn> items)> get groupedByDay => _group(monthTxns);
+  /// 把当前期明细按日期分组（日期倒序，组内 id 倒序）
+  List<(String date, List<Txn> items)> get groupedByDay => _group(txns);
 
   /// 筛选态下的按日分组，与 groupedByDay 同构
   List<(String date, List<Txn> items)> get groupedVisibleByDay =>
@@ -317,5 +444,17 @@ class Store extends ChangeNotifier {
     await Db.close();
     _resetFilter();
     await boot();
+  }
+
+  /// 账单日改动后：重算归属期 + 挪预算 + 拨回今天所在的那一期 + 全量重载
+  Future<void> applyCycleStartDay(int day) async {
+    cycleStartDay = day.clamp(1, 31);
+    await Repo.setSetting(Repo.cycleStartDayKey, '$cycleStartDay');
+    await Repo.rebuildPeriods(ledgerId);
+    // 预算的 key 是期首日，账单日变了必须跟着挪，否则历史预算全部「悬空」
+    await Repo.remapBudgetPeriods(cycleStartDay);
+    resetCycleToToday();
+    await loadCycle();
+    await loadStats();
   }
 }

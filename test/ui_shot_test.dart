@@ -293,11 +293,11 @@ Future<void> _seedDemoData() async {
   ));
 
   // 预算：总预算 + 一个必然超支的分类（用于验证红色警示）
-  await Repo.setBudget(ledgerId: ledgerId, month: month, amountCents: 600000);
+  await Repo.setBudget(ledgerId: ledgerId, periodStart: '$month-01', amountCents: 600000);
   if (food != null) {
     await Repo.setBudget(
       ledgerId: ledgerId,
-      month: month,
+      periodStart: '$month-01',
       categoryId: food,
       amountCents: 120000,
     );
@@ -305,7 +305,7 @@ Future<void> _seedDemoData() async {
   if (transport != null) {
     await Repo.setBudget(
       ledgerId: ledgerId,
-      month: month,
+      periodStart: '$month-01',
       categoryId: transport,
       amountCents: 30000,
     );

@@ -227,10 +227,19 @@ class Repo {
 
   /// 一条记录算在哪一期 —— 判定「这笔该不该抬期」的唯一入口。
   /// 区间与抬期规则本身在 `cycle.dart` 的 [periodStartOf] 里，不在这里重写一遍。
-  static String periodFor(Txn t, int startDay, Set<int> liftableIds) {
-    final lift = t.type.isIncome &&
-        t.categoryId != null &&
-        liftableIds.contains(t.categoryId);
+  ///
+  /// [liftToNext] 为 null 时按分类白名单给默认值；给了 true/false 就是用户在
+  /// 记一笔面板里手动拨过的结果（设计 §5.2：白名单只决定初值，最终值听用户的）。
+  static String periodFor(
+    Txn t,
+    int startDay,
+    Set<int> liftableIds, {
+    bool? liftToNext,
+  }) {
+    final lift = liftToNext ??
+        (t.type.isIncome &&
+            t.categoryId != null &&
+            liftableIds.contains(t.categoryId));
     return periodStartOf(t.date, startDay, liftToNext: lift);
   }
 
@@ -330,16 +339,22 @@ class Repo {
 
   // ------------------------------------------------------------------- 交易
 
-  static Future<int> insertTxn(Txn t) async {
+  static Future<int> insertTxn(Txn t, {bool? liftToNext}) async {
     final db = await Db.open();
     final startDay = await cycleStartDay();
     final liftable = await _liftableCategoryIds(db, t.ledgerId);
-    final id = await db.insert('txn', _txnRow(t, periodFor(t, startDay, liftable)));
+    final id = await db.insert(
+      'txn',
+      _txnRow(
+        t,
+        periodFor(t, startDay, liftable, liftToNext: liftToNext),
+      ),
+    );
     await _applyBalanceDelta(db, t, reverse: false);
     return id;
   }
 
-  static Future<void> updateTxn(Txn old, Txn now) async {
+  static Future<void> updateTxn(Txn old, Txn now, {bool? liftToNext}) async {
     final db = await Db.open();
     final startDay = await cycleStartDay();
     final liftable = await _liftableCategoryIds(db, now.ledgerId);
@@ -347,7 +362,10 @@ class Repo {
       await _applyBalanceDelta(txn, old, reverse: true);
       await txn.update(
         'txn',
-        _txnRow(now, periodFor(now, startDay, liftable)),
+        _txnRow(
+          now,
+          periodFor(now, startDay, liftable, liftToNext: liftToNext),
+        ),
         where: 'id = ?',
         whereArgs: [now.id],
       );
@@ -426,9 +444,11 @@ class Repo {
     String? keyword,
     int limit = 500,
     int offset = 0,
+    DateBasis basis = DateBasis.period,
   }) async {
     final db = await Db.open();
-    final where = StringBuffer('ledger_id = ? AND period_start BETWEEN ? AND ?');
+    final where =
+        StringBuffer('ledger_id = ? AND ${_col(basis)} BETWEEN ? AND ?');
     final args = <Object?>[
       ledgerId,
       from,
@@ -604,8 +624,37 @@ class Repo {
     for (var i = count - 1; i >= 0; i--) {
       final d = DateTime(y, m - i);
       final ym = '${d.year}-${d.month.toString().padLeft(2, '0')}';
-      final t = await monthTotals(ledgerId, ym);
+      final t = await rangeTotals(
+        ledgerId,
+        '$ym-01',
+        '$ym-${Fmt.daysInMonth(d.year, d.month).toString().padLeft(2, '0')}',
+        basis: DateBasis.date,
+      );
       out.add((ym, t.$1, t.$2));
+    }
+    return out;
+  }
+
+  /// 最近 [count] 期（含 [endFrom] 那一期）的收支合计，按期升序。
+  ///
+  /// 统计页的「近 6 期」用。逐期调 [rangeTotals] 与 [recentMonths] 同理由：
+  /// 最多 6 次、每次毫秒级，不值得为它写一条按周期分组的复杂 SQL。
+  static Future<List<(String from, int expense, int income)>> recentPeriods({
+    required int ledgerId,
+    required String endFrom,
+    required int startDay,
+    int count = 6,
+  }) async {
+    final out = <(String, int, int)>[];
+    final base = DateTime.parse(endFrom);
+    for (var i = count - 1; i >= 0; i--) {
+      final from = Fmt.date(shiftCycle(base, startDay, -i));
+      final to = Fmt.date(
+        shiftCycle(DateTime.parse(from), startDay, 1)
+            .subtract(const Duration(days: 1)),
+      );
+      final t = await rangeTotals(ledgerId, from, to);
+      out.add((from, t.$1, t.$2));
     }
     return out;
   }
@@ -663,7 +712,11 @@ class Repo {
         }
         final batch = txn.batch();
         for (final row in rows) {
-          batch.insert(t, row, conflictAlgorithm: ConflictAlgorithm.replace);
+          batch.insert(
+            t,
+            _normalizeBackupRow(t, row),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
         }
         await batch.commit(noResult: true);
       }
@@ -671,6 +724,25 @@ class Repo {
     // 旧备份（v3 及更早）里没有 period_start，回填一次即可；新备份自带，等于空跑
     await backfillMissingPeriods();
     return counts;
+  }
+
+  /// 把旧格式备份里的行改写成当前 schema 的形状。
+  ///
+  /// 现在只有一处：v4 及更早的备份里 `budget` 按 `month` 存，v5 起按
+  /// `period_start` 存。直接插会报「没有 month 列」，所以在这里换算一次。
+  /// 账单日默认 1 时 `2026-10` → `2026-10-01` 是无损的。
+  static Map<String, Object?> _normalizeBackupRow(
+    String table,
+    Map<String, Object?> row,
+  ) {
+    if (table != 'budget') return row;
+    if (row.containsKey('period_start')) return row;
+    final month = row['month'] as String?;
+    if (month == null) return row;
+    final out = Map<String, Object?>.from(row)
+      ..remove('month')
+      ..['period_start'] = '$month-01';
+    return out;
   }
 
   /// 读出全部设置项（键值对），恢复时用来保留机器状态
@@ -692,6 +764,10 @@ class Repo {
   ) =>
       rangeTotals(ledgerId, monthStart(month), monthEnd(month));
 
+  /// 归集口径对应的字段名：周期视图筛 `period_start`，月份视图筛 `date`。
+  static String _col(DateBasis basis) =>
+      basis == DateBasis.period ? 'period_start' : 'date';
+
   /// 某一期的收支合计。[from] / [to] 是该期的首尾日期（含两端）。
   ///
   /// 条件打在 **`period_start`** 上，不是 `date` —— 这是周期归集的口径：
@@ -699,13 +775,14 @@ class Repo {
   static Future<(int expense, int income, int count)> rangeTotals(
     int ledgerId,
     String from,
-    String to,
-  ) async {
+    String to, {
+    DateBasis basis = DateBasis.period,
+  }) async {
     final db = await Db.open();
     final r = await db.rawQuery(
       // 负数交叉归集：支出里的负数算进收入，收入里的负数算进支出
       'SELECT $_expSumSql AS exp, $_incSumSql AS inc, COUNT(*) AS cnt '
-      'FROM txn WHERE ledger_id = ? AND period_start BETWEEN ? AND ?',
+      'FROM txn WHERE ledger_id = ? AND ${_col(basis)} BETWEEN ? AND ?',
       [ledgerId, from, to],
     );
     final row = r.first;
@@ -735,6 +812,7 @@ class Repo {
     required String from,
     required String to,
     required TxnType type,
+    DateBasis basis = DateBasis.period,
   }) async {
     final db = await Db.open();
     // 对侧类型：支出饼要吸收「收入里的负数」，反之亦然
@@ -749,7 +827,7 @@ class Repo {
       '          ELSE t.amount_cents END) AS total, '
       '  COUNT(*) AS cnt '
       'FROM txn t LEFT JOIN category c ON c.id = t.category_id '
-      'WHERE t.ledger_id = ? AND t.period_start BETWEEN ? AND ? '
+      'WHERE t.ledger_id = ? AND t.${_col(basis)} BETWEEN ? AND ? '
       '  AND ((t.type = ? AND t.amount_cents >= 0)'
       '    OR (t.type = ? AND t.amount_cents < 0)) '
       'GROUP BY t.category_id '
@@ -779,8 +857,12 @@ class Repo {
   /// **筛的是归属期，分组仍按真实 `date`** —— 趋势图的柱子代表「那天花了多少」，
   /// 把它挪到账单日会变成谎报。所以一笔 10-10 的工资在 10-15 那一期里，
   /// 仍然显示在 10-10 这根柱子上。
-  static Future<List<(String date, int expense, int income)>>
-      rangeDailyTotals(int ledgerId, String from, String to) async {
+  static Future<List<(String date, int expense, int income)>> rangeDailyTotals(
+    int ledgerId,
+    String from,
+    String to, {
+    DateBasis basis = DateBasis.period,
+  }) async {
     final db = await Db.open();
     final rows = await db.rawQuery(
       'SELECT date, '
@@ -792,7 +874,7 @@ class Repo {
       "    WHEN type = 'income'  AND amount_cents >= 0 THEN amount_cents "
       "    WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
       '    ELSE 0 END), 0) AS inc '
-      'FROM txn WHERE ledger_id = ? AND period_start BETWEEN ? AND ? '
+      'FROM txn WHERE ledger_id = ? AND ${_col(basis)} BETWEEN ? AND ? '
       'GROUP BY date ORDER BY date',
       [ledgerId, from, to],
     );
@@ -817,24 +899,31 @@ class Repo {
 
   // ------------------------------------------------------------------- 预算
 
-  static Future<List<Budget>> listBudgets(int ledgerId, String month) async {
+  /// 某一期的预算明细（`category_id IS NULL` 那条是总预算）
+  static Future<List<Budget>> listBudgets(
+    int ledgerId,
+    String periodStart,
+  ) async {
     final db = await Db.open();
     final rows = await db.query(
       'budget',
-      where: 'ledger_id = ? AND month = ?',
-      whereArgs: [ledgerId, month],
+      where: 'ledger_id = ? AND period_start = ?',
+      whereArgs: [ledgerId, periodStart],
     );
     return rows.map(Budget.fromMap).toList();
   }
 
   /// 总预算（category_id 为 NULL 的那条）
-  static Future<int?> totalBudgetCents(int ledgerId, String month) async {
+  static Future<int?> totalBudgetCents(
+    int ledgerId,
+    String periodStart,
+  ) async {
     final db = await Db.open();
     final rows = await db.query(
       'budget',
       columns: ['amount_cents'],
-      where: 'ledger_id = ? AND month = ? AND category_id IS NULL',
-      whereArgs: [ledgerId, month],
+      where: 'ledger_id = ? AND period_start = ? AND category_id IS NULL',
+      whereArgs: [ledgerId, periodStart],
       limit: 1,
     );
     if (rows.isEmpty) return null;
@@ -843,7 +932,7 @@ class Repo {
 
   static Future<void> setBudget({
     required int ledgerId,
-    required String month,
+    required String periodStart,
     int? categoryId,
     required int amountCents,
   }) async {
@@ -851,11 +940,11 @@ class Repo {
     if (amountCents <= 0) {
       await db.delete(
         'budget',
-        where: 'ledger_id = ? AND month = ? AND '
+        where: 'ledger_id = ? AND period_start = ? AND '
             '${categoryId == null ? 'category_id IS NULL' : 'category_id = ?'}',
         whereArgs: [
           ledgerId,
-          month,
+          periodStart,
           ?categoryId,
         ],
       );
@@ -865,7 +954,7 @@ class Repo {
       'budget',
       {
         'ledger_id': ledgerId,
-        'month': month,
+        'period_start': periodStart,
         'category_id': categoryId,
         'amount_cents': amountCents,
       },
@@ -873,27 +962,75 @@ class Repo {
     );
   }
 
+  /// 改账单日后，把预算挪到新的归属期上。
+  ///
+  /// 预算的 key 是 `period_start`，账单日一变，原来那些 key 就落在期中间了
+  /// （10-15 起的一期，在账单日改回 1 号后已经不存在）。规则是：
+  /// **按「旧期第一天」找到它现在落进哪一期**，挪过去。
+  ///
+  /// 两条旧预算可能挤进同一期（期变长时），此时**金额相加**而不是让后一条
+  /// 覆盖前一条 —— 覆盖等于凭空吃掉一笔预算，用户只会觉得「我的预算少了」。
+  static Future<int> remapBudgetPeriods(int startDay) async {
+    final db = await Db.open();
+    final rows = await db.query(
+      'budget',
+      columns: ['ledger_id', 'period_start', 'category_id', 'amount_cents'],
+    );
+    if (rows.isEmpty) return 0;
+
+    final merged = <(int, String, int?), int>{};
+    for (final r in rows) {
+      final newStart = periodStartOf(r['period_start'] as String, startDay);
+      final key = (
+        r['ledger_id'] as int,
+        newStart,
+        r['category_id'] as int?,
+      );
+      merged[key] = (merged[key] ?? 0) + ((r['amount_cents'] as int?) ?? 0);
+    }
+
+    await db.transaction((txn) async {
+      await txn.delete('budget');
+      final batch = txn.batch();
+      merged.forEach((key, amount) {
+        batch.insert('budget', {
+          'ledger_id': key.$1,
+          'period_start': key.$2,
+          'category_id': key.$3,
+          'amount_cents': amount,
+        });
+      });
+      await batch.commit(noResult: true);
+    });
+    return merged.length;
+  }
+
   /// 分类预算 + 实际支出 —— 计划页进度条的数据源。
   /// 返回结果包含**设置了预算的分类**，以及**有支出但没设预算的分类**
   /// （后者 budgetCents 为 0，用于展示「未设预算」）。
-  static Future<List<BudgetStat>> budgetStats(
-    int ledgerId,
-    String month,
-  ) async {
+  ///
+  /// [periodStart] 决定读哪一期的预算；[from] / [to] 是该期的首尾日期，
+  /// 支出按 `period_start` 归集 —— 与明细页的「本期支出」同口径。
+  static Future<List<BudgetStat>> budgetStats({
+    required int ledgerId,
+    required String periodStart,
+    required String from,
+    required String to,
+  }) async {
     final db = await Db.open();
     final rows = await db.rawQuery(
       'SELECT c.id AS cid, c.name AS name, c.icon AS icon, '
       '  b.amount_cents AS budget, '
       '  COALESCE((SELECT SUM(t.amount_cents) FROM txn t '
       "     WHERE t.category_id = c.id AND t.type = 'expense' "
-      '       AND t.date BETWEEN ? AND ?), 0) AS spent '
+      '       AND t.period_start BETWEEN ? AND ?), 0) AS spent '
       'FROM category c '
       'LEFT JOIN budget b ON b.category_id = c.id '
-      '  AND b.ledger_id = c.ledger_id AND b.month = ? '
+      '  AND b.ledger_id = c.ledger_id AND b.period_start = ? '
       "WHERE c.ledger_id = ? AND c.type = 'expense' AND c.archived = 0 "
       '  AND (b.amount_cents IS NOT NULL OR spent > 0) '
       'ORDER BY (b.amount_cents IS NULL), b.amount_cents DESC',
-      [monthStart(month), monthEnd(month), month, ledgerId],
+      [from, to, periodStart, ledgerId],
     );
     return rows
         .map((m) => BudgetStat(
