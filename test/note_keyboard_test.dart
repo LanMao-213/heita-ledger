@@ -1,13 +1,16 @@
 // 记一笔面板的键盘适配自检。
 //
-// 真机上的坑：点备注框后系统输入法弹出，把面板下半屏接管，备注框正好压在
-// 它底下 —— 一边打字一边看不见自己写了什么。根因是面板整体没有让开
-// `viewInsets.bottom`；而只加 padding 还不够：自绘数字键盘 274dp 高，
-// 和 300dp 的系统键盘叠在一起会把可滚动区压成 0，备注框照样看不见。
+// 真机上的两个坑：
+// 1) 点备注框后系统输入法弹出，把面板下半屏接管，备注框正好压在它底下；
+// 2) 写备注时下面又冒出一颗「完成」按钮 —— 面板高度来回变、内容重排，
+//    看起来像「又打开了一个新页面」。用户明确要求去掉它：输入法自带的
+//    「完成」或直接收起键盘，就是这个意思。
 //
-// 所以这里钉两件事：
+// 所以这里钉四件事：
 // 1) 备注框整体落在键盘上沿之上；
-// 2) 写备注时数字键盘让位、出现「完成」，点完键盘回来（确认键不能丢）。
+// 2) 写备注时数字键盘让位，且**没有**「完成」按钮；
+// 3) 输入法点「完成」→ 收起键盘 → 数字键盘和确认键回来；
+// 4) 键盘收起后，最后一排（0 / . / 确认）没有被屏幕底边裁掉。
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -44,7 +47,7 @@ void main() {
     if (file.existsSync()) file.deleteSync();
   });
 
-  testWidgets('备注聚焦时键盘不遮住输入框，且数字键盘让位', (tester) async {
+  testWidgets('备注聚焦时键盘不遮住输入框，数字键盘让位且没有「完成」', (tester) async {
     tester.view.physicalSize = const Size(390 * 2, _screenH * 2);
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.reset);
@@ -79,9 +82,9 @@ void main() {
     tester.view.viewInsets = const FakeViewPadding(bottom: _keyboardH * 2);
     await tester.pumpAndSettle();
 
-    // 键盘让位：数字键盘收起，「完成」出现
+    // 键盘让位：数字键盘收起；不再有替代它的「完成」按钮
     expect(find.byType(CalcKeypad), findsNothing);
-    expect(find.text('完成'), findsOneWidget);
+    expect(find.text('完成'), findsNothing);
 
     // 备注框整个落在键盘上沿之上（844 − 300 = 544）
     final rect = tester.getRect(find.byType(TextField));
@@ -92,12 +95,48 @@ void main() {
     );
     expect(rect.height, greaterThan(0));
 
-    // 点「完成」→ 收起输入法，数字键盘和确认键回来
-    await tester.tap(find.text('完成'));
-    await tester.pumpAndSettle();
+    // 用输入法自带的「完成」：收起键盘，数字键盘和确认键回来
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     tester.view.viewInsets = FakeViewPadding.zero;
     await tester.pumpAndSettle();
+
     expect(find.byType(CalcKeypad), findsOneWidget);
-    expect(find.text('完成'), findsNothing);
+    expect(find.text('确认'), findsOneWidget);
+  });
+
+  testWidgets('小屏 + 底部手势条：键盘最后一排不会被裁掉', (tester) async {
+    // 360 × 740 是那台真机的逻辑尺寸量级；底部 24 是手势条的高度。
+    tester.view.physicalSize = const Size(360 * 3, 740 * 3);
+    tester.view.devicePixelRatio = 3.0;
+    tester.view.padding = const FakeViewPadding(bottom: 24 * 3);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 24 * 3);
+    addTearDown(tester.view.reset);
+
+    await tester.runAsync(() => Store.i.boot());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (c) => Center(
+            child: TextButton(
+              onPressed: () => showRecordSheet(c),
+              child: const Text('记一笔'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('记一笔'));
+    await tester.pumpAndSettle();
+
+    // 没有溢出异常（溢出只会表现为最后一排被裁，debug 里是 RenderFlex overflow）
+    expect(tester.takeException(), isNull);
+
+    // 数字键盘整体得让开手势条：底部 24 是系统条，压上去就等于「确认」被裁
+    final pad = tester.getRect(find.byType(CalcKeypad));
+    expect(
+      pad.bottom,
+      lessThanOrEqualTo(740 - 24 + 0.5),
+      reason: '键盘落进了手势条区域：底边 ${pad.bottom}',
+    );
   });
 }

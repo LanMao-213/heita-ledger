@@ -282,7 +282,7 @@ class Store extends ChangeNotifier {
     if (statBasis == StatBasis.period) await loadStats();
   }
 
-  /// 跳到某个日期所在的那一期（明细页日历里点某天用）
+  /// 跳到某个日期所在的那一期（日历里点某天用）
   Future<void> goToCycleOf(String date) async {
     final (from, to) = cyc.cycleRange(DateTime.parse(date), cycleStartDay);
     if (from == cycleFrom && to == cycleTo) return;
@@ -290,6 +290,15 @@ class Store extends ChangeNotifier {
     cycleTo = to;
     await loadCycle();
     if (statBasis == StatBasis.period) await loadStats();
+  }
+
+  /// 跳到某个月（统计页的月份视图里点日历用）。
+  ///
+  /// 只动 `month` 与统计数据：明细页/预算走的是「期」，不该被月份跳转带偏。
+  Future<void> goToMonth(String ym) async {
+    if (month == ym) return;
+    month = ym;
+    await loadStats();
   }
 
   Future<void> switchLedger(int id) async {

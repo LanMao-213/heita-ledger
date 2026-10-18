@@ -6,6 +6,7 @@ import '../data/repo.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
+import '../widgets/calendar_picker.dart';
 import '../widgets/common.dart';
 
 /// 计划页 = 预算 + 储蓄目标。
@@ -28,6 +29,7 @@ class PlanPage extends StatelessWidget {
               to: s.cycleTo,
               onPrev: () => s.shiftCycle(-1),
               onNext: () => s.shiftCycle(1),
+              onTapLabel: () => showCalendarAndGo(context),
             ),
           ),
           // ⚠️ 不要加 const：这些组件读 Store，const 实例在重建时会被

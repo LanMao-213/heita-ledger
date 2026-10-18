@@ -4,6 +4,7 @@ import '../data/models.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
+import '../widgets/calendar_picker.dart';
 import '../widgets/charts.dart';
 import '../widgets/common.dart';
 
@@ -64,11 +65,14 @@ class _StatsPageState extends State<StatsPage> {
                       to: s.statTo,
                       onPrev: () => s.shiftStat(-1),
                       onNext: () => s.shiftStat(1),
+                      // 点「10-15 → 11-14」也能弹日历：两条路都通
+                      onTapLabel: () => showCalendarAndGo(context),
                     )
                   : MonthBar(
                       month: s.month,
                       onPrev: () => s.shiftStat(-1),
                       onNext: () => s.shiftStat(1),
+                      onTapLabel: () => showCalendarAndGo(context, byMonth: true),
                     ),
             ),
             Padding(

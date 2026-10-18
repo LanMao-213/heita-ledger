@@ -226,6 +226,72 @@ Widget _barArrow(IconData icon, VoidCallback onTap, Color color) => IconButton(
       padding: EdgeInsets.zero,
     );
 
+/// 「当前是哪一期」—— 明细页顶部只有这一个，不做左右翻期。
+///
+/// 翻期交给日历：点这一颗就弹日历，点哪天就跳到那天所在的期。理由是一期
+/// 可能跨两个月（10-15 → 11-14），左右箭头一次只挪一期，要回到三个月前
+/// 得连点三下，而且每次都得重新读一遍数字确认自己翻到哪了。
+///
+/// 日历图案贴在文字**里面**（右侧），不另起一个按钮：它表达的是
+/// 「这个时间段是可点的」，不是一个并列的入口。
+class PeriodChip extends StatelessWidget {
+  const PeriodChip({
+    super.key,
+    required this.from,
+    required this.to,
+    required this.onTap,
+    this.onDark = false,
+  });
+
+  final String from;
+  final String to;
+  final VoidCallback onTap;
+
+  /// 放在深色卡里时用
+  final bool onDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = onDark ? C.bg : C.ink;
+    final iconColor = onDark ? C.bg.withValues(alpha: 0.8) : C.ink2;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.only(left: 12, right: 10),
+        decoration: BoxDecoration(
+          color: onDark ? C.bg.withValues(alpha: 0.10) : C.bg,
+          borderRadius: BorderRadius.circular(999),
+          border: onDark ? null : Border.all(color: C.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  cycleLabel(from, to),
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: fg,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.calendar_month_rounded, size: 16, color: iconColor),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class MonthBar extends StatelessWidget {
   const MonthBar({
     super.key,

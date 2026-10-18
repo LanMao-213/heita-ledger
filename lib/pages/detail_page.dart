@@ -7,8 +7,7 @@ import '../data/ui_flags.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
-import '../widgets/calendar_sheet.dart';
-import '../widgets/period_sheet.dart';
+import '../widgets/calendar_picker.dart';
 import '../widgets/common.dart';
 import '../widgets/filter_sheet.dart';
 import '../widgets/record_sheet.dart';
@@ -67,42 +66,65 @@ class DetailPage extends StatelessWidget {
       final dayExpense = sumBySide(items, TxnType.expense);
       final dayIncome = sumBySide(items, TxnType.income);
 
-      out.add(Padding(
-        padding: const EdgeInsets.fromLTRB(S.xl, S.lg, S.xl, S.sm),
-        child: Row(
-          children: [
-            // 日期让出剩余宽度：某天既有收入又有支出、数字又长时，
-            // 三个 Text 并排会顶出屏幕（真机上表现为右侧被裁掉一截）
-            Expanded(
-              child: Text(
-                Fmt.friendly(date),
-                style: T.caption,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+      out.add(Container(
+        margin: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
+        decoration: BoxDecoration(
+          color: C.bg,
+          borderRadius: BorderRadius.circular(R.card),
+          border: Border.all(color: C.line),
+          // 极淡的投影：白卡叠在白底上只靠 1px 描边，看起来还是一条长列表；
+          // 一点点投影就够让它「浮」起来，不至于抢走顶部概览卡的分量
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0A14161A),
+              blurRadius: 10,
+              offset: Offset(0, 2),
             ),
-            if (dayIncome > 0)
-              Padding(
-                padding: const EdgeInsets.only(right: S.sm),
-                child: Text(
-                  '收入 ${Fmt.money(dayIncome)}',
-                  style: T.caption.copyWith(color: C.ink2),
-                ),
-              ),
-            if (dayExpense > 0)
-              Text('支出 ${Fmt.money(dayExpense)}', style: T.caption),
           ],
         ),
-      ));
-
-      out.add(SectionCard(
-        padding: const EdgeInsets.symmetric(vertical: S.xs),
-        margin: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 0),
         child: Column(
           children: [
+            // 日期是这张卡的头，放在卡里 —— 挂在卡外面的话，
+            // 一屏几张卡会读成一串「小标题 + 列表」，不像卡片
+            Padding(
+              padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
+              child: Row(
+                children: [
+                  // 日期让出剩余宽度：某天既有收入又有支出、数字又长时，
+                  // 三个 Text 并排会顶出屏幕（真机上表现为右侧被裁掉一截）
+                  Expanded(
+                    child: Text(
+                      Fmt.friendly(date),
+                      style: T.caption.copyWith(
+                        color: C.ink2,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (dayIncome > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(right: S.sm),
+                      child: Text(
+                        '收入 ${Fmt.money(dayIncome)}',
+                        style: T.caption.copyWith(color: C.ink2),
+                      ),
+                    ),
+                  if (dayExpense > 0)
+                    Text('支出 ${Fmt.money(dayExpense)}', style: T.caption),
+                ],
+              ),
+            ),
+            const Divider(height: 1, thickness: 1, color: C.line),
             for (var i = 0; i < items.length; i++) ...[
               if (i > 0)
-                const Divider(height: 1, thickness: 1, color: C.line, indent: 56),
+                const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: C.line,
+                  indent: 56,
+                ),
               _TxnRow(txn: items[i]),
             ],
           ],
@@ -268,17 +290,18 @@ class _SearchDelegate extends SearchDelegate<String> {
       );
 }
 
-/// 首页概览卡（深色 hero）。
+/// 首页概览卡。
 ///
-/// 只用 `C.ink` 作底、`C.bg` 作字，不引入任何新颜色；超支时用为深底准备的
-/// `C.overD`。一整屏白底黑字里需要一个「先看这里」的落点，卡片就是它。
+/// 浅灰底（`C.bg2`）+ 描边，和下方白底明细卡正好反过来：
+/// 一个「压下去」的汇总区，配一组「浮上来」的记录卡。之前是纯黑 hero，
+/// 在满屏黑白灰里太重，一进页面眼睛只能看到这块黑。
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard();
 
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    // 筛选态下这张卡整体换口径：月份条换成结果摘要，数字改成筛选结果合计，
+    // 筛选态下这张卡整体换口径：周期换成结果摘要，数字改成筛选结果合计，
     // 预算进度条收起（预算按本期，跟跨期筛选没有关系）
     final filtering = s.filtering;
     final expense = filtering ? s.filteredExpenseCents : s.expenseCents;
@@ -286,7 +309,9 @@ class _SummaryCard extends StatelessWidget {
     // 笔数也用聚合里的真实值：列表可能被截到 500 条，但「共几笔」不该跟着少算
     final count = filtering ? s.filterCount : s.txnCount;
 
-    final dim = C.bg.withValues(alpha: 0.62);
+    // 次要文字的灰度：浅底上不能再用「白字压暗」，那是深色卡的做法
+    final dim = C.ink2;
+    final faint = C.ink3;
     final budget = s.totalBudgetCents;
 
     // 预算节奏只在「按本期看」时算：跨期筛选的合计和一期预算不是一回事
@@ -300,34 +325,34 @@ class _SummaryCard extends StatelessWidget {
         : null;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
-      padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.lg),
+      margin: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.xs),
+      padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
       decoration: BoxDecoration(
-        color: C.ink,
+        color: C.bg2,
         borderRadius: BorderRadius.circular(R.lg),
+        border: Border.all(color: C.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            height: 44,
+            height: 38,
             child: filtering
-                ? const _FilterHead(onDark: true)
-                : CycleBar(
-                    from: s.cycleFrom,
-                    to: s.cycleTo,
-                    onPrev: () => s.shiftCycle(-1),
-                    onNext: () => s.shiftCycle(1),
-                    onTapLabel: () => showPeriodPicker(context),
-                    onDark: true,
-                    trailing: _CalButton(
-                      onTap: () => showMonthCalendar(context),
+                ? const _FilterHead()
+                : Align(
+                    alignment: Alignment.centerLeft,
+                    // 只有这一颗：不提供左右翻期，点它弹日历挑日期
+                    child: PeriodChip(
+                      from: s.cycleFrom,
+                      to: s.cycleTo,
+                      onTap: () => showCalendarAndGo(context),
                     ),
                   ),
           ),
+          const SizedBox(height: S.sm),
           Text(
             filtering ? '筛选支出' : '本期支出',
-            style: TextStyle(fontSize: 12, color: dim),
+            style: TextStyle(fontSize: 12, color: faint),
           ),
           const SizedBox(height: 2),
           // 金额到六位数时用 FittedBox 收一点，保证永远单行
@@ -337,7 +362,7 @@ class _SummaryCard extends StatelessWidget {
             child: Text(
               Fmt.money(expense),
               maxLines: 1,
-              style: T.hero.copyWith(color: C.bg, fontSize: 34),
+              style: T.hero.copyWith(fontSize: 34),
             ),
           ),
           const SizedBox(height: S.md),
@@ -357,14 +382,14 @@ class _SummaryCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
                   '$count 笔',
-                  style: TextStyle(fontSize: 12, color: dim),
+                  style: TextStyle(fontSize: 12, color: faint),
                 ),
               ),
             ],
           ),
           if (pacing != null) ...[
             const SizedBox(height: S.lg),
-            Container(height: 1, color: C.bg.withValues(alpha: 0.12)),
+            const Divider(height: 1, color: C.line),
             const SizedBox(height: S.md),
             Row(
               children: [
@@ -381,7 +406,7 @@ class _SummaryCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: s.overBudget ? C.overD : dim,
+                    color: s.overBudget ? C.over : C.ink,
                   ),
                 ),
               ],
@@ -392,9 +417,9 @@ class _SummaryCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: pacing.usedRatio.clamp(0.0, 1.0),
                 minHeight: 6,
-                backgroundColor: C.bg.withValues(alpha: 0.14),
+                backgroundColor: C.line2,
                 valueColor: AlwaysStoppedAnimation(
-                  s.overBudget ? C.overD : C.bg,
+                  s.overBudget ? C.over : C.ink,
                 ),
               ),
             ),
@@ -403,7 +428,7 @@ class _SummaryCard extends StatelessWidget {
               children: [
                 Text(
                   '还剩 ${pacing.remainDays} 天',
-                  style: TextStyle(fontSize: 11.5, color: dim),
+                  style: TextStyle(fontSize: 11.5, color: faint),
                 ),
                 const Spacer(),
                 Text(
@@ -411,7 +436,7 @@ class _SummaryCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: C.bg,
+                    color: C.ink,
                   ),
                 ),
               ],
@@ -423,7 +448,7 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-/// hero 里的一格小数字（收入 / 结余）
+/// 概览卡里的一格小数字（收入 / 结余）
 class _HeroStat extends StatelessWidget {
   const _HeroStat({required this.label, required this.value});
 
@@ -435,13 +460,7 @@ class _HeroStat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            color: C.bg.withValues(alpha: 0.62),
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 11.5, color: C.ink3)),
         const SizedBox(height: 2),
         // 金额可能很长（收入五位数 + 结余带符号），等比缩一点保证单行
         FittedBox(
@@ -451,41 +470,12 @@ class _HeroStat extends StatelessWidget {
             value,
             maxLines: 1,
             style: T.amountSm.copyWith(
-              color: C.bg,
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-/// hero 右上角的日历入口
-class _CalButton extends StatelessWidget {
-  const _CalButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: C.bg.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(9),
-        ),
-        child: Icon(
-          Icons.calendar_month_rounded,
-          size: 18,
-          color: C.bg.withValues(alpha: 0.9),
-        ),
-      ),
     );
   }
 }
@@ -551,28 +541,21 @@ class _TypeChips extends StatelessWidget {
   }
 }
 
-/// 筛选态下替代月份条的那行：说清「这是筛选结果，共几笔，覆盖哪段时间」
+/// 筛选态下替代周期条的那行：说清「这是筛选结果，共几笔，覆盖哪段时间」
 class _FilterHead extends StatelessWidget {
-  const _FilterHead({this.onDark = false});
-
-  final bool onDark;
+  const _FilterHead();
 
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    final title = onDark ? C.bg : C.ink;
-    final sub = onDark ? C.bg.withValues(alpha: 0.62) : C.ink3;
     return Row(
       children: [
-        Text(
-          '筛选结果',
-          style: T.section.copyWith(color: title),
-        ),
+        const Text('筛选结果', style: T.section),
         const Spacer(),
         Flexible(
           child: Text(
             s.filter.dateLabel ?? '全部时间',
-            style: T.caption.copyWith(color: sub),
+            style: T.caption,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.end,

@@ -19,7 +19,10 @@ Future<bool?> showRecordSheet(BuildContext context, {Txn? editing}) {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: C.bg,
+    // 透明底 + 自己画背景：面板要给系统键盘让出底部空间，那段留白如果由
+    // 面板自己涂白，键盘弹起的过程中会先闪一块白板（看起来像「重开了一页」）。
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.35),
     builder: (_) => RecordSheet(editing: editing),
   );
 }
@@ -42,6 +45,9 @@ class _RecordSheetState extends State<RecordSheet> {
 
   /// 双轮盘里选了「自定义…」时，把焦点交给备注框
   final _noteFocus = FocusNode();
+
+  /// 备注框滚到可见位置用（键盘弹起后信息区会被压扁）
+  final _scroll = ScrollController();
 
   /// 正在输入的金额，直接存字符串便于按键操作（避免浮点误差累积）
   String _amountInput = '';
@@ -117,11 +123,25 @@ class _RecordSheetState extends State<RecordSheet> {
     _noteFocus.removeListener(_onNoteFocusChanged);
     _note.dispose();
     _noteFocus.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
   void _onNoteFocusChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    // 输入法把信息区压扁之后，备注框可能落到可视区下面。滚到底，
+    // 让用户一眼看到自己在写什么 —— 否则会出现「打着字看不见」。
+    if (_noteFocus.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+        );
+      });
+    }
   }
 
   /// 双轮盘：左选分类、右选名目。选「自定义…」就把焦点交回备注框。
@@ -335,148 +355,148 @@ class _RecordSheetState extends State<RecordSheet> {
     // 系统输入法占掉的高度。写备注时下半屏归它，面板必须整体让开，
     // 否则备注框正好落在它底下。
     final keyboard = media.viewInsets.bottom;
+    // 没有输入法时，屏幕底部还有手势条 / 三键导航栏。它不体现在 size 里，
+    // 面板必须自己让出来 —— 之前漏了这一步，真机上键盘最后一排（0 / . / 确认）
+    // 正好被手势条压掉一条，看起来就是「键盘尺寸不对」。
+    final bottomInset = keyboard > media.viewPadding.bottom
+        ? keyboard
+        : media.viewPadding.bottom;
     // 焦点在备注里、且输入法真的弹出时，才把数字键盘收起来。
     // 只看焦点不看键盘高度的话，用户用输入法自带的「完成」收起键盘后，
     // 数字键盘不会回来，连确认键一起消失。
     final typingNote = keyboard > 0 && _noteFocus.hasFocus;
     // 0.90：顶部多了「最近模板」那排之后，0.88 会把备注框切掉一条。
-    // 键盘弹出时按「让开键盘后剩下的高度」算，否则面板加键盘会顶出屏幕。
-    final maxH = (media.size.height - keyboard) * 0.90;
+    final maxH = (media.size.height - bottomInset) * 0.90;
 
-    final body = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SheetHeader(
-          title: _isEdit ? '编辑记录' : '记一笔',
-          action: _isEdit
-              ? TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('取消', style: TextStyle(color: C.ink2)),
-                )
-              : TextButton(
-                  onPressed: _saveAsTemplate,
-                  child: const Text(
-                    '存为模板',
-                    style: TextStyle(fontSize: 13, color: C.ink2),
-                  ),
-                ),
-        ),
-        // 顶部常驻「最近用过的模板」—— 记账高频场景下这就是快捷键
-        if (!_isEdit && Store.i.recentTemplates.isNotEmpty)
-          _TemplateStrip(
-            templates: Store.i.recentTemplates,
-            appliedId: _applied?.id,
-            onTap: _applyTemplate,
-          ),
-        _TypeSwitch(
-          value: _type,
-          onChanged: (t) {
-            setState(() {
-              _type = t;
-              // 切换收支后原分类不再适用，重置到第一个；模板也随之失效
-              _categoryId = _firstCategoryId();
-              _applied = null;
-            });
-          },
-        ),
-        _AmountDisplay(input: _amountInput),
-        const Divider(height: 1, color: C.line),
-        // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
-        // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
-        Flexible(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: S.sm),
-            child: Column(
-              children: [
-                _CategoryNoteRow(
-                  category: Store.i.categoryOf(_categoryId),
-                  note: _note,
-                  onTap: _pickCategoryNote,
-                ),
-                const Divider(height: 1, color: C.line),
-                _MetaRow(
-                  date: _date,
-                  onPickDate: _pickDate,
-                  accountName: Store.i.accountOf(_accountId)?.name ?? '未选账户',
-                  accountIcon: Store.i.accountOf(_accountId)?.icon ?? 'wallet',
-                  onPickAccount: _pickAccount,
-                ),
-                if (_showLift)
-                  _LiftRow(
-                    on: _liftOn,
-                    periodLabel: shortYmd(
-                      periodStartOf(
-                        _date,
-                        Store.i.cycleStartDay,
-                        liftToNext: _liftOn,
+    final body = LayoutBuilder(
+      builder: (context, box) {
+        // 键高跟着可用高度走：先给头部 / 金额 / 信息区留 380，剩下 5 排均分。
+        // 46 是设计值，只有小屏才往下收 —— 宁可键矮一点，也不要裁掉「确认」。
+        final keyH = ((box.maxHeight - 380) / 5).clamp(38.0, 46.0);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SheetHeader(
+              title: _isEdit ? '编辑记录' : '记一笔',
+              action: _isEdit
+                  ? TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('取消', style: TextStyle(color: C.ink2)),
+                    )
+                  : TextButton(
+                      onPressed: _saveAsTemplate,
+                      child: const Text(
+                        '存为模板',
+                        style: TextStyle(fontSize: 13, color: C.ink2),
                       ),
                     ),
-                    onChanged: (v) => setState(() => _liftOverride = v),
-                  ),
-                _NoteField(
-                  controller: _note,
-                  focusNode: _noteFocus,
-                  onSubmitted: (_) => _noteFocus.unfocus(),
+            ),
+            // 顶部常驻「最近用过的模板」—— 记账高频场景下这就是快捷键
+            if (!_isEdit && Store.i.recentTemplates.isNotEmpty)
+              _TemplateStrip(
+                templates: Store.i.recentTemplates,
+                appliedId: _applied?.id,
+                onTap: _applyTemplate,
+              ),
+            _TypeSwitch(
+              value: _type,
+              onChanged: (t) {
+                setState(() {
+                  _type = t;
+                  // 切换收支后原分类不再适用，重置到第一个；模板也随之失效
+                  _categoryId = _firstCategoryId();
+                  _applied = null;
+                });
+              },
+            ),
+            _AmountDisplay(input: _amountInput),
+            const Divider(height: 1, color: C.line),
+            // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
+            // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
+            Flexible(
+              child: SingleChildScrollView(
+                controller: _scroll,
+                padding: const EdgeInsets.only(bottom: S.sm),
+                child: Column(
+                  children: [
+                    _CategoryNoteRow(
+                      category: Store.i.categoryOf(_categoryId),
+                      note: _note,
+                      onTap: _pickCategoryNote,
+                    ),
+                    const Divider(height: 1, color: C.line),
+                    _MetaRow(
+                      date: _date,
+                      onPickDate: _pickDate,
+                      accountName:
+                          Store.i.accountOf(_accountId)?.name ?? '未选账户',
+                      accountIcon:
+                          Store.i.accountOf(_accountId)?.icon ?? 'wallet',
+                      onPickAccount: _pickAccount,
+                    ),
+                    if (_showLift)
+                      _LiftRow(
+                        on: _liftOn,
+                        periodLabel: shortYmd(
+                          periodStartOf(
+                            _date,
+                            Store.i.cycleStartDay,
+                            liftToNext: _liftOn,
+                          ),
+                        ),
+                        onChanged: (v) => setState(() => _liftOverride = v),
+                      ),
+                    _NoteField(
+                      controller: _note,
+                      focusNode: _noteFocus,
+                      // 输入法的「完成」= 备注写完：收起键盘，数字键盘和确认键回来
+                      onSubmitted: (_) => _noteFocus.unfocus(),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
-        // 写备注时数字键盘让位：它 274dp 高，和系统键盘叠在一起会把可滚动区
-        // 压成 0，备注框照样看不见；何况这时候本来也按不到数字。
-        if (typingNote)
-          _NoteDoneBar(onDone: () => _noteFocus.unfocus())
-        else ...[
-          const Divider(height: 1, color: C.line),
-          CalcKeypad(
-            onKey: _pressKey,
-            onConfirm: _save,
-            canConfirm: _canSave && !_saving,
-          ),
-        ],
-      ],
+            // 写备注时数字键盘让位：它 270dp 高，和系统键盘叠在一起会把可滚动区
+            // 压成 0，备注框照样看不见；何况这时候本来也按不到数字。
+            // 不给「完成」按钮：输入法自带的那颗 + 收起键盘，都是「写完了」。
+            if (!typingNote) ...[
+              const Divider(height: 1, color: C.line),
+              CalcKeypad(
+                onKey: _pressKey,
+                onConfirm: _save,
+                canConfirm: _canSave && !_saving,
+                keyHeight: keyH,
+              ),
+            ],
+          ],
+        );
+      },
     );
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: keyboard),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxH),
-        child: body,
-      ),
-    );
-  }
-}
-
-/// 写备注时替代数字键盘的一条。
-///
-/// 系统输入法已经把下半屏占住，数字键盘这时候帮不上忙，先让位；
-/// 点「完成」收起输入法，数字键盘和确认键自动回来。
-class _NoteDoneBar extends StatelessWidget {
-  const _NoteDoneBar({required this.onDone});
-
-  final VoidCallback onDone;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.md),
-      child: SizedBox(
-        height: 46,
-        child: TextButton(
-          onPressed: onDone,
-          style: TextButton.styleFrom(
-            backgroundColor: C.ink,
-            foregroundColor: C.bg,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(R.md),
-            ),
+    // 键盘弹出 / 收起时面板整体滑动，配合动画让「换成输入法」看起来是
+    // 同一个面板在让位，而不是「又打开了一个新页面」。
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxH),
+          child: ClipRRect(
+            // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
+            // 留白不会跟着变白
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(R.lg)),
+            child: Container(color: C.bg, child: body),
           ),
-          child: const Text('完成'),
         ),
       ),
     );
   }
 }
+
 
 /// 「最近用过的模板」横排。点一下就填，选中态用纯黑反白，
 /// 和其它选中态（分类九宫格、底部导航）保持同一套语言。
@@ -795,6 +815,9 @@ class _NoteField extends StatelessWidget {
         maxLength: 60,
         textInputAction: TextInputAction.done,
         onSubmitted: onSubmitted,
+        // 点空白处也算写完了：不再要求用户专门去点一颗「完成」
+        onTapOutside: (_) => focusNode?.unfocus(),
+        onEditingComplete: () => focusNode?.unfocus(),
         inputFormatters: [LengthLimitingTextInputFormatter(60)],
         decoration: InputDecoration(
           counterText: '',

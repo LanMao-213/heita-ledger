@@ -121,6 +121,14 @@ void main() {
     await _shot(tester, 'build/visual/shot_1_detail.png');
     expect(tester.takeException(), isNull, reason: '明细页有布局溢出');
 
+    // ---- 日历卡片（上下滚动，没有左右翻月）----
+    await tester.tap(find.byIcon(Icons.calendar_month_rounded));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    await _shot(tester, 'build/visual/shot_14_calendar.png');
+    expect(tester.takeException(), isNull, reason: '日历卡片有布局溢出');
+    await tester.tapAt(const Offset(195, 60));
+    await tester.pumpAndSettle();
+
     // ---- 图表页 ----
     await tester.tap(find.text('图表'));
     await tester.pumpAndSettle();

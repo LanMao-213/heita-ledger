@@ -20,14 +20,23 @@ class CalcKeypad extends StatelessWidget {
     required this.onKey,
     required this.onConfirm,
     required this.canConfirm,
+    this.keyHeight = 46,
   });
 
   final ValueChanged<String> onKey;
   final VoidCallback onConfirm;
   final bool canConfirm;
 
+  /// 单个键的高度。面板按屏幕高度算好再传进来 —— 小屏机型上固定 46 会让
+  /// 最后一排（0 / . / 确认）被裁掉一条，那正是「键盘尺寸有问题」的真身。
+  final double keyHeight;
+
   static const _gap = 6.0;
-  static const _h = 46.0;
+
+  double get _h => keyHeight;
+
+  /// 键盘整体高度（不含外边距），给面板算可用空间用
+  static double heightFor(double keyHeight) => keyHeight * 5 + _gap * 4;
 
   @override
   Widget build(BuildContext context) {

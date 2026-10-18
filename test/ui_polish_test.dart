@@ -14,6 +14,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ledger/data/cycle.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
@@ -145,32 +146,57 @@ void main() {
     expect(s.filteredTxns.length, 2);
   });
 
-  testWidgets('日历面板：显示当月金额，点某天跳到那天的筛选', (tester) async {
+  testWidgets('明细顶部只有周期、没有左右翻期，点它弹日历', (tester) async {
     await seed(tester);
     await pumpDetail(tester);
     final s = Store.i;
-    final today = Fmt.today();
 
-    // 打开日历（hero 右上角的按钮）。先推完弹出动画，再等查询回包
+    // 周期还在
+    expect(find.text(cycleLabel(s.cycleFrom, s.cycleTo)), findsOneWidget);
+    // 但没有左右箭头 —— 翻期交给日历
+    expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+    expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+
+    // 点这一颗 → 日历卡片（上下滚动，不是左右翻月）
     await tester.tap(find.byIcon(Icons.calendar_month_rounded));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await settle(tester);
 
-    expect(find.text('点某一天，直接看那天的明细'), findsOneWidget);
+    expect(find.text('跳到哪一期'), findsOneWidget);
+    // 日历是纵向列表，不是 PageView：没有左右切月的按钮
+    expect(find.byType(ListView), findsWidgets);
+    expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+  });
 
-    // 点「今天」那一格（限定在网格里找，避免命中列表里的日期文字）
-    final day = int.parse(today.substring(8)).toString();
+  testWidgets('日历里点上个月的 1 号 → 明细跳到那一期', (tester) async {
+    await seed(tester);
+    await pumpDetail(tester);
+    final s = Store.i;
+
+    await tester.tap(find.byIcon(Icons.calendar_month_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // 列表最新在上：第 0 块是本月，第 1 块是上月
+    final prev = DateTime(DateTime.now().year, DateTime.now().month - 1, 1);
+    final prevYm =
+        '${prev.year}-${prev.month.toString().padLeft(2, '0')}';
     await tester.tap(find.descendant(
-      of: find.byType(GridView),
-      matching: find.text(day),
+      of: find.byType(GridView).at(1),
+      matching: find.text('1'),
     ));
     await settle(tester);
 
-    expect(s.filtering, isTrue);
-    expect(s.filter.dateFrom, today);
-    expect(s.filter.dateTo, today);
-    expect(s.filteredTxns.length, 3); // 三笔都在今天
+    expect(s.cycleFrom, '$prevYm-01');
+    expect(s.cycleTo, Fmt.date(DateTime(prev.year, prev.month + 1, 0)));
+    // loadCycle 里有 5 次串行查询，一次 settle 不一定跑完 —— 等它落地再断言
+    for (var i = 0; i < 10 && s.isCurrentPeriod; i++) {
+      await settle(tester);
+    }
+    expect(s.isCurrentPeriod, isFalse);
+    // 上个月没有记录，明细清空但不该顺手筛出东西来
+    expect(s.txns, isEmpty);
+    expect(s.filtering, isFalse);
   });
 
   testWidgets('我的页有备份与恢复两个入口', (tester) async {
