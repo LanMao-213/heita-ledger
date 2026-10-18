@@ -143,8 +143,18 @@ void main() {
     canvas.translate(gap, gap);
     canvas.scale(bigW / kMarkViewBoxW, bigH / kMarkViewBoxH);
     canvas.translate(-kMarkViewBoxX, -kMarkViewBoxY);
-    canvas.drawPath(body, Paint()..color = _ink..isAntiAlias = true);
-    canvas.drawPath(flame, Paint()..color = _over..isAntiAlias = true);
+    canvas.drawPath(
+      body,
+      Paint()
+        ..color = _ink
+        ..isAntiAlias = true,
+    );
+    canvas.drawPath(
+      flame,
+      Paint()
+        ..color = _over
+        ..isAntiAlias = true,
+    );
     canvas.restore();
 
     // 小图（验证缩小后眼睛的白区是否仍然可见 = evenodd 生效）
@@ -153,8 +163,18 @@ void main() {
     canvas.translate(sx, gap);
     canvas.scale(smallW / kMarkViewBoxW, smallH / kMarkViewBoxH);
     canvas.translate(-kMarkViewBoxX, -kMarkViewBoxY);
-    canvas.drawPath(body, Paint()..color = _ink..isAntiAlias = true);
-    canvas.drawPath(flame, Paint()..color = _over..isAntiAlias = true);
+    canvas.drawPath(
+      body,
+      Paint()
+        ..color = _ink
+        ..isAntiAlias = true,
+    );
+    canvas.drawPath(
+      flame,
+      Paint()
+        ..color = _over
+        ..isAntiAlias = true,
+    );
     canvas.restore();
 
     final image = await recorder.endRecording().toImage(w.toInt(), h.toInt());

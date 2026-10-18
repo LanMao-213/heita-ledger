@@ -61,8 +61,10 @@ class _FilterSheetState extends State<_FilterSheet> {
     _dateFrom = f.dateFrom;
     _dateTo = f.dateTo;
     _preset = _matchPreset(f.dateFrom, f.dateTo);
-    if (f.minCents != null) _minCtrl.text = Fmt.money(f.minCents!, trimZero: true);
-    if (f.maxCents != null) _maxCtrl.text = Fmt.money(f.maxCents!, trimZero: true);
+    if (f.minCents != null)
+      _minCtrl.text = Fmt.money(f.minCents!, trimZero: true);
+    if (f.maxCents != null)
+      _maxCtrl.text = Fmt.money(f.maxCents!, trimZero: true);
     _scheduleCount();
   }
 
@@ -121,8 +123,10 @@ class _FilterSheetState extends State<_FilterSheet> {
       });
       return;
     }
-    final (items, truncated) =
-        await Repo.searchTxns(ledgerId: Store.i.ledgerId, filter: f);
+    final (items, truncated) = await Repo.searchTxns(
+      ledgerId: Store.i.ledgerId,
+      filter: f,
+    );
     if (!mounted) return;
     setState(() {
       _count = items.length;
@@ -137,20 +141,20 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   /// 切到「收入」时分类必须清掉：支出分类配收入条件永远是空结果
   void _setType(TxnType? t) => _edit(() {
-        _type = _type == t ? null : t;
-        if (_type == TxnType.income) _categoryId = null;
-      });
+    _type = _type == t ? null : t;
+    if (_type == TxnType.income) _categoryId = null;
+  });
 
   void _reset() => _edit(() {
-        _type = null;
-        _categoryId = null;
-        _accountId = null;
-        _dateFrom = null;
-        _dateTo = null;
-        _preset = null;
-        _minCtrl.clear();
-        _maxCtrl.clear();
-      });
+    _type = null;
+    _categoryId = null;
+    _accountId = null;
+    _dateFrom = null;
+    _dateTo = null;
+    _preset = null;
+    _minCtrl.clear();
+    _maxCtrl.clear();
+  });
 
   // ---------------------------------------------------------------- 时间档
 
@@ -179,9 +183,7 @@ class _FilterSheetState extends State<_FilterSheet> {
       case 'lastPeriod':
         return (
           shiftCycleDate(curFrom, s.cycleStartDay, -1),
-          Fmt.date(
-            DateTime.parse(curFrom).subtract(const Duration(days: 1)),
-          ),
+          Fmt.date(DateTime.parse(curFrom).subtract(const Duration(days: 1))),
         );
       case 'quarter':
         return (shiftCycleDate(curFrom, s.cycleStartDay, -2), curTo);
@@ -265,7 +267,10 @@ class _FilterSheetState extends State<_FilterSheet> {
               title: '筛选',
               action: TextButton(
                 onPressed: _reset,
-                child: const Text('重置', style: TextStyle(fontSize: 13, color: C.ink2)),
+                child: const Text(
+                  '重置',
+                  style: TextStyle(fontSize: 13, color: C.ink2),
+                ),
               ),
             ),
             Flexible(
@@ -351,10 +356,7 @@ class _FilterSheetState extends State<_FilterSheet> {
         if (locked)
           Padding(
             padding: const EdgeInsets.fromLTRB(S.xl, 0, S.xl, S.xs),
-            child: Text(
-              '收入不按分类筛选',
-              style: T.caption.copyWith(color: C.ink4),
-            ),
+            child: Text('收入不按分类筛选', style: T.caption.copyWith(color: C.ink4)),
           ),
         IgnorePointer(
           ignoring: locked,
@@ -364,9 +366,8 @@ class _FilterSheetState extends State<_FilterSheet> {
             child: CategoryGrid(
               cats: s.expenseCats,
               selected: _categoryId,
-              onSelect: (id) => _edit(
-                () => _categoryId = _categoryId == id ? null : id,
-              ),
+              onSelect: (id) =>
+                  _edit(() => _categoryId = _categoryId == id ? null : id),
             ),
           ),
         ),
@@ -392,9 +393,8 @@ class _FilterSheetState extends State<_FilterSheet> {
               label: a.name,
               icon: a.icon,
               selected: _accountId == a.id,
-              onTap: () => _edit(
-                () => _accountId = _accountId == a.id ? null : a.id,
-              ),
+              onTap: () =>
+                  _edit(() => _accountId = _accountId == a.id ? null : a.id),
             ),
         ],
       ),

@@ -37,7 +37,10 @@ abstract final class ExcelService {
     }
 
     final cats = <int, String>{};
-    for (final c in await Repo.listCategories(ledgerId, includeArchived: true)) {
+    for (final c in await Repo.listCategories(
+      ledgerId,
+      includeArchived: true,
+    )) {
       cats[c.id] = c.name;
     }
     final accs = <int, String>{};
@@ -128,7 +131,10 @@ abstract final class ExcelService {
     if (sheet.maxRows <= 1) return const ImportResult(0, 0, 0, 0, []);
 
     final cats = <String, int>{};
-    for (final c in await Repo.listCategories(ledgerId, includeArchived: true)) {
+    for (final c in await Repo.listCategories(
+      ledgerId,
+      includeArchived: true,
+    )) {
       cats['${c.type.code}|${c.name}'] = c.id;
     }
     final accs = <String, int>{};
@@ -178,14 +184,16 @@ abstract final class ExcelService {
         final key = '${type.code}|$rawCat';
         categoryId = cats[key];
         if (categoryId == null) {
-          categoryId = await Repo.insertCategory(Category(
-            id: 0,
-            ledgerId: ledgerId,
-            type: type,
-            name: rawCat,
-            icon: 'more',
-            sortOrder: 999,
-          ));
+          categoryId = await Repo.insertCategory(
+            Category(
+              id: 0,
+              ledgerId: ledgerId,
+              type: type,
+              name: rawCat,
+              icon: 'more',
+              sortOrder: 999,
+            ),
+          );
           cats[key] = categoryId;
           newCats++;
         }
@@ -196,27 +204,31 @@ abstract final class ExcelService {
       if (rawAcc.isNotEmpty) {
         accountId = accs[rawAcc];
         if (accountId == null) {
-          accountId = await Repo.insertAccount(Account(
-            id: 0,
-            name: rawAcc,
-            kind: AccountKind.other,
-            sortOrder: 999,
-          ));
+          accountId = await Repo.insertAccount(
+            Account(
+              id: 0,
+              name: rawAcc,
+              kind: AccountKind.other,
+              sortOrder: 999,
+            ),
+          );
           accs[rawAcc] = accountId;
           newAccs++;
         }
       }
 
-      await Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: ledgerId,
-        type: type,
-        amountCents: amountCents,
-        date: date,
-        categoryId: categoryId,
-        accountId: accountId,
-        note: note,
-      ));
+      await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: type,
+          amountCents: amountCents,
+          date: date,
+          categoryId: categoryId,
+          accountId: accountId,
+          note: note,
+        ),
+      );
       imported++;
     }
 
@@ -237,7 +249,8 @@ abstract final class ExcelService {
     final direct = DateTime.tryParse(s);
     if (direct != null) return Fmt.date(direct);
 
-    final m = RegExp(r'^(\d{4})[/.\-年]?(\d{1,2})[/.\-月]?(\d{1,2})').firstMatch(s);
+    final m = RegExp(r'^(\d{4})[/.\-年]?(\d{1,2})[/.\-月]?(\d{1,2})')
+        .firstMatch(s);
     if (m != null) {
       final y = int.parse(m.group(1)!);
       final mo = int.parse(m.group(2)!);

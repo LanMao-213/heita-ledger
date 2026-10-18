@@ -80,7 +80,8 @@ class _RecordSheetState extends State<RecordSheet> {
     final e = widget.editing;
     _type = e?.type ?? TxnType.expense;
     _categoryId = e?.categoryId;
-    _accountId = e?.accountId ?? (s.accounts.isEmpty ? null : s.accounts.first.id);
+    _accountId =
+        e?.accountId ?? (s.accounts.isEmpty ? null : s.accounts.first.id);
     _date = e?.date ?? Fmt.today();
     _note = TextEditingController(text: e?.note ?? '');
     if (e != null) {
@@ -91,8 +92,7 @@ class _RecordSheetState extends State<RecordSheet> {
 
     // 反推「计入下期」开关：归属期跟真实日期所在期不一致，就是当时拨开了
     if (e != null && e.periodStart != null) {
-      _liftOverride =
-          e.periodStart != periodStartOf(e.date, s.cycleStartDay);
+      _liftOverride = e.periodStart != periodStartOf(e.date, s.cycleStartDay);
     }
   }
 
@@ -236,17 +236,19 @@ class _RecordSheetState extends State<RecordSheet> {
     ctl.dispose();
     if (ok != true) return;
 
-    await Repo.insertTemplate(TxnTemplate(
-      id: 0,
-      ledgerId: Store.i.ledgerId,
-      name: name.isEmpty ? catName : name,
-      icon: Store.i.categoryOf(_categoryId)?.icon ?? 'tpl',
-      type: _type,
-      amountCents: _amountCents ?? 0,
-      categoryId: _categoryId,
-      accountId: _accountId,
-      note: _note.text.trim(),
-    ));
+    await Repo.insertTemplate(
+      TxnTemplate(
+        id: 0,
+        ledgerId: Store.i.ledgerId,
+        name: name.isEmpty ? catName : name,
+        icon: Store.i.categoryOf(_categoryId)?.icon ?? 'tpl',
+        type: _type,
+        amountCents: _amountCents ?? 0,
+        categoryId: _categoryId,
+        accountId: _accountId,
+        note: _note.text.trim(),
+      ),
+    );
     await Store.i.afterTemplateChange();
     if (!mounted) return;
     setState(() {}); // 让顶部那排模板立刻带上新的
@@ -281,17 +283,20 @@ class _RecordSheetState extends State<RecordSheet> {
         );
         await Repo.updateTxn(old, now, liftToNext: _liftOverride);
       } else {
-        await Repo.insertTxn(Txn(
-          id: 0,
-          ledgerId: store.ledgerId,
-          type: _type,
-          amountCents: cents,
-          date: _date,
-          categoryId: _categoryId,
-          accountId: _accountId,
-          note: note,
-          templateId: tplId,
-        ), liftToNext: _liftOverride);
+        await Repo.insertTxn(
+          Txn(
+            id: 0,
+            ledgerId: store.ledgerId,
+            type: _type,
+            amountCents: cents,
+            date: _date,
+            categoryId: _categoryId,
+            accountId: _accountId,
+            note: note,
+            templateId: tplId,
+          ),
+          liftToNext: _liftOverride,
+        );
         if (tplId != null) {
           await Repo.touchTemplate(tplId);
           await store.afterTemplateChange();
@@ -489,7 +494,9 @@ class _RecordSheetState extends State<RecordSheet> {
           child: ClipRRect(
             // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
             // 留白不会跟着变白
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(R.lg)),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(R.lg),
+            ),
             child: Container(color: C.bg, child: body),
           ),
         ),
@@ -497,7 +504,6 @@ class _RecordSheetState extends State<RecordSheet> {
     );
   }
 }
-
 
 /// 「最近用过的模板」横排。点一下就填，选中态用纯黑反白，
 /// 和其它选中态（分类九宫格、底部导航）保持同一套语言。
@@ -551,9 +557,7 @@ class _TemplateStrip extends StatelessWidget {
                       Fmt.yuan(t.amountCents),
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: on
-                            ? C.bg.withValues(alpha: 0.72)
-                            : C.ink3,
+                        color: on ? C.bg.withValues(alpha: 0.72) : C.ink3,
                       ),
                     ),
                   ],
@@ -678,7 +682,12 @@ class _MetaRow extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip({super.key, required this.icon, required this.label, required this.onTap});
+  const _Chip({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   final String icon;
   final String label;
@@ -827,8 +836,10 @@ class _NoteField extends StatelessWidget {
           filled: true,
           fillColor: C.bg2,
           isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: S.md, vertical: 13),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: S.md,
+            vertical: 13,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(R.md),
             borderSide: BorderSide.none,

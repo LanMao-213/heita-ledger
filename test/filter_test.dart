@@ -40,18 +40,12 @@ void main() {
 
     await Db.open();
     ledgerId = await Repo.currentLedgerId();
-    catFood = await Repo.insertCategory(Category(
-      id: 0,
-      ledgerId: ledgerId,
-      type: TxnType.expense,
-      name: '餐饮',
-    ));
-    catSalary = await Repo.insertCategory(Category(
-      id: 0,
-      ledgerId: ledgerId,
-      type: TxnType.income,
-      name: '工资',
-    ));
+    catFood = await Repo.insertCategory(
+      Category(id: 0, ledgerId: ledgerId, type: TxnType.expense, name: '餐饮'),
+    );
+    catSalary = await Repo.insertCategory(
+      Category(id: 0, ledgerId: ledgerId, type: TxnType.income, name: '工资'),
+    );
     accCash = await Repo.insertAccount(const Account(id: 0, name: '现金'));
     accBank = await Repo.insertAccount(const Account(id: 0, name: '银行卡'));
   });
@@ -70,25 +64,54 @@ void main() {
     int? acc,
     int? toAcc,
     String note = '',
-  }) =>
-      Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: ledgerId,
-        type: type,
-        amountCents: cents,
-        date: date,
-        categoryId: cat,
-        accountId: acc,
-        toAccountId: toAcc,
-        note: note,
-      ));
+  }) => Repo.insertTxn(
+    Txn(
+      id: 0,
+      ledgerId: ledgerId,
+      type: type,
+      amountCents: cents,
+      date: date,
+      categoryId: cat,
+      accountId: acc,
+      toAccountId: toAcc,
+      note: note,
+    ),
+  );
 
   /// 四条记录，覆盖支出/收入/转账、两个账户、两个月份
   Future<void> seed() async {
-    await add(type: TxnType.expense, cents: 8000, date: '2026-10-01', cat: catFood, acc: accCash, note: '午饭');
-    await add(type: TxnType.expense, cents: 30000, date: '2026-10-05', cat: catFood, acc: accBank, note: '聚餐');
-    await add(type: TxnType.income, cents: 1000000, date: '2026-10-10', cat: catSalary, acc: accBank, note: '工资');
-    await add(type: TxnType.transfer, cents: 50000, date: '2026-09-20', acc: accBank, toAcc: accCash, note: '取现');
+    await add(
+      type: TxnType.expense,
+      cents: 8000,
+      date: '2026-10-01',
+      cat: catFood,
+      acc: accCash,
+      note: '午饭',
+    );
+    await add(
+      type: TxnType.expense,
+      cents: 30000,
+      date: '2026-10-05',
+      cat: catFood,
+      acc: accBank,
+      note: '聚餐',
+    );
+    await add(
+      type: TxnType.income,
+      cents: 1000000,
+      date: '2026-10-10',
+      cat: catSalary,
+      acc: accBank,
+      note: '工资',
+    );
+    await add(
+      type: TxnType.transfer,
+      cents: 50000,
+      date: '2026-09-20',
+      acc: accBank,
+      toAcc: accCash,
+      note: '取现',
+    );
   }
 
   Future<List<Txn>> query(TxnFilter f, {String? keyword, int? limit}) async {
@@ -103,8 +126,10 @@ void main() {
 
   test('空条件等价于全量，且不报截断', () async {
     await seed();
-    final (items, truncated) =
-        await Repo.searchTxns(ledgerId: ledgerId, filter: TxnFilter.none);
+    final (items, truncated) = await Repo.searchTxns(
+      ledgerId: ledgerId,
+      filter: TxnFilter.none,
+    );
     expect(items.length, 4);
     expect(truncated, isFalse);
     // 默认按日期倒序
@@ -131,7 +156,10 @@ void main() {
 
   test('金额区间两端都含', () async {
     await seed();
-    expect((await query(const TxnFilter(minCents: 10000, maxCents: 50000))).length, 2);
+    expect(
+      (await query(const TxnFilter(minCents: 10000, maxCents: 50000))).length,
+      2,
+    );
     // 端点值本身要命中
     final exact = await query(const TxnFilter(minCents: 8000, maxCents: 8000));
     expect(exact.length, 1);
@@ -148,8 +176,9 @@ void main() {
 
   test('时间段两端都含', () async {
     await seed();
-    final items =
-        await query(const TxnFilter(dateFrom: '2026-10-01', dateTo: '2026-10-10'));
+    final items = await query(
+      const TxnFilter(dateFrom: '2026-10-01', dateTo: '2026-10-10'),
+    );
     expect(items.length, 3);
     expect(items.any((t) => t.date == '2026-09-20'), isFalse);
     // 端点那天本身要在结果里
@@ -173,8 +202,14 @@ void main() {
 
   test('关键词与筛选叠加，空关键词不影响', () async {
     await seed();
-    expect((await query(TxnFilter(categoryId: catFood), keyword: '聚')).length, 1);
-    expect((await query(TxnFilter(categoryId: catFood), keyword: '   ')).length, 2);
+    expect(
+      (await query(TxnFilter(categoryId: catFood), keyword: '聚')).length,
+      1,
+    );
+    expect(
+      (await query(TxnFilter(categoryId: catFood), keyword: '   ')).length,
+      2,
+    );
   });
 
   test('超出上限时标记截断，正好等于上限时不算截断', () async {

@@ -56,60 +56,70 @@ void main() {
     final income = s.incomeCats.first.id;
     final acc = s.accounts.first.id;
 
-    await Repo.insertTxn(Txn(
-      id: 0,
-      ledgerId: s.ledgerId,
-      type: TxnType.expense,
-      amountCents: 12800,
-      date: now,
-      categoryId: cat,
-      accountId: acc,
-      note: '午饭',
-    ));
-    await Repo.insertTxn(Txn(
-      id: 0,
-      ledgerId: s.ledgerId,
-      type: TxnType.income,
-      amountCents: 500000,
-      date: now,
-      categoryId: income,
-      accountId: acc,
-      note: '工资',
-    ));
+    await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: s.ledgerId,
+        type: TxnType.expense,
+        amountCents: 12800,
+        date: now,
+        categoryId: cat,
+        accountId: acc,
+        note: '午饭',
+      ),
+    );
+    await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: s.ledgerId,
+        type: TxnType.income,
+        amountCents: 500000,
+        date: now,
+        categoryId: income,
+        accountId: acc,
+        note: '工资',
+      ),
+    );
     await Repo.setBudget(
       ledgerId: s.ledgerId,
       periodStart: s.cycleFrom,
       categoryId: null,
       amountCents: 300000,
     );
-    await Repo.insertGoal(const SavingGoal(
-      id: 0,
-      name: '相机',
-      targetCents: 800000,
-      savedCents: 200000,
-      dueMonth: '2027-03',
-    ));
-    await Repo.insertTemplate(TxnTemplate(
-      id: 0,
-      ledgerId: s.ledgerId,
-      name: '咖啡',
-      type: TxnType.expense,
-      amountCents: 1500,
-      categoryId: cat,
-      accountId: acc,
-      note: '咖啡',
-    ));
-    await Repo.insertRecurring(RecurringRule(
-      id: 0,
-      ledgerId: s.ledgerId,
-      type: TxnType.expense,
-      amountCents: 8800,
-      categoryId: cat,
-      accountId: acc,
-      note: '会员',
-      freq: 'monthly',
-      nextRunDate: now,
-    ));
+    await Repo.insertGoal(
+      const SavingGoal(
+        id: 0,
+        name: '相机',
+        targetCents: 800000,
+        savedCents: 200000,
+        dueMonth: '2027-03',
+      ),
+    );
+    await Repo.insertTemplate(
+      TxnTemplate(
+        id: 0,
+        ledgerId: s.ledgerId,
+        name: '咖啡',
+        type: TxnType.expense,
+        amountCents: 1500,
+        categoryId: cat,
+        accountId: acc,
+        note: '咖啡',
+      ),
+    );
+    await Repo.insertRecurring(
+      RecurringRule(
+        id: 0,
+        ledgerId: s.ledgerId,
+        type: TxnType.expense,
+        amountCents: 8800,
+        categoryId: cat,
+        accountId: acc,
+        note: '会员',
+        freq: 'monthly',
+        nextRunDate: now,
+      ),
+    );
     await s.loadAll();
   });
 
@@ -126,6 +136,7 @@ void main() {
       final r = await db.rawQuery('SELECT COUNT(*) AS c FROM $t');
       return (r.first['c'] as int?) ?? 0;
     }
+
     final totals = await Repo.monthTotals(s.ledgerId, s.month);
     final budgets = await Repo.totalBudgetCents(s.ledgerId, s.month);
     return (
@@ -173,10 +184,7 @@ void main() {
     // 2) schema 比当前新
     final future = await BackupService.dump();
     await expectLater(
-      BackupService.restore({
-        ...future,
-        'schemaVersion': Db.schemaVersion + 1,
-      }),
+      BackupService.restore({...future, 'schemaVersion': Db.schemaVersion + 1}),
       throwsA(isA<BackupException>()),
     );
 
@@ -215,10 +223,16 @@ void main() {
 
     await BackupService.restore(payload);
 
-    expect(await Repo.getSetting('app_name'), '改过的名字',
-        reason: '应用名属于这台机器的状态，不该被备份覆盖');
-    expect(await Repo.getSetting('ui.type_chips'), '0',
-        reason: '实验开关属于这台机器的状态');
+    expect(
+      await Repo.getSetting('app_name'),
+      '改过的名字',
+      reason: '应用名属于这台机器的状态，不该被备份覆盖',
+    );
+    expect(
+      await Repo.getSetting('ui.type_chips'),
+      '0',
+      reason: '实验开关属于这台机器的状态',
+    );
     // 「当前用哪个账本」是用户数据，跟着走
     expect(await Repo.getSetting('current_ledger_id'), '${Store.i.ledgerId}');
   });

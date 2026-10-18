@@ -43,7 +43,8 @@ class MinePage extends StatelessWidget {
                 SettingRow(
                   icon: 'tag',
                   title: '分类管理',
-                  subtitle: '支出 ${s.expenseCats.length} · 收入 ${s.incomeCats.length}',
+                  subtitle:
+                      '支出 ${s.expenseCats.length} · 收入 ${s.incomeCats.length}',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const CatsPage()),
@@ -450,12 +451,16 @@ class MinePage extends StatelessWidget {
                     SettingRow(
                       icon: a.icon,
                       title: a.name,
-                      subtitle: '${a.kind.label} · ${Fmt.yuan(a.balanceCents)}'
+                      subtitle:
+                          '${a.kind.label} · ${Fmt.yuan(a.balanceCents)}'
                           '${a.includeInTotal ? '' : ' · 不计入净资产'}',
                       trailing: IconButton(
                         onPressed: () => _accountSheet(context, a),
-                        icon: const Icon(Icons.more_horiz_rounded,
-                            size: 20, color: C.ink3),
+                        icon: const Icon(
+                          Icons.more_horiz_rounded,
+                          size: 20,
+                          color: C.ink3,
+                        ),
                       ),
                     ),
                   Padding(
@@ -509,8 +514,9 @@ class MinePage extends StatelessWidget {
                 const SizedBox(height: S.md),
                 TextField(
                   controller: balCtl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     hintText: '当前余额（元）',
                     helperText: '记一笔时会自动增减',
@@ -523,7 +529,10 @@ class MinePage extends StatelessWidget {
                   children: [
                     for (final k in AccountKind.values)
                       ChoiceChip(
-                        label: Text(k.label, style: const TextStyle(fontSize: 12.5)),
+                        label: Text(
+                          k.label,
+                          style: const TextStyle(fontSize: 12.5),
+                        ),
                         selected: kind == k,
                         onSelected: (_) => setLocal(() => kind = k),
                         backgroundColor: C.bg2,
@@ -577,21 +586,25 @@ class MinePage extends StatelessWidget {
 
     final balance = Fmt.parseCents(balCtl.text);
     if (acc == null) {
-      await Repo.insertAccount(Account(
-        id: 0,
-        name: name,
-        kind: kind,
-        balanceCents: balance,
-        includeInTotal: include,
-        sortOrder: 999,
-      ));
+      await Repo.insertAccount(
+        Account(
+          id: 0,
+          name: name,
+          kind: kind,
+          balanceCents: balance,
+          includeInTotal: include,
+          sortOrder: 999,
+        ),
+      );
     } else {
-      await Repo.updateAccount(acc.copyWith(
-        name: name,
-        kind: kind,
-        balanceCents: balance,
-        includeInTotal: include,
-      ));
+      await Repo.updateAccount(
+        acc.copyWith(
+          name: name,
+          kind: kind,
+          balanceCents: balance,
+          includeInTotal: include,
+        ),
+      );
     }
     await Store.i.afterAccountChange();
     if (context.mounted) showToast(context, '已保存');
@@ -642,13 +655,17 @@ class MinePage extends StatelessWidget {
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(dctx),
-                          child: const Text('取消',
-                              style: TextStyle(color: C.ink2)),
+                          child: const Text(
+                            '取消',
+                            style: TextStyle(color: C.ink2),
+                          ),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(dctx, ctl.text.trim()),
-                          child: const Text('创建',
-                              style: TextStyle(color: C.ink)),
+                          child: const Text(
+                            '创建',
+                            style: TextStyle(color: C.ink),
+                          ),
                         ),
                       ],
                     ),
@@ -716,10 +733,7 @@ class _NetWorthCard extends StatelessWidget {
         children: [
           Text('净资产', style: T.caption),
           const SizedBox(height: 4),
-          Text(
-            Fmt.yuan(s.netWorthCents),
-            style: T.hero.copyWith(fontSize: 32),
-          ),
+          Text(Fmt.yuan(s.netWorthCents), style: T.hero.copyWith(fontSize: 32)),
           if (s.accounts.isNotEmpty) ...[
             const SizedBox(height: S.md),
             const Divider(height: 1, color: C.line),
@@ -808,8 +822,9 @@ class _CycleDaySheet extends StatelessWidget {
                         '$d',
                         style: T.body.copyWith(
                           color: d == current ? C.bg : C.ink,
-                          fontWeight:
-                              d == current ? FontWeight.w600 : FontWeight.w400,
+                          fontWeight: d == current
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                         ),
                       ),
                     ),

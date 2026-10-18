@@ -47,27 +47,29 @@ void main() {
     required ValueSetter<NotePick?> onPicked,
     int? categoryId,
   }) async {
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: Builder(
-          builder: (ctx) => Center(
-            child: ElevatedButton(
-              onPressed: () async {
-                final r = await showCategoryNoteWheel(
-                  ctx,
-                  cats: cats,
-                  categoryId: categoryId ?? cats.first.id,
-                  type: TxnType.expense,
-                  note: note,
-                );
-                onPicked(r);
-              },
-              child: const Text('open'),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  final r = await showCategoryNoteWheel(
+                    ctx,
+                    cats: cats,
+                    categoryId: categoryId ?? cats.first.id,
+                    type: TxnType.expense,
+                    note: note,
+                  );
+                  onPicked(r);
+                },
+                child: const Text('open'),
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();

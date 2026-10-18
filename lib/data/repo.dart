@@ -18,11 +18,10 @@ class Repo {
 
   static Future<void> setSetting(String key, String value) async {
     final db = await Db.open();
-    await db.insert(
-      'setting',
-      {'k': key, 'v': value},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('setting', {
+      'k': key,
+      'v': value,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   static Future<int> currentLedgerId() async {
@@ -50,7 +49,9 @@ class Repo {
 
   // ------------------------------------------------------------------- 账本
 
-  static Future<List<Ledger>> listLedgers({bool includeArchived = false}) async {
+  static Future<List<Ledger>> listLedgers({
+    bool includeArchived = false,
+  }) async {
     final db = await Db.open();
     final rows = await db.query(
       'ledger',
@@ -81,33 +82,54 @@ class Repo {
 
   static Future<void> _seedCategoriesFor(Database db, int ledgerId) async {
     const expense = [
-      ('餐饮', 'food'), ('交通', 'transport'), ('购物', 'shopping'),
-      ('居住', 'home'), ('娱乐', 'fun'), ('医疗', 'medical'),
-      ('学习', 'study'), ('通讯', 'comm'), ('人情', 'gift'), ('其他', 'more'),
+      ('餐饮', 'food'),
+      ('交通', 'transport'),
+      ('购物', 'shopping'),
+      ('居住', 'home'),
+      ('娱乐', 'fun'),
+      ('医疗', 'medical'),
+      ('学习', 'study'),
+      ('通讯', 'comm'),
+      ('人情', 'gift'),
+      ('其他', 'more'),
     ];
     const income = [
-      ('工资', 'salary'), ('奖金', 'bonus'), ('兼职', 'parttime'),
-      ('理财', 'invest'), ('红包', 'redpacket'), ('其他', 'more'),
+      ('工资', 'salary'),
+      ('奖金', 'bonus'),
+      ('兼职', 'parttime'),
+      ('理财', 'invest'),
+      ('红包', 'redpacket'),
+      ('其他', 'more'),
     ];
     var order = 0;
     for (final (name, icon) in expense) {
       await db.insert('category', {
-        'ledger_id': ledgerId, 'type': 'expense', 'name': name,
-        'icon': icon, 'sort_order': order++, 'archived': 0,
+        'ledger_id': ledgerId,
+        'type': 'expense',
+        'name': name,
+        'icon': icon,
+        'sort_order': order++,
+        'archived': 0,
       });
     }
     order = 0;
     for (final (name, icon) in income) {
       await db.insert('category', {
-        'ledger_id': ledgerId, 'type': 'income', 'name': name,
-        'icon': icon, 'sort_order': order++, 'archived': 0,
+        'ledger_id': ledgerId,
+        'type': 'income',
+        'name': name,
+        'icon': icon,
+        'sort_order': order++,
+        'archived': 0,
       });
     }
   }
 
   // ------------------------------------------------------------------- 账户
 
-  static Future<List<Account>> listAccounts({bool includeArchived = false}) async {
+  static Future<List<Account>> listAccounts({
+    bool includeArchived = false,
+  }) async {
     final db = await Db.open();
     final rows = await db.query(
       'account',
@@ -180,8 +202,12 @@ class Repo {
   static Future<void> deleteCategory(int id) async {
     final db = await Db.open();
     await db.transaction((txn) async {
-      await txn.update('txn', {'category_id': null},
-          where: 'category_id = ?', whereArgs: [id]);
+      await txn.update(
+        'txn',
+        {'category_id': null},
+        where: 'category_id = ?',
+        whereArgs: [id],
+      );
       await txn.delete('category', where: 'id = ?', whereArgs: [id]);
     });
   }
@@ -218,7 +244,8 @@ class Repo {
     final rows = await db.query(
       'category',
       columns: ['id'],
-      where: 'ledger_id = ? AND type = ? '
+      where:
+          'ledger_id = ? AND type = ? '
           'AND name IN (${List.filled(keys.length, '?').join(',')})',
       whereArgs: [ledgerId, TxnType.income.code, ...keys],
     );
@@ -236,7 +263,8 @@ class Repo {
     Set<int> liftableIds, {
     bool? liftToNext,
   }) {
-    final lift = liftToNext ??
+    final lift =
+        liftToNext ??
         (t.type.isIncome &&
             t.categoryId != null &&
             liftableIds.contains(t.categoryId));
@@ -249,9 +277,9 @@ class Repo {
   /// 别处不要自己拼 map 直接 insert —— 漏算一条，这笔就会从某一期里凭空消失，
   /// 而且列表条数和合计对不上时极难定位。
   static Map<String, Object?> _txnRow(Txn t, String period) => {
-        ...t.toMap(),
-        'period_start': period,
-      };
+    ...t.toMap(),
+    'period_start': period,
+  };
 
   /// 重算某账本全部记录的归属期（改账单日后必须调，否则历史全部错位）。
   ///
@@ -345,10 +373,7 @@ class Repo {
     final liftable = await _liftableCategoryIds(db, t.ledgerId);
     final id = await db.insert(
       'txn',
-      _txnRow(
-        t,
-        periodFor(t, startDay, liftable, liftToNext: liftToNext),
-      ),
+      _txnRow(t, periodFor(t, startDay, liftable, liftToNext: liftToNext)),
     );
     await _applyBalanceDelta(db, t, reverse: false);
     return id;
@@ -422,17 +447,16 @@ class Repo {
     String? keyword,
     int limit = 500,
     int offset = 0,
-  }) =>
-      rangeListTxns(
-        ledgerId: ledgerId,
-        from: monthStart(month),
-        to: monthEnd(month),
-        type: type,
-        categoryId: categoryId,
-        keyword: keyword,
-        limit: limit,
-        offset: offset,
-      );
+  }) => rangeListTxns(
+    ledgerId: ledgerId,
+    from: monthStart(month),
+    to: monthEnd(month),
+    type: type,
+    categoryId: categoryId,
+    keyword: keyword,
+    limit: limit,
+    offset: offset,
+  );
 
   /// 某一期的明细，条件打在 `period_start` 上；排序仍按真实 `date`。
   static Future<List<Txn>> rangeListTxns({
@@ -447,13 +471,10 @@ class Repo {
     DateBasis basis = DateBasis.period,
   }) async {
     final db = await Db.open();
-    final where =
-        StringBuffer('ledger_id = ? AND ${_col(basis)} BETWEEN ? AND ?');
-    final args = <Object?>[
-      ledgerId,
-      from,
-      to,
-    ];
+    final where = StringBuffer(
+      'ledger_id = ? AND ${_col(basis)} BETWEEN ? AND ?',
+    );
+    final args = <Object?>[ledgerId, from, to];
     if (type != null) {
       where.write(' AND type = ?');
       args.add(type.code);
@@ -492,11 +513,13 @@ class Repo {
   ///
   /// 负数按交叉口径：支出里的负数算进收入，收入里的负数算进支出。
   /// [monthTotals] 与 [sumFiltered] 共用这两段，避免两处口径漂移。
-  static const _expSumSql = 'COALESCE(SUM(CASE '
+  static const _expSumSql =
+      'COALESCE(SUM(CASE '
       "  WHEN type = 'expense' AND amount_cents >= 0 THEN amount_cents "
       "  WHEN type = 'income'  AND amount_cents <  0 THEN -amount_cents "
       '  ELSE 0 END), 0)';
-  static const _incSumSql = 'COALESCE(SUM(CASE '
+  static const _incSumSql =
+      'COALESCE(SUM(CASE '
       "  WHEN type = 'income'  AND amount_cents >= 0 THEN amount_cents "
       "  WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
       '  ELSE 0 END), 0)';
@@ -650,8 +673,11 @@ class Repo {
     for (var i = count - 1; i >= 0; i--) {
       final from = Fmt.date(shiftCycle(base, startDay, -i));
       final to = Fmt.date(
-        shiftCycle(DateTime.parse(from), startDay, 1)
-            .subtract(const Duration(days: 1)),
+        shiftCycle(
+          DateTime.parse(from),
+          startDay,
+          1,
+        ).subtract(const Duration(days: 1)),
       );
       final t = await rangeTotals(ledgerId, from, to);
       out.add((from, t.$1, t.$2));
@@ -749,9 +775,7 @@ class Repo {
   static Future<Map<String, String>> listSettings() async {
     final db = await Db.open();
     final rows = await db.query('setting');
-    return {
-      for (final r in rows) r['k'] as String: r['v'] as String,
-    };
+    return {for (final r in rows) r['k'] as String: r['v'] as String};
   }
 
   /// 月收支合计。
@@ -761,8 +785,7 @@ class Repo {
   static Future<(int expense, int income, int count)> monthTotals(
     int ledgerId,
     String month,
-  ) =>
-      rangeTotals(ledgerId, monthStart(month), monthEnd(month));
+  ) => rangeTotals(ledgerId, monthStart(month), monthEnd(month));
 
   /// 归集口径对应的字段名：周期视图筛 `period_start`，月份视图筛 `date`。
   static String _col(DateBasis basis) =>
@@ -798,13 +821,12 @@ class Repo {
     required int ledgerId,
     required String month,
     required TxnType type,
-  }) =>
-      rangeCategoryStats(
-        ledgerId: ledgerId,
-        from: monthStart(month),
-        to: monthEnd(month),
-        type: type,
-      );
+  }) => rangeCategoryStats(
+    ledgerId: ledgerId,
+    from: monthStart(month),
+    to: monthEnd(month),
+    type: type,
+  );
 
   /// 某一期的分类聚合（[categoryStats] 的区间版）
   static Future<List<CatStat>> rangeCategoryStats({
@@ -835,13 +857,15 @@ class Repo {
       [ledgerId, from, to, type.code, other.code],
     );
     return rows
-        .map((m) => CatStat(
-              categoryId: (m['cid'] as int?) ?? -1,
-              name: m['name'] as String,
-              icon: m['icon'] as String,
-              totalCents: (m['total'] as int?) ?? 0,
-              count: (m['cnt'] as int?) ?? 0,
-            ))
+        .map(
+          (m) => CatStat(
+            categoryId: (m['cid'] as int?) ?? -1,
+            name: m['name'] as String,
+            icon: m['icon'] as String,
+            totalCents: (m['total'] as int?) ?? 0,
+            count: (m['cnt'] as int?) ?? 0,
+          ),
+        )
         .toList();
   }
 
@@ -849,8 +873,7 @@ class Repo {
   static Future<List<(String date, int expense, int income)>> dailyTotals(
     int ledgerId,
     String month,
-  ) =>
-      rangeDailyTotals(ledgerId, monthStart(month), monthEnd(month));
+  ) => rangeDailyTotals(ledgerId, monthStart(month), monthEnd(month));
 
   /// 某一期的每日收支（趋势图）。
   ///
@@ -879,11 +902,13 @@ class Repo {
       [ledgerId, from, to],
     );
     return rows
-        .map((m) => (
-              m['date'] as String,
-              (m['exp'] as int?) ?? 0,
-              (m['inc'] as int?) ?? 0,
-            ))
+        .map(
+          (m) => (
+            m['date'] as String,
+            (m['exp'] as int?) ?? 0,
+            (m['inc'] as int?) ?? 0,
+          ),
+        )
         .toList();
   }
 
@@ -914,10 +939,7 @@ class Repo {
   }
 
   /// 总预算（category_id 为 NULL 的那条）
-  static Future<int?> totalBudgetCents(
-    int ledgerId,
-    String periodStart,
-  ) async {
+  static Future<int?> totalBudgetCents(int ledgerId, String periodStart) async {
     final db = await Db.open();
     final rows = await db.query(
       'budget',
@@ -940,26 +962,19 @@ class Repo {
     if (amountCents <= 0) {
       await db.delete(
         'budget',
-        where: 'ledger_id = ? AND period_start = ? AND '
+        where:
+            'ledger_id = ? AND period_start = ? AND '
             '${categoryId == null ? 'category_id IS NULL' : 'category_id = ?'}',
-        whereArgs: [
-          ledgerId,
-          periodStart,
-          ?categoryId,
-        ],
+        whereArgs: [ledgerId, periodStart, ?categoryId],
       );
       return;
     }
-    await db.insert(
-      'budget',
-      {
-        'ledger_id': ledgerId,
-        'period_start': periodStart,
-        'category_id': categoryId,
-        'amount_cents': amountCents,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('budget', {
+      'ledger_id': ledgerId,
+      'period_start': periodStart,
+      'category_id': categoryId,
+      'amount_cents': amountCents,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   /// 改账单日后，把预算挪到新的归属期上。
@@ -981,11 +996,7 @@ class Repo {
     final merged = <(int, String, int?), int>{};
     for (final r in rows) {
       final newStart = periodStartOf(r['period_start'] as String, startDay);
-      final key = (
-        r['ledger_id'] as int,
-        newStart,
-        r['category_id'] as int?,
-      );
+      final key = (r['ledger_id'] as int, newStart, r['category_id'] as int?);
       merged[key] = (merged[key] ?? 0) + ((r['amount_cents'] as int?) ?? 0);
     }
 
@@ -1033,19 +1044,23 @@ class Repo {
       [from, to, periodStart, ledgerId],
     );
     return rows
-        .map((m) => BudgetStat(
-              categoryId: (m['cid'] as int?) ?? -1,
-              name: m['name'] as String,
-              icon: m['icon'] as String,
-              spentCents: (m['spent'] as int?) ?? 0,
-              budgetCents: (m['budget'] as int?) ?? 0,
-            ))
+        .map(
+          (m) => BudgetStat(
+            categoryId: (m['cid'] as int?) ?? -1,
+            name: m['name'] as String,
+            icon: m['icon'] as String,
+            spentCents: (m['spent'] as int?) ?? 0,
+            budgetCents: (m['budget'] as int?) ?? 0,
+          ),
+        )
         .toList();
   }
 
   // --------------------------------------------------------------- 储蓄目标
 
-  static Future<List<SavingGoal>> listGoals({bool includeArchived = false}) async {
+  static Future<List<SavingGoal>> listGoals({
+    bool includeArchived = false,
+  }) async {
     final db = await Db.open();
     final rows = await db.query(
       'saving_goal',
@@ -1062,7 +1077,12 @@ class Repo {
 
   static Future<void> updateGoal(SavingGoal g) async {
     final db = await Db.open();
-    await db.update('saving_goal', g.toMap(), where: 'id = ?', whereArgs: [g.id]);
+    await db.update(
+      'saving_goal',
+      g.toMap(),
+      where: 'id = ?',
+      whereArgs: [g.id],
+    );
   }
 
   static Future<void> deleteGoal(int id) async {
@@ -1156,10 +1176,7 @@ class Repo {
             note: rule.note.isEmpty ? '周期账单' : rule.note,
             recurringId: rule.id,
           );
-          await txn.insert(
-            'txn',
-            _txnRow(t, periodFor(t, startDay, liftable)),
-          );
+          await txn.insert('txn', _txnRow(t, periodFor(t, startDay, liftable)));
           await _applyBalanceDelta(txn, t, reverse: false);
           created++;
         });
@@ -1179,8 +1196,12 @@ class Repo {
           endDate: rule.endDate,
           enabled: rule.enabled,
         );
-        await db.update('recurring', rule.toMap(),
-            where: 'id = ?', whereArgs: [rule.id]);
+        await db.update(
+          'recurring',
+          rule.toMap(),
+          where: 'id = ?',
+          whereArgs: [rule.id],
+        );
       }
     }
     return created;
@@ -1235,7 +1256,8 @@ class Repo {
       'txn_template',
       where: 'ledger_id = ?',
       whereArgs: [ledgerId],
-      orderBy: "use_count DESC, COALESCE(last_used_at, '') DESC, sort_order, id",
+      orderBy:
+          "use_count DESC, COALESCE(last_used_at, '') DESC, sort_order, id",
       limit: limit,
     );
     return rows.map(TxnTemplate.fromMap).toList();
@@ -1254,8 +1276,12 @@ class Repo {
 
   static Future<void> updateTemplate(TxnTemplate t) async {
     final db = await Db.open();
-    await db.update('txn_template', t.toMap(),
-        where: 'id = ?', whereArgs: [t.id]);
+    await db.update(
+      'txn_template',
+      t.toMap(),
+      where: 'id = ?',
+      whereArgs: [t.id],
+    );
   }
 
   static Future<void> deleteTemplate(int id) async {

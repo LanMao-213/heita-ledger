@@ -72,11 +72,15 @@ class _StatsPageState extends State<StatsPage> {
                       month: s.month,
                       onPrev: () => s.shiftStat(-1),
                       onNext: () => s.shiftStat(1),
-                      onTapLabel: () => showCalendarAndGo(context, byMonth: true),
+                      onTapLabel: () =>
+                          showCalendarAndGo(context, byMonth: true),
                     ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: S.xl, vertical: S.sm),
+              padding: const EdgeInsets.symmetric(
+                horizontal: S.xl,
+                vertical: S.sm,
+              ),
               child: SegTabs(
                 value: _type,
                 onChanged: (t) => setState(() => _type = t),
@@ -124,7 +128,10 @@ class _StatsPageState extends State<StatsPage> {
                             children: [
                               Text(
                                 '共 ${stats.length} 个分类',
-                                style: T.body2.copyWith(color: C.ink, fontWeight: FontWeight.w500),
+                                style: T.body2.copyWith(
+                                  color: C.ink,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                               const SizedBox(height: S.sm),
                               for (var i = 0; i < stats.length && i < 5; i++)
@@ -144,7 +151,9 @@ class _StatsPageState extends State<StatsPage> {
                                       Expanded(
                                         child: Text(
                                           stats[i].name,
-                                          style: T.caption.copyWith(color: C.ink2),
+                                          style: T.caption.copyWith(
+                                            color: C.ink2,
+                                          ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
@@ -186,16 +195,12 @@ class _StatsPageState extends State<StatsPage> {
             ],
 
             // 下面两块和「支出/收入」切换无关，放在最后
-            SectionTitle(
-              s.statBasis == StatBasis.period ? '近 6 期' : '近 6 个月',
-            ),
+            SectionTitle(s.statBasis == StatBasis.period ? '近 6 期' : '近 6 个月'),
             SectionCard(
               child: s.statTrend.isEmpty
                   ? const SizedBox(
                       height: 90,
-                      child: Center(
-                        child: Text('还没有历史数据', style: T.caption),
-                      ),
+                      child: Center(child: Text('还没有历史数据', style: T.caption)),
                     )
                   : _MonthlyTrend(rows: s.statTrend),
             ),
@@ -272,8 +277,9 @@ class _DailyTrend extends StatelessWidget {
     final todayStr = Fmt.today();
     final todayIdx = DateTime.parse(todayStr).difference(from).inDays + 1;
     final today = (todayIdx >= 1 && todayIdx <= dayCount) ? todayIdx : null;
-    final maxV =
-        values.values.isEmpty ? 0 : values.values.reduce((a, b) => a > b ? a : b);
+    final maxV = values.values.isEmpty
+        ? 0
+        : values.values.reduce((a, b) => a > b ? a : b);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,20 +377,20 @@ class _MonthlyTrend extends StatelessWidget {
   }
 
   Widget _legend(String label, Color color) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(label, style: T.caption.copyWith(fontSize: 11.5)),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 9,
+        height: 9,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: T.caption.copyWith(fontSize: 11.5)),
+    ],
+  );
 
   /// 零值不画柱：留 2px 会让人以为「那个月花了点钱」。
   Widget _bar(int value, int maxV, double barH, Color color) {
@@ -429,7 +435,12 @@ class _AccountsCard extends StatelessWidget {
               decoration: const BoxDecoration(
                 border: Border(top: BorderSide(color: C.line)),
               ),
-              padding: const EdgeInsets.fromLTRB(S.md, S.sm + 2, S.md, S.sm + 2),
+              padding: const EdgeInsets.fromLTRB(
+                S.md,
+                S.sm + 2,
+                S.md,
+                S.sm + 2,
+              ),
               child: Row(
                 children: [
                   LineIcon(a.icon, size: 17, color: C.ink3),

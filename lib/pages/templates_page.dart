@@ -73,8 +73,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('删除「${t.name}」？', style: T.section),
-        content: const Text('用这个模板记过的账目会保留，只是以后不再出现在列表里。',
-            style: T.body2),
+        content: const Text('用这个模板记过的账目会保留，只是以后不再出现在列表里。', style: T.body2),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -208,8 +207,11 @@ class _TemplateRow extends StatelessWidget {
                 index: index,
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 6),
-                  child: Icon(Icons.drag_indicator_rounded,
-                      size: 20, color: C.ink4),
+                  child: Icon(
+                    Icons.drag_indicator_rounded,
+                    size: 20,
+                    color: C.ink4,
+                  ),
                 ),
               ),
               Container(
@@ -246,8 +248,11 @@ class _TemplateRow extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onMore,
-                icon: const Icon(Icons.more_horiz_rounded,
-                    size: 20, color: C.ink3),
+                icon: const Icon(
+                  Icons.more_horiz_rounded,
+                  size: 20,
+                  color: C.ink3,
+                ),
               ),
             ],
           ),
@@ -288,7 +293,8 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
     final s = Store.i;
     _type = t?.type ?? TxnType.expense;
     _categoryId = t?.categoryId ?? _firstCategoryId();
-    _accountId = t?.accountId ?? (s.accounts.isEmpty ? null : s.accounts.first.id);
+    _accountId =
+        t?.accountId ?? (s.accounts.isEmpty ? null : s.accounts.first.id);
     _icon = t?.icon ?? (s.categoryOf(_categoryId)?.icon ?? 'tpl');
     _iconTouched = t != null;
     _name = TextEditingController(text: t?.name ?? '');
@@ -409,8 +415,10 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                 filled: true,
                 fillColor: C.bg2,
                 isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: S.md, vertical: 13),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: S.md,
+                  vertical: 13,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(R.md),
                   borderSide: BorderSide.none,
@@ -444,8 +452,11 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                         borderRadius: BorderRadius.circular(11),
                       ),
                       child: Center(
-                        child: LineIcon(k,
-                            size: 19, color: k == _icon ? C.bg : C.ink2),
+                        child: LineIcon(
+                          k,
+                          size: 19,
+                          color: k == _icon ? C.bg : C.ink2,
+                        ),
                       ),
                     ),
                   ),
@@ -488,8 +499,11 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                             borderRadius: BorderRadius.circular(13),
                           ),
                           child: Center(
-                            child: LineIcon(c.icon,
-                                size: 21, color: on ? C.bg : C.ink2),
+                            child: LineIcon(
+                              c.icon,
+                              size: 21,
+                              color: on ? C.bg : C.ink2,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -521,7 +535,9 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                     onTap: () => setState(() => _accountId = a.id),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: S.md, vertical: 9),
+                        horizontal: S.md,
+                        vertical: 9,
+                      ),
                       decoration: BoxDecoration(
                         color: a.id == _accountId ? C.bg2 : C.bg,
                         border: Border.all(
@@ -534,13 +550,15 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                         children: [
                           LineIcon(a.icon, size: 16, color: C.ink2),
                           const SizedBox(width: 6),
-                          Text(a.name,
-                              style: T.body2.copyWith(
-                                color: C.ink,
-                                fontWeight: a.id == _accountId
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                              )),
+                          Text(
+                            a.name,
+                            style: T.body2.copyWith(
+                              color: C.ink,
+                              fontWeight: a.id == _accountId
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -553,8 +571,9 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
             padding: const EdgeInsets.symmetric(horizontal: S.xl),
             child: TextField(
               controller: _amount,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
               ],
@@ -567,8 +586,10 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                 filled: true,
                 fillColor: C.bg2,
                 isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: S.md, vertical: 13),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: S.md,
+                  vertical: 13,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(R.md),
                   borderSide: BorderSide.none,
@@ -591,10 +612,36 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
   /// 图标墙：常用分类图标排前面，其余按图标库顺序补齐。
   /// 底部导航那几个（列表 / 饼图 / 人像 / 加号）不属于「一笔账」，剔除。
   List<String> _iconChoices() {
-    const primary = ['food', 'transport', 'shopping', 'home', 'fun', 'medical',
-      'study', 'comm', 'gift', 'salary', 'bonus', 'parttime', 'invest',
-      'redpacket', 'tpl', 'wallet', 'coin', 'target', 'car', 'laptop',
-      'plane', 'flag', 'card', 'book', 'rec', 'bell', 'tag', 'moon'];
+    const primary = [
+      'food',
+      'transport',
+      'shopping',
+      'home',
+      'fun',
+      'medical',
+      'study',
+      'comm',
+      'gift',
+      'salary',
+      'bonus',
+      'parttime',
+      'invest',
+      'redpacket',
+      'tpl',
+      'wallet',
+      'coin',
+      'target',
+      'car',
+      'laptop',
+      'plane',
+      'flag',
+      'card',
+      'book',
+      'rec',
+      'bell',
+      'tag',
+      'moon',
+    ];
     const navOnly = {'list', 'pie', 'person', 'plus'};
     final rest = kIcons.keys.where((k) => !navOnly.contains(k));
     return <String>{...primary, ...rest}.toList();

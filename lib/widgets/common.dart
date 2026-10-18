@@ -142,7 +142,9 @@ class SegTabs extends StatelessWidget {
         color: C.bg2,
         borderRadius: BorderRadius.circular(R.md),
       ),
-      child: Row(children: [item(left, TxnType.expense), item(right, TxnType.income)]),
+      child: Row(
+        children: [item(left, TxnType.expense), item(right, TxnType.income)],
+      ),
     );
   }
 }
@@ -219,12 +221,12 @@ class CycleBar extends StatelessWidget {
 }
 
 Widget _barArrow(IconData icon, VoidCallback onTap, Color color) => IconButton(
-      onPressed: onTap,
-      icon: Icon(icon, size: 22, color: color),
-      splashRadius: 20,
-      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-      padding: EdgeInsets.zero,
-    );
+  onPressed: onTap,
+  icon: Icon(icon, size: 22, color: color),
+  splashRadius: 20,
+  constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+  padding: EdgeInsets.zero,
+);
 
 /// 「当前是哪一期」—— 明细页顶部只有这一个，不做左右翻期。
 ///
@@ -340,12 +342,12 @@ class MonthBar extends StatelessWidget {
   }
 
   Widget _arrow(IconData icon, VoidCallback onTap, Color color) => IconButton(
-        onPressed: onTap,
-        icon: Icon(icon, size: 22, color: color),
-        splashRadius: 20,
-        constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-        padding: EdgeInsets.zero,
-      );
+    onPressed: onTap,
+    icon: Icon(icon, size: 22, color: color),
+    splashRadius: 20,
+    constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+    padding: EdgeInsets.zero,
+  );
 }
 
 /// 空状态
@@ -418,11 +420,13 @@ class SettingRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: T.body.copyWith(
-                        color: fg,
-                        fontWeight: FontWeight.w500,
-                      )),
+                  Text(
+                    title,
+                    style: T.body.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
                     Text(subtitle!, style: T.caption),
@@ -482,11 +486,16 @@ void showToast(BuildContext context, String message) {
     ..clearSnackBars()
     ..showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(color: C.bg, fontSize: 13.5)),
+        content: Text(
+          message,
+          style: const TextStyle(color: C.bg, fontSize: 13.5),
+        ),
         backgroundColor: C.ink.withValues(alpha: 0.92),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(S.xl),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.md)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(R.md),
+        ),
         duration: const Duration(seconds: 2),
       ),
     );

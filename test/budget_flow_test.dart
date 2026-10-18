@@ -47,17 +47,20 @@ void main() {
       amountCents: 300000,
     );
     await s.afterBudgetChange();
-    expect(s.totalBudgetCents, 300000,
-        reason: '写入与读取用的必须是同一个期');
+    expect(s.totalBudgetCents, 300000, reason: '写入与读取用的必须是同一个期');
     expect(await Repo.totalBudgetCents(s.ledgerId, s.cycleFrom), 300000);
   });
 
   testWidgets('Store 里的预算变了，卡片必须跟着变（const 陷阱回归）', (tester) async {
     await tester.runAsync(() => Store.i.boot());
 
-    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: PlanPage())));
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: PlanPage())),
+    );
     await tester.pump();
-    await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 120)));
+    await tester.runAsync(
+      () => Future.delayed(const Duration(milliseconds: 120)),
+    );
     await tester.pump();
     expect(find.textContaining('还没有设预算'), findsOneWidget);
 

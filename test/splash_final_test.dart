@@ -16,11 +16,18 @@ import 'package:ledger/design/tokens.dart';
 final _key = GlobalKey();
 
 Future<void> _loadFont() async {
-  for (final p in [r'C:\Windows\Fonts\Deng.ttf', r'C:\Windows\Fonts\simhei.ttf']) {
+  for (final p in [
+    r'C:\Windows\Fonts\Deng.ttf',
+    r'C:\Windows\Fonts\simhei.ttf',
+  ]) {
     final f = File(p);
     if (!f.existsSync()) continue;
     final l = FontLoader('Roboto')
-      ..addFont(Future.value(ByteData.view(Uint8List.fromList(f.readAsBytesSync()).buffer)));
+      ..addFont(
+        Future.value(
+          ByteData.view(Uint8List.fromList(f.readAsBytesSync()).buffer),
+        ),
+      );
     await l.load();
     return;
   }
@@ -35,26 +42,26 @@ const _gradient = RadialGradient(
 );
 
 Widget _splash(double markH) => MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: RepaintBoundary(
-        key: _key,
-        child: Scaffold(
-          backgroundColor: const Color(0xFF07080B),
-          body: SizedBox.expand(
-            child: DecoratedBox(
-              decoration: const BoxDecoration(gradient: _gradient),
-              child: Center(
-                child: BrandMark(
-                  height: markH,
-                  fg: const Color(0xFFFFFFFF),
-                  flameColor: C.overD,
-                ),
-              ),
+  debugShowCheckedModeBanner: false,
+  home: RepaintBoundary(
+    key: _key,
+    child: Scaffold(
+      backgroundColor: const Color(0xFF07080B),
+      body: SizedBox.expand(
+        child: DecoratedBox(
+          decoration: const BoxDecoration(gradient: _gradient),
+          child: Center(
+            child: BrandMark(
+              height: markH,
+              fg: const Color(0xFFFFFFFF),
+              flameColor: C.overD,
             ),
           ),
         ),
       ),
-    );
+    ),
+  ),
+);
 
 void main() {
   testWidgets('渲染启动页最终效果（390×844 @2x）', (tester) async {
@@ -76,18 +83,22 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.runAsync(() async {
-      final boundary = _key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      final boundary =
+          _key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       final image = await boundary.toImage(pixelRatio: 1.0);
       final data = await image.toByteData(format: ui.ImageByteFormat.png);
       final dir = Directory('build/visual')..createSync(recursive: true);
-      File('${dir.path}/splash_final.png').writeAsBytesSync(data!.buffer.asUint8List());
+      File('${dir.path}/splash_final.png')
+          .writeAsBytesSync(data!.buffer.asUint8List());
     });
 
     // 打印关键尺寸，便于核对是否等于「宽 88%」
     final size = tester.getSize(find.byType(BrandMark));
     // ignore: avoid_print
-    print('$kAppName 启动页 —— 标志 ${size.width.toStringAsFixed(1)} × '
-        '${size.height.toStringAsFixed(1)}，占屏宽 '
-        '${(size.width / screenW * 100).toStringAsFixed(1)}%');
+    print(
+      '$kAppName 启动页 —— 标志 ${size.width.toStringAsFixed(1)} × '
+      '${size.height.toStringAsFixed(1)}，占屏宽 '
+      '${(size.width / screenW * 100).toStringAsFixed(1)}%',
+    );
   });
 }

@@ -32,7 +32,8 @@ abstract final class Fmt {
   }
 
   /// 分 → 「¥1,234.56」
-  static String yuan(int cents, {bool sign = false}) => '¥${money(cents, sign: sign)}';
+  static String yuan(int cents, {bool sign = false}) =>
+      '¥${money(cents, sign: sign)}';
 
   /// 分 → 紧凑写法「1.2万」「3,456」，用于卡片上的大数字
   static String compact(int cents) {
@@ -46,8 +47,7 @@ abstract final class Fmt {
   }
 
   /// 「2026-10-16」→「10-16」
-  static String md(String date) =>
-      date.length >= 10 ? date.substring(5) : date;
+  static String md(String date) => date.length >= 10 ? date.substring(5) : date;
 
   /// 「2026-10-16」→「10月16日 周四」
   static String friendly(String date) {
@@ -111,8 +111,10 @@ enum TxnType {
   final String code;
   final String label;
 
-  static TxnType fromCode(String c) =>
-      TxnType.values.firstWhere((e) => e.code == c, orElse: () => TxnType.expense);
+  static TxnType fromCode(String c) => TxnType.values.firstWhere(
+    (e) => e.code == c,
+    orElse: () => TxnType.expense,
+  );
 
   bool get isExpense => this == TxnType.expense;
   bool get isIncome => this == TxnType.income;
@@ -144,8 +146,10 @@ enum AccountKind {
   final String label;
   final String icon;
 
-  static AccountKind fromCode(String c) => AccountKind.values
-      .firstWhere((e) => e.code == c, orElse: () => AccountKind.other);
+  static AccountKind fromCode(String c) => AccountKind.values.firstWhere(
+    (e) => e.code == c,
+    orElse: () => AccountKind.other,
+  );
 }
 
 class Ledger {
@@ -164,29 +168,33 @@ class Ledger {
   final bool archived;
 
   factory Ledger.fromMap(Map<String, Object?> m) => Ledger(
-        id: m['id'] as int,
-        name: m['name'] as String,
-        icon: (m['icon'] as String?) ?? 'book',
-        sortOrder: (m['sort_order'] as int?) ?? 0,
-        archived: ((m['archived'] as int?) ?? 0) == 1,
-      );
+    id: m['id'] as int,
+    name: m['name'] as String,
+    icon: (m['icon'] as String?) ?? 'book',
+    sortOrder: (m['sort_order'] as int?) ?? 0,
+    archived: ((m['archived'] as int?) ?? 0) == 1,
+  );
 
   Map<String, Object?> toMap() => {
-        if (id > 0) 'id': id,
-        'name': name,
-        'icon': icon,
-        'sort_order': sortOrder,
-        'archived': archived ? 1 : 0,
-      };
+    if (id > 0) 'id': id,
+    'name': name,
+    'icon': icon,
+    'sort_order': sortOrder,
+    'archived': archived ? 1 : 0,
+  };
 
-  Ledger copyWith({String? name, String? icon, int? sortOrder, bool? archived}) =>
-      Ledger(
-        id: id,
-        name: name ?? this.name,
-        icon: icon ?? this.icon,
-        sortOrder: sortOrder ?? this.sortOrder,
-        archived: archived ?? this.archived,
-      );
+  Ledger copyWith({
+    String? name,
+    String? icon,
+    int? sortOrder,
+    bool? archived,
+  }) => Ledger(
+    id: id,
+    name: name ?? this.name,
+    icon: icon ?? this.icon,
+    sortOrder: sortOrder ?? this.sortOrder,
+    archived: archived ?? this.archived,
+  );
 }
 
 class Account {
@@ -211,24 +219,24 @@ class Account {
   String get icon => kind.icon;
 
   factory Account.fromMap(Map<String, Object?> m) => Account(
-        id: m['id'] as int,
-        name: m['name'] as String,
-        kind: AccountKind.fromCode((m['kind'] as String?) ?? 'cash'),
-        balanceCents: (m['balance_cents'] as int?) ?? 0,
-        includeInTotal: ((m['include_in_total'] as int?) ?? 1) == 1,
-        sortOrder: (m['sort_order'] as int?) ?? 0,
-        archived: ((m['archived'] as int?) ?? 0) == 1,
-      );
+    id: m['id'] as int,
+    name: m['name'] as String,
+    kind: AccountKind.fromCode((m['kind'] as String?) ?? 'cash'),
+    balanceCents: (m['balance_cents'] as int?) ?? 0,
+    includeInTotal: ((m['include_in_total'] as int?) ?? 1) == 1,
+    sortOrder: (m['sort_order'] as int?) ?? 0,
+    archived: ((m['archived'] as int?) ?? 0) == 1,
+  );
 
   Map<String, Object?> toMap() => {
-        if (id > 0) 'id': id,
-        'name': name,
-        'kind': kind.code,
-        'balance_cents': balanceCents,
-        'include_in_total': includeInTotal ? 1 : 0,
-        'sort_order': sortOrder,
-        'archived': archived ? 1 : 0,
-      };
+    if (id > 0) 'id': id,
+    'name': name,
+    'kind': kind.code,
+    'balance_cents': balanceCents,
+    'include_in_total': includeInTotal ? 1 : 0,
+    'sort_order': sortOrder,
+    'archived': archived ? 1 : 0,
+  };
 
   Account copyWith({
     String? name,
@@ -237,16 +245,15 @@ class Account {
     bool? includeInTotal,
     int? sortOrder,
     bool? archived,
-  }) =>
-      Account(
-        id: id,
-        name: name ?? this.name,
-        kind: kind ?? this.kind,
-        balanceCents: balanceCents ?? this.balanceCents,
-        includeInTotal: includeInTotal ?? this.includeInTotal,
-        sortOrder: sortOrder ?? this.sortOrder,
-        archived: archived ?? this.archived,
-      );
+  }) => Account(
+    id: id,
+    name: name ?? this.name,
+    kind: kind ?? this.kind,
+    balanceCents: balanceCents ?? this.balanceCents,
+    includeInTotal: includeInTotal ?? this.includeInTotal,
+    sortOrder: sortOrder ?? this.sortOrder,
+    archived: archived ?? this.archived,
+  );
 }
 
 class Category {
@@ -271,26 +278,26 @@ class Category {
   final bool archived;
 
   factory Category.fromMap(Map<String, Object?> m) => Category(
-        id: m['id'] as int,
-        ledgerId: m['ledger_id'] as int,
-        type: TxnType.fromCode((m['type'] as String?) ?? 'expense'),
-        name: m['name'] as String,
-        icon: (m['icon'] as String?) ?? 'more',
-        parentId: m['parent_id'] as int?,
-        sortOrder: (m['sort_order'] as int?) ?? 0,
-        archived: ((m['archived'] as int?) ?? 0) == 1,
-      );
+    id: m['id'] as int,
+    ledgerId: m['ledger_id'] as int,
+    type: TxnType.fromCode((m['type'] as String?) ?? 'expense'),
+    name: m['name'] as String,
+    icon: (m['icon'] as String?) ?? 'more',
+    parentId: m['parent_id'] as int?,
+    sortOrder: (m['sort_order'] as int?) ?? 0,
+    archived: ((m['archived'] as int?) ?? 0) == 1,
+  );
 
   Map<String, Object?> toMap() => {
-        if (id > 0) 'id': id,
-        'ledger_id': ledgerId,
-        'type': type.code,
-        'name': name,
-        'icon': icon,
-        'parent_id': parentId,
-        'sort_order': sortOrder,
-        'archived': archived ? 1 : 0,
-      };
+    if (id > 0) 'id': id,
+    'ledger_id': ledgerId,
+    'type': type.code,
+    'name': name,
+    'icon': icon,
+    'parent_id': parentId,
+    'sort_order': sortOrder,
+    'archived': archived ? 1 : 0,
+  };
 
   Category copyWith({
     String? name,
@@ -298,17 +305,16 @@ class Category {
     int? parentId,
     int? sortOrder,
     bool? archived,
-  }) =>
-      Category(
-        id: id,
-        ledgerId: ledgerId,
-        type: type,
-        name: name ?? this.name,
-        icon: icon ?? this.icon,
-        parentId: parentId ?? this.parentId,
-        sortOrder: sortOrder ?? this.sortOrder,
-        archived: archived ?? this.archived,
-      );
+  }) => Category(
+    id: id,
+    ledgerId: ledgerId,
+    type: type,
+    name: name ?? this.name,
+    icon: icon ?? this.icon,
+    parentId: parentId ?? this.parentId,
+    sortOrder: sortOrder ?? this.sortOrder,
+    archived: archived ?? this.archived,
+  );
 }
 
 class Txn {
@@ -352,35 +358,37 @@ class Txn {
   int get signedCents => type.isIncome ? amountCents : -amountCents;
 
   factory Txn.fromMap(Map<String, Object?> m) => Txn(
-        id: m['id'] as int,
-        ledgerId: m['ledger_id'] as int,
-        type: TxnType.fromCode((m['type'] as String?) ?? 'expense'),
-        amountCents: (m['amount_cents'] as int?) ?? 0,
-        date: m['date'] as String,
-        categoryId: m['category_id'] as int?,
-        accountId: m['account_id'] as int?,
-        toAccountId: m['to_account_id'] as int?,
-        note: (m['note'] as String?) ?? '',
-        templateId: m['template_id'] as int?,
-        recurringId: m['recurring_id'] as int?,
-        createdAt: (m['created_at'] as String?) ?? '',
-        periodStart: m['period_start'] as String?,
-      );
+    id: m['id'] as int,
+    ledgerId: m['ledger_id'] as int,
+    type: TxnType.fromCode((m['type'] as String?) ?? 'expense'),
+    amountCents: (m['amount_cents'] as int?) ?? 0,
+    date: m['date'] as String,
+    categoryId: m['category_id'] as int?,
+    accountId: m['account_id'] as int?,
+    toAccountId: m['to_account_id'] as int?,
+    note: (m['note'] as String?) ?? '',
+    templateId: m['template_id'] as int?,
+    recurringId: m['recurring_id'] as int?,
+    createdAt: (m['created_at'] as String?) ?? '',
+    periodStart: m['period_start'] as String?,
+  );
 
   Map<String, Object?> toMap() => {
-        if (id > 0) 'id': id,
-        'ledger_id': ledgerId,
-        'type': type.code,
-        'amount_cents': amountCents,
-        'date': date,
-        'category_id': categoryId,
-        'account_id': accountId,
-        'to_account_id': toAccountId,
-        'note': note,
-        'template_id': templateId,
-        'recurring_id': recurringId,
-        'created_at': createdAt.isEmpty ? DateTime.now().toIso8601String() : createdAt,
-      };
+    if (id > 0) 'id': id,
+    'ledger_id': ledgerId,
+    'type': type.code,
+    'amount_cents': amountCents,
+    'date': date,
+    'category_id': categoryId,
+    'account_id': accountId,
+    'to_account_id': toAccountId,
+    'note': note,
+    'template_id': templateId,
+    'recurring_id': recurringId,
+    'created_at': createdAt.isEmpty
+        ? DateTime.now().toIso8601String()
+        : createdAt,
+  };
 
   Txn copyWith({
     TxnType? type,
@@ -392,23 +400,22 @@ class Txn {
     String? note,
     bool clearCategory = false,
     bool clearAccount = false,
-  }) =>
-      Txn(
-        id: id,
-        ledgerId: ledgerId,
-        type: type ?? this.type,
-        amountCents: amountCents ?? this.amountCents,
-        date: date ?? this.date,
-        categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
-        accountId: clearAccount ? null : (accountId ?? this.accountId),
-        toAccountId: toAccountId ?? this.toAccountId,
-        note: note ?? this.note,
-        templateId: templateId,
-        recurringId: recurringId,
-        createdAt: createdAt,
-        // 改了日期，旧的归属期就不再成立，等 Repo 写入时重算
-        periodStart: date == null ? periodStart : null,
-      );
+  }) => Txn(
+    id: id,
+    ledgerId: ledgerId,
+    type: type ?? this.type,
+    amountCents: amountCents ?? this.amountCents,
+    date: date ?? this.date,
+    categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
+    accountId: clearAccount ? null : (accountId ?? this.accountId),
+    toAccountId: toAccountId ?? this.toAccountId,
+    note: note ?? this.note,
+    templateId: templateId,
+    recurringId: recurringId,
+    createdAt: createdAt,
+    // 改了日期，旧的归属期就不再成立，等 Repo 写入时重算
+    periodStart: date == null ? periodStart : null,
+  );
 }
 
 /// 某一侧（支出 / 收入）的合计，口径是**交叉归集**：
@@ -482,14 +489,14 @@ class TxnFilter {
   /// 明细页顶部那排「全部/支出/收入/转账」快捷筛选用它：点一下只改 type，
   /// 用户已经设好的分类、金额区间、时间段不能被顺手清掉。
   TxnFilter withType(TxnType? type) => TxnFilter(
-        type: type,
-        categoryId: categoryId,
-        accountId: accountId,
-        minCents: minCents,
-        maxCents: maxCents,
-        dateFrom: dateFrom,
-        dateTo: dateTo,
-      );
+    type: type,
+    categoryId: categoryId,
+    accountId: accountId,
+    minCents: minCents,
+    maxCents: maxCents,
+    dateFrom: dateFrom,
+    dateTo: dateTo,
+  );
 
   /// 金额区间的短标签，如「¥50–200」「≥ ¥50」「≤ ¥200」。
   ///
@@ -539,20 +546,20 @@ class Budget {
   bool get isTotal => categoryId == null;
 
   factory Budget.fromMap(Map<String, Object?> m) => Budget(
-        id: m['id'] as int,
-        ledgerId: m['ledger_id'] as int,
-        periodStart: m['period_start'] as String,
-        categoryId: m['category_id'] as int?,
-        amountCents: (m['amount_cents'] as int?) ?? 0,
-      );
+    id: m['id'] as int,
+    ledgerId: m['ledger_id'] as int,
+    periodStart: m['period_start'] as String,
+    categoryId: m['category_id'] as int?,
+    amountCents: (m['amount_cents'] as int?) ?? 0,
+  );
 
   Map<String, Object?> toMap() => {
-        if (id > 0) 'id': id,
-        'ledger_id': ledgerId,
-        'period_start': periodStart,
-        'category_id': categoryId,
-        'amount_cents': amountCents,
-      };
+    if (id > 0) 'id': id,
+    'ledger_id': ledgerId,
+    'period_start': periodStart,
+    'category_id': categoryId,
+    'amount_cents': amountCents,
+  };
 }
 
 class SavingGoal {
@@ -584,26 +591,26 @@ class SavingGoal {
   bool get done => savedCents >= targetCents;
 
   factory SavingGoal.fromMap(Map<String, Object?> m) => SavingGoal(
-        id: m['id'] as int,
-        name: m['name'] as String,
-        icon: (m['icon'] as String?) ?? 'target',
-        targetCents: (m['target_cents'] as int?) ?? 0,
-        savedCents: (m['saved_cents'] as int?) ?? 0,
-        dueMonth: m['due_month'] as String?,
-        sortOrder: (m['sort_order'] as int?) ?? 0,
-        archived: ((m['archived'] as int?) ?? 0) == 1,
-      );
+    id: m['id'] as int,
+    name: m['name'] as String,
+    icon: (m['icon'] as String?) ?? 'target',
+    targetCents: (m['target_cents'] as int?) ?? 0,
+    savedCents: (m['saved_cents'] as int?) ?? 0,
+    dueMonth: m['due_month'] as String?,
+    sortOrder: (m['sort_order'] as int?) ?? 0,
+    archived: ((m['archived'] as int?) ?? 0) == 1,
+  );
 
   Map<String, Object?> toMap() => {
-        if (id > 0) 'id': id,
-        'name': name,
-        'icon': icon,
-        'target_cents': targetCents,
-        'saved_cents': savedCents,
-        'due_month': dueMonth,
-        'sort_order': sortOrder,
-        'archived': archived ? 1 : 0,
-      };
+    if (id > 0) 'id': id,
+    'name': name,
+    'icon': icon,
+    'target_cents': targetCents,
+    'saved_cents': savedCents,
+    'due_month': dueMonth,
+    'sort_order': sortOrder,
+    'archived': archived ? 1 : 0,
+  };
 
   SavingGoal copyWith({
     String? name,
@@ -613,17 +620,16 @@ class SavingGoal {
     String? dueMonth,
     int? sortOrder,
     bool? archived,
-  }) =>
-      SavingGoal(
-        id: id,
-        name: name ?? this.name,
-        icon: icon ?? this.icon,
-        targetCents: targetCents ?? this.targetCents,
-        savedCents: savedCents ?? this.savedCents,
-        dueMonth: dueMonth ?? this.dueMonth,
-        sortOrder: sortOrder ?? this.sortOrder,
-        archived: archived ?? this.archived,
-      );
+  }) => SavingGoal(
+    id: id,
+    name: name ?? this.name,
+    icon: icon ?? this.icon,
+    targetCents: targetCents ?? this.targetCents,
+    savedCents: savedCents ?? this.savedCents,
+    dueMonth: dueMonth ?? this.dueMonth,
+    sortOrder: sortOrder ?? this.sortOrder,
+    archived: archived ?? this.archived,
+  );
 }
 
 /// 周期账单规则。
@@ -664,34 +670,34 @@ class RecurringRule {
   final bool enabled;
 
   factory RecurringRule.fromMap(Map<String, Object?> m) => RecurringRule(
-        id: m['id'] as int,
-        ledgerId: m['ledger_id'] as int,
-        type: TxnType.fromCode((m['type'] as String?) ?? 'expense'),
-        amountCents: (m['amount_cents'] as int?) ?? 0,
-        categoryId: m['category_id'] as int?,
-        accountId: m['account_id'] as int?,
-        note: (m['note'] as String?) ?? '',
-        freq: (m['freq'] as String?) ?? 'monthly',
-        interval: (m['interval'] as int?) ?? 1,
-        nextRunDate: m['next_run_date'] as String,
-        endDate: m['end_date'] as String?,
-        enabled: ((m['enabled'] as int?) ?? 1) == 1,
-      );
+    id: m['id'] as int,
+    ledgerId: m['ledger_id'] as int,
+    type: TxnType.fromCode((m['type'] as String?) ?? 'expense'),
+    amountCents: (m['amount_cents'] as int?) ?? 0,
+    categoryId: m['category_id'] as int?,
+    accountId: m['account_id'] as int?,
+    note: (m['note'] as String?) ?? '',
+    freq: (m['freq'] as String?) ?? 'monthly',
+    interval: (m['interval'] as int?) ?? 1,
+    nextRunDate: m['next_run_date'] as String,
+    endDate: m['end_date'] as String?,
+    enabled: ((m['enabled'] as int?) ?? 1) == 1,
+  );
 
   Map<String, Object?> toMap() => {
-        if (id > 0) 'id': id,
-        'ledger_id': ledgerId,
-        'type': type.code,
-        'amount_cents': amountCents,
-        'category_id': categoryId,
-        'account_id': accountId,
-        'note': note,
-        'freq': freq,
-        'interval': interval,
-        'next_run_date': nextRunDate,
-        'end_date': endDate,
-        'enabled': enabled ? 1 : 0,
-      };
+    if (id > 0) 'id': id,
+    'ledger_id': ledgerId,
+    'type': type.code,
+    'amount_cents': amountCents,
+    'category_id': categoryId,
+    'account_id': accountId,
+    'note': note,
+    'freq': freq,
+    'interval': interval,
+    'next_run_date': nextRunDate,
+    'end_date': endDate,
+    'enabled': enabled ? 1 : 0,
+  };
 }
 
 class TxnTemplate {
@@ -731,32 +737,32 @@ class TxnTemplate {
   bool get hasAmount => amountCents > 0;
 
   factory TxnTemplate.fromMap(Map<String, Object?> m) => TxnTemplate(
-        id: m['id'] as int,
-        ledgerId: m['ledger_id'] as int,
-        name: m['name'] as String,
-        icon: (m['icon'] as String?) ?? 'tpl',
-        type: TxnType.fromCode((m['type'] as String?) ?? 'expense'),
-        amountCents: (m['amount_cents'] as int?) ?? 0,
-        categoryId: m['category_id'] as int?,
-        accountId: m['account_id'] as int?,
-        note: (m['note'] as String?) ?? '',
-        sortOrder: (m['sort_order'] as int?) ?? 0,
-        useCount: (m['use_count'] as int?) ?? 0,
-        lastUsedAt: m['last_used_at'] as String?,
-      );
+    id: m['id'] as int,
+    ledgerId: m['ledger_id'] as int,
+    name: m['name'] as String,
+    icon: (m['icon'] as String?) ?? 'tpl',
+    type: TxnType.fromCode((m['type'] as String?) ?? 'expense'),
+    amountCents: (m['amount_cents'] as int?) ?? 0,
+    categoryId: m['category_id'] as int?,
+    accountId: m['account_id'] as int?,
+    note: (m['note'] as String?) ?? '',
+    sortOrder: (m['sort_order'] as int?) ?? 0,
+    useCount: (m['use_count'] as int?) ?? 0,
+    lastUsedAt: m['last_used_at'] as String?,
+  );
 
   Map<String, Object?> toMap() => {
-        if (id > 0) 'id': id,
-        'ledger_id': ledgerId,
-        'name': name,
-        'icon': icon,
-        'type': type.code,
-        'amount_cents': amountCents,
-        'category_id': categoryId,
-        'account_id': accountId,
-        'note': note,
-        'sort_order': sortOrder,
-      };
+    if (id > 0) 'id': id,
+    'ledger_id': ledgerId,
+    'name': name,
+    'icon': icon,
+    'type': type.code,
+    'amount_cents': amountCents,
+    'category_id': categoryId,
+    'account_id': accountId,
+    'note': note,
+    'sort_order': sortOrder,
+  };
 
   TxnTemplate copyWith({
     String? name,
@@ -769,21 +775,20 @@ class TxnTemplate {
     int? sortOrder,
     bool clearCategory = false,
     bool clearAccount = false,
-  }) =>
-      TxnTemplate(
-        id: id,
-        ledgerId: ledgerId,
-        name: name ?? this.name,
-        icon: icon ?? this.icon,
-        type: type ?? this.type,
-        amountCents: amountCents ?? this.amountCents,
-        categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
-        accountId: clearAccount ? null : (accountId ?? this.accountId),
-        note: note ?? this.note,
-        sortOrder: sortOrder ?? this.sortOrder,
-        useCount: useCount,
-        lastUsedAt: lastUsedAt,
-      );
+  }) => TxnTemplate(
+    id: id,
+    ledgerId: ledgerId,
+    name: name ?? this.name,
+    icon: icon ?? this.icon,
+    type: type ?? this.type,
+    amountCents: amountCents ?? this.amountCents,
+    categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
+    accountId: clearAccount ? null : (accountId ?? this.accountId),
+    note: note ?? this.note,
+    sortOrder: sortOrder ?? this.sortOrder,
+    useCount: useCount,
+    lastUsedAt: lastUsedAt,
+  );
 }
 
 // ---------------------------------------------------------------------------

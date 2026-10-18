@@ -125,8 +125,9 @@ class _RecurringPageState extends State<RecurringPage> {
                   const SizedBox(height: S.md),
                   TextField(
                     controller: amountCtl,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(
                       prefixText: '¥ ',
                       hintText: '金额',
@@ -213,32 +214,36 @@ class _RecurringPageState extends State<RecurringPage> {
     }
 
     if (rule == null) {
-      await Repo.insertRecurring(RecurringRule(
-        id: 0,
-        ledgerId: s.ledgerId,
-        type: type,
-        amountCents: amount,
-        categoryId: categoryId,
-        accountId: accountId,
-        note: noteCtl.text.trim(),
-        freq: freq,
-        nextRunDate: nextDate,
-      ));
+      await Repo.insertRecurring(
+        RecurringRule(
+          id: 0,
+          ledgerId: s.ledgerId,
+          type: type,
+          amountCents: amount,
+          categoryId: categoryId,
+          accountId: accountId,
+          note: noteCtl.text.trim(),
+          freq: freq,
+          nextRunDate: nextDate,
+        ),
+      );
     } else {
-      await Repo.updateRecurring(RecurringRule(
-        id: rule.id,
-        ledgerId: rule.ledgerId,
-        type: type,
-        amountCents: amount,
-        categoryId: categoryId,
-        accountId: accountId,
-        note: noteCtl.text.trim(),
-        freq: freq,
-        interval: rule.interval,
-        nextRunDate: nextDate,
-        endDate: rule.endDate,
-        enabled: rule.enabled,
-      ));
+      await Repo.updateRecurring(
+        RecurringRule(
+          id: rule.id,
+          ledgerId: rule.ledgerId,
+          type: type,
+          amountCents: amount,
+          categoryId: categoryId,
+          accountId: accountId,
+          note: noteCtl.text.trim(),
+          freq: freq,
+          interval: rule.interval,
+          nextRunDate: nextDate,
+          endDate: rule.endDate,
+          enabled: rule.enabled,
+        ),
+      );
     }
     await Store.i.afterTxnChange();
     if (context.mounted) showToast(context, '已保存');
@@ -304,20 +309,22 @@ class _RuleCard extends StatelessWidget {
             value: rule.enabled,
             activeThumbColor: C.ink,
             onChanged: (v) async {
-              await Repo.updateRecurring(RecurringRule(
-                id: rule.id,
-                ledgerId: rule.ledgerId,
-                type: rule.type,
-                amountCents: rule.amountCents,
-                categoryId: rule.categoryId,
-                accountId: rule.accountId,
-                note: rule.note,
-                freq: rule.freq,
-                interval: rule.interval,
-                nextRunDate: rule.nextRunDate,
-                endDate: rule.endDate,
-                enabled: v,
-              ));
+              await Repo.updateRecurring(
+                RecurringRule(
+                  id: rule.id,
+                  ledgerId: rule.ledgerId,
+                  type: rule.type,
+                  amountCents: rule.amountCents,
+                  categoryId: rule.categoryId,
+                  accountId: rule.accountId,
+                  note: rule.note,
+                  freq: rule.freq,
+                  interval: rule.interval,
+                  nextRunDate: rule.nextRunDate,
+                  endDate: rule.endDate,
+                  enabled: v,
+                ),
+              );
               await onChanged();
             },
           ),
@@ -344,8 +351,11 @@ class _RuleCard extends StatelessWidget {
               await Repo.deleteRecurring(rule.id);
               await onChanged();
             },
-            icon: const Icon(Icons.delete_outline_rounded,
-                size: 19, color: C.ink3),
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              size: 19,
+              color: C.ink3,
+            ),
           ),
         ],
       ),

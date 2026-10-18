@@ -14,6 +14,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ledger/app.dart';
 import 'package:ledger/data/cycle.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
@@ -264,6 +265,29 @@ void main() {
     // 上个月没有记录，明细清空但不该顺手筛出东西来
     expect(s.txns, isEmpty);
     expect(s.filtering, isFalse);
+  });
+
+  testWidgets('底部 tab 能点，也能左右滑', (tester) async {
+    await seed(tester);
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const HeitaApp());
+    await settle(tester);
+    expect(Store.i.tabIndex, 0);
+
+    // 点「图表」
+    await tester.tap(find.byKey(const ValueKey('tab-1')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(Store.i.tabIndex, 1, reason: '点 tab 要切页');
+
+    // 手指往右滑 = 回上一页（明细）
+    await tester.drag(find.byType(PageView), const Offset(300, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(Store.i.tabIndex, 0, reason: '横滑也要能换页，并且和 tab 状态是同一个');
   });
 
   testWidgets('我的页有备份与恢复两个入口', (tester) async {

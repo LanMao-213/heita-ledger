@@ -148,17 +148,23 @@ void main() {
     required int categoryId,
     int cents = 1000,
   }) async {
-    final id = await Repo.insertTxn(Txn(
-      id: 0,
-      ledgerId: ledgerId,
-      type: type,
-      amountCents: cents,
-      date: date,
-      categoryId: categoryId,
-    ));
+    final id = await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: ledgerId,
+        type: type,
+        amountCents: cents,
+        date: date,
+        categoryId: categoryId,
+      ),
+    );
     final db = await Db.open();
-    final row = await db.query('txn',
-        columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
+    final row = await db.query(
+      'txn',
+      columns: ['period_start'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     return row.first['period_start'] as String?;
   }
 
@@ -175,7 +181,11 @@ void main() {
   group('账单日默认 1（= 自然月，老用户行为不变）', () {
     test('支出落在月初', () async {
       expect(
-        await add(type: TxnType.expense, date: '2026-10-10', categoryId: catFood),
+        await add(
+          type: TxnType.expense,
+          date: '2026-10-10',
+          categoryId: catFood,
+        ),
         '2026-10-01',
       );
     });
@@ -183,14 +193,21 @@ void main() {
     test('工资不抬期：账单日为 1 时没有日期能早于当月 1 号', () async {
       expect(
         await add(
-            type: TxnType.income, date: '2026-10-10', categoryId: catSalary),
+          type: TxnType.income,
+          date: '2026-10-10',
+          categoryId: catSalary,
+        ),
         '2026-10-01',
       );
     });
 
     test('跨年：12 月的期仍是当月 1 号', () async {
       expect(
-        await add(type: TxnType.expense, date: '2026-12-31', categoryId: catFood),
+        await add(
+          type: TxnType.expense,
+          date: '2026-12-31',
+          categoryId: catFood,
+        ),
         '2026-12-01',
       );
     });
@@ -203,12 +220,20 @@ void main() {
 
     test('支出按真实日期归期，不抬', () async {
       expect(
-        await add(type: TxnType.expense, date: '2026-10-10', categoryId: catFood),
+        await add(
+          type: TxnType.expense,
+          date: '2026-10-10',
+          categoryId: catFood,
+        ),
         '2026-09-15',
         reason: '10-10 在 09-15 那一期里，支出永不抬期',
       );
       expect(
-        await add(type: TxnType.expense, date: '2026-10-20', categoryId: catFood),
+        await add(
+          type: TxnType.expense,
+          date: '2026-10-20',
+          categoryId: catFood,
+        ),
         '2026-10-15',
       );
     });
@@ -230,7 +255,10 @@ void main() {
     test('账单日前一天也抬（date < 账单日，不要求更早）', () async {
       expect(
         await add(
-            type: TxnType.income, date: '2026-10-14', categoryId: catSalary),
+          type: TxnType.income,
+          date: '2026-10-14',
+          categoryId: catSalary,
+        ),
         '2026-10-15',
       );
     });
@@ -238,7 +266,10 @@ void main() {
     test('已经在期内就不动，不会抬两期', () async {
       expect(
         await add(
-            type: TxnType.income, date: '2026-10-17', categoryId: catSalary),
+          type: TxnType.income,
+          date: '2026-10-17',
+          categoryId: catSalary,
+        ),
         '2026-10-15',
       );
     });
@@ -246,7 +277,10 @@ void main() {
     test('上个月的工资不会被再抬一次（两个月工资不挤进一期）', () async {
       expect(
         await add(
-            type: TxnType.income, date: '2026-09-20', categoryId: catSalary),
+          type: TxnType.income,
+          date: '2026-09-20',
+          categoryId: catSalary,
+        ),
         '2026-09-15',
       );
     });
@@ -254,7 +288,10 @@ void main() {
     test('兼职 / 理财 这类不固定的收入不进池', () async {
       expect(
         await add(
-            type: TxnType.income, date: '2026-10-10', categoryId: catParttime),
+          type: TxnType.income,
+          date: '2026-10-10',
+          categoryId: catParttime,
+        ),
         '2026-09-15',
       );
     });
@@ -263,43 +300,62 @@ void main() {
   group('写入路径', () {
     test('改日期会重算归属期', () async {
       await Repo.setSetting(Repo.cycleStartDayKey, '15');
-      final id = await Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: ledgerId,
-        type: TxnType.expense,
-        amountCents: 2000,
-        date: '2026-10-20',
-        categoryId: catFood,
-      ));
+      final id = await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.expense,
+          amountCents: 2000,
+          date: '2026-10-20',
+          categoryId: catFood,
+        ),
+      );
       final db = await Db.open();
 
-      var row = await db.query('txn',
-          columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
+      var row = await db.query(
+        'txn',
+        columns: ['period_start'],
+        where: 'id = ?',
+        whereArgs: [id],
+      );
       expect(row.first['period_start'], '2026-10-15');
 
       final old = await byId(id);
       await Repo.updateTxn(old, old.copyWith(date: '2026-10-10'));
 
-      row = await db.query('txn',
-          columns: ['period_start', 'date'], where: 'id = ?', whereArgs: [id]);
+      row = await db.query(
+        'txn',
+        columns: ['period_start', 'date'],
+        where: 'id = ?',
+        whereArgs: [id],
+      );
       expect(row.first['date'], '2026-10-10', reason: '真实日期要改');
-      expect(row.first['period_start'], '2026-09-15',
-          reason: '改了日期但没重算，这笔会停在 10-15 那期');
+      expect(
+        row.first['period_start'],
+        '2026-09-15',
+        reason: '改了日期但没重算，这笔会停在 10-15 那期',
+      );
     });
 
     test('改分类会重算归属期（支出 → 工资）', () async {
       await Repo.setSetting(Repo.cycleStartDayKey, '15');
-      final id = await Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: ledgerId,
-        type: TxnType.expense,
-        amountCents: 800000,
-        date: '2026-10-10',
-        categoryId: catFood,
-      ));
+      final id = await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.expense,
+          amountCents: 800000,
+          date: '2026-10-10',
+          categoryId: catFood,
+        ),
+      );
       final db = await Db.open();
-      final before = await db.query('txn',
-          columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
+      final before = await db.query(
+        'txn',
+        columns: ['period_start'],
+        where: 'id = ?',
+        whereArgs: [id],
+      );
       expect(before.first['period_start'], '2026-09-15');
 
       final old = await byId(id);
@@ -315,10 +371,13 @@ void main() {
         ),
       );
 
-      final after = await db.query('txn',
-          columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
-      expect(after.first['period_start'], '2026-10-15',
-          reason: '变成工资类收入后就该抬期');
+      final after = await db.query(
+        'txn',
+        columns: ['period_start'],
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      expect(after.first['period_start'], '2026-10-15', reason: '变成工资类收入后就该抬期');
     });
 
     test('手动关掉抬期：工资留在真实日期那一期', () async {
@@ -335,10 +394,17 @@ void main() {
         liftToNext: false,
       );
       final db = await Db.open();
-      final row = await db.query('txn',
-          columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
-      expect(row.first['period_start'], '2026-09-15',
-          reason: '用户明确说「不算下期」，就不该被白名单强行抬走');
+      final row = await db.query(
+        'txn',
+        columns: ['period_start'],
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      expect(
+        row.first['period_start'],
+        '2026-09-15',
+        reason: '用户明确说「不算下期」，就不该被白名单强行抬走',
+      );
     });
 
     test('手动打开抬期：兼职也能算进下一期', () async {
@@ -355,8 +421,12 @@ void main() {
         liftToNext: true,
       );
       final db = await Db.open();
-      final row = await db.query('txn',
-          columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
+      final row = await db.query(
+        'txn',
+        columns: ['period_start'],
+        where: 'id = ?',
+        whereArgs: [id],
+      );
       expect(row.first['period_start'], '2026-10-15');
     });
 
@@ -400,15 +470,22 @@ void main() {
     test('rebuildPeriods 重写全部历史', () async {
       // 先在默认账单日下记两笔
       await add(type: TxnType.expense, date: '2026-10-20', categoryId: catFood);
-      await add(type: TxnType.income, date: '2026-10-10', categoryId: catSalary);
+      await add(
+        type: TxnType.income,
+        date: '2026-10-10',
+        categoryId: catSalary,
+      );
 
       await Repo.setSetting(Repo.cycleStartDayKey, '15');
       final changed = await Repo.rebuildPeriods(ledgerId);
       expect(changed, 2, reason: '两笔都要改：一笔换期、一笔抬期');
 
       final db = await Db.open();
-      final rows = await db.query('txn',
-          columns: ['type', 'period_start'], orderBy: 'id');
+      final rows = await db.query(
+        'txn',
+        columns: ['type', 'period_start'],
+        orderBy: 'id',
+      );
       expect(rows[0]['period_start'], '2026-10-15');
       expect(rows[1]['period_start'], '2026-10-15');
     });
@@ -421,8 +498,11 @@ void main() {
       await Repo.rebuildPeriods(ledgerId);
 
       final db = await Db.open();
-      final rows =
-          await db.query('txn', columns: ['period_start'], orderBy: 'id');
+      final rows = await db.query(
+        'txn',
+        columns: ['period_start'],
+        orderBy: 'id',
+      );
       expect(rows.first['period_start'], '2026-10-01');
     });
 
@@ -457,8 +537,11 @@ void main() {
 
       rows = await db.query('txn', columns: ['period_start', 'date']);
       expect(rows.first['date'], '2026-10-10', reason: '真实日期一个字不改');
-      expect(rows.first['period_start'], '2026-10-01',
-          reason: '账单日默认 1，归属期 = 月初');
+      expect(
+        rows.first['period_start'],
+        '2026-10-01',
+        reason: '账单日默认 1，归属期 = 月初',
+      );
     });
 
     test('迁移可重复执行（已升级的库再打开一次不抛异常）', () async {

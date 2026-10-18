@@ -122,10 +122,7 @@ abstract final class BackupService {
       throw BackupException('这个文件不是 JSON，可能选错了');
     }
     if (json is! Map) throw BackupException('备份文件内容不是 JSON 对象');
-    return (
-      json.map((k, v) => MapEntry(k.toString(), v)),
-      files.first.name,
-    );
+    return (json.map((k, v) => MapEntry(k.toString(), v)), files.first.name);
   }
 
   /// 校验并恢复。返回每张表写入的行数。

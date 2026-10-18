@@ -213,8 +213,12 @@ class Store extends ChangeNotifier {
     statTo = byPeriod ? cycleTo : Repo.monthEnd(month);
     final basis = byPeriod ? DateBasis.period : DateBasis.date;
 
-    final totals =
-        await Repo.rangeTotals(ledgerId, statFrom, statTo, basis: basis);
+    final totals = await Repo.rangeTotals(
+      ledgerId,
+      statFrom,
+      statTo,
+      basis: basis,
+    );
     statExpenseCents = totals.$1;
     statIncomeCents = totals.$2;
     statExpenseStats = await Repo.rangeCategoryStats(

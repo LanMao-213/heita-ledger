@@ -127,7 +127,14 @@ void main() {
     final names = await _incomeNames();
 
     expect(names.where((n) => n == '提成').length, 1, reason: '出现了两个「提成」');
-    expect(names, ['工资', '奖金', '兼职', '理财', '红包', '其他', '提成'],
-        reason: '用户自建的那条应保持原位，不能被新种子顶掉');
+    expect(names, [
+      '工资',
+      '奖金',
+      '兼职',
+      '理财',
+      '红包',
+      '其他',
+      '提成',
+    ], reason: '用户自建的那条应保持原位，不能被新种子顶掉');
   });
 }

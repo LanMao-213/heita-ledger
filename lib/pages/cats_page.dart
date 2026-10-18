@@ -38,7 +38,10 @@ class _CatsPageState extends State<CatsPage> {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: S.xl, vertical: S.sm),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: S.xl,
+                  vertical: S.sm,
+                ),
                 child: SegTabs(
                   value: _type,
                   onChanged: (t) => setState(() => _type = t),
@@ -63,8 +66,11 @@ class _CatsPageState extends State<CatsPage> {
                             title: c.name,
                             trailing: IconButton(
                               onPressed: () => _menu(context, c),
-                              icon: const Icon(Icons.more_horiz_rounded,
-                                  size: 20, color: C.ink3),
+                              icon: const Icon(
+                                Icons.more_horiz_rounded,
+                                size: 20,
+                                color: C.ink3,
+                              ),
                             ),
                           );
                         },
@@ -127,10 +133,7 @@ class _CatsPageState extends State<CatsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('删除「${c.name}」？', style: T.section),
-        content: const Text(
-          '这个分类下的历史记录不会消失，会显示为「未分类」。',
-          style: T.body2,
-        ),
+        content: const Text('这个分类下的历史记录不会消失，会显示为「未分类」。', style: T.body2),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -179,10 +182,10 @@ class _CatsPageState extends State<CatsPage> {
                   child: GridView.builder(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 6,
-                      mainAxisSpacing: S.sm,
-                      crossAxisSpacing: S.sm,
-                    ),
+                          crossAxisCount: 6,
+                          mainAxisSpacing: S.sm,
+                          crossAxisSpacing: S.sm,
+                        ),
                     itemCount: choices.length,
                     itemBuilder: (c2, i) {
                       final k = choices[i];
@@ -195,8 +198,11 @@ class _CatsPageState extends State<CatsPage> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Center(
-                            child: LineIcon(k,
-                                size: 19, color: on ? C.bg : C.ink2),
+                            child: LineIcon(
+                              k,
+                              size: 19,
+                              color: on ? C.bg : C.ink2,
+                            ),
                           ),
                         ),
                       );
@@ -228,14 +234,16 @@ class _CatsPageState extends State<CatsPage> {
     }
 
     if (cat == null) {
-      await Repo.insertCategory(Category(
-        id: 0,
-        ledgerId: s.ledgerId,
-        type: _type,
-        name: name,
-        icon: icon,
-        sortOrder: 999,
-      ));
+      await Repo.insertCategory(
+        Category(
+          id: 0,
+          ledgerId: s.ledgerId,
+          type: _type,
+          name: name,
+          icon: icon,
+          sortOrder: 999,
+        ),
+      );
     } else {
       await Repo.updateCategory(cat.copyWith(name: name, icon: icon));
     }
@@ -246,8 +254,18 @@ class _CatsPageState extends State<CatsPage> {
   /// 常用图标优先，其余按图标库顺序补齐
   static List<String> _iconChoices(TxnType type) {
     final primary = type.isExpense
-        ? ['food', 'transport', 'shopping', 'home', 'fun', 'medical',
-           'study', 'comm', 'gift', 'more']
+        ? [
+            'food',
+            'transport',
+            'shopping',
+            'home',
+            'fun',
+            'medical',
+            'study',
+            'comm',
+            'gift',
+            'more',
+          ]
         : ['salary', 'bonus', 'parttime', 'invest', 'redpacket', 'more'];
     final all = <String>{...primary, ...kIcons.keys};
     return all.toList();

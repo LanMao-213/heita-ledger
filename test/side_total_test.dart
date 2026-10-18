@@ -39,18 +39,12 @@ void main() {
 
     await Db.open();
     ledgerId = await Repo.currentLedgerId();
-    catFood = await Repo.insertCategory(Category(
-      id: 0,
-      ledgerId: ledgerId,
-      type: TxnType.expense,
-      name: '餐饮',
-    ));
-    catSalary = await Repo.insertCategory(Category(
-      id: 0,
-      ledgerId: ledgerId,
-      type: TxnType.income,
-      name: '工资',
-    ));
+    catFood = await Repo.insertCategory(
+      Category(id: 0, ledgerId: ledgerId, type: TxnType.expense, name: '餐饮'),
+    );
+    catSalary = await Repo.insertCategory(
+      Category(id: 0, ledgerId: ledgerId, type: TxnType.income, name: '工资'),
+    );
     accA = await Repo.insertAccount(const Account(id: 0, name: '现金'));
     accB = await Repo.insertAccount(const Account(id: 0, name: '银行卡'));
   });
@@ -62,16 +56,18 @@ void main() {
   });
 
   Future<void> add(TxnType type, int cents, {int? cat, int? toAcc}) =>
-      Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: ledgerId,
-        type: type,
-        amountCents: cents,
-        date: '$month-10',
-        categoryId: cat,
-        accountId: accA,
-        toAccountId: toAcc,
-      )).then((_) {});
+      Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: type,
+          amountCents: cents,
+          date: '$month-10',
+          categoryId: cat,
+          accountId: accA,
+          toAccountId: toAcc,
+        ),
+      ).then((_) {});
 
   /// 支出 100、支出 −20、收入 1000、收入 −30、一笔转账
   Future<void> seed() async {
@@ -96,10 +92,16 @@ void main() {
     await seed();
     final (exp, inc, _) = await Repo.monthTotals(ledgerId, month);
 
-    final expStats =
-        await Repo.categoryStats(ledgerId: ledgerId, month: month, type: TxnType.expense);
-    final incStats =
-        await Repo.categoryStats(ledgerId: ledgerId, month: month, type: TxnType.income);
+    final expStats = await Repo.categoryStats(
+      ledgerId: ledgerId,
+      month: month,
+      type: TxnType.expense,
+    );
+    final incStats = await Repo.categoryStats(
+      ledgerId: ledgerId,
+      month: month,
+      type: TxnType.income,
+    );
 
     // 支出饼：餐饮 10000 + 工资 3000（收入负数落进来）
     expect(expStats.length, 2);

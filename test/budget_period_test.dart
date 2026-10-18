@@ -96,10 +96,16 @@ void main() {
 
       final db = await Db.open(); // 触发 onUpgrade
       final cols = await db.rawQuery('PRAGMA table_info(budget)');
-      expect(cols.any((c) => c['name'] == 'period_start'), isTrue,
-          reason: '没加 period_start 列');
-      expect(cols.any((c) => c['name'] == 'month'), isFalse,
-          reason: '旧的 month 列应当已被重建表替换掉');
+      expect(
+        cols.any((c) => c['name'] == 'period_start'),
+        isTrue,
+        reason: '没加 period_start 列',
+      );
+      expect(
+        cols.any((c) => c['name'] == 'month'),
+        isFalse,
+        reason: '旧的 month 列应当已被重建表替换掉',
+      );
 
       final rows = await db.query('budget', orderBy: 'id');
       expect(rows.length, 3, reason: '一条预算都不能丢');
@@ -125,9 +131,15 @@ void main() {
   group('按期读写预算', () {
     test('不同期互不影响', () async {
       await Repo.setBudget(
-          ledgerId: ledgerId, periodStart: '2026-10-15', amountCents: 300000);
+        ledgerId: ledgerId,
+        periodStart: '2026-10-15',
+        amountCents: 300000,
+      );
       await Repo.setBudget(
-          ledgerId: ledgerId, periodStart: '2026-09-15', amountCents: 250000);
+        ledgerId: ledgerId,
+        periodStart: '2026-09-15',
+        amountCents: 250000,
+      );
 
       expect(await Repo.totalBudgetCents(ledgerId, '2026-10-15'), 300000);
       expect(await Repo.totalBudgetCents(ledgerId, '2026-09-15'), 250000);
@@ -136,23 +148,31 @@ void main() {
 
     test('金额为 0 等于清除', () async {
       await Repo.setBudget(
-          ledgerId: ledgerId, periodStart: '2026-10-15', amountCents: 100000);
+        ledgerId: ledgerId,
+        periodStart: '2026-10-15',
+        amountCents: 100000,
+      );
       await Repo.setBudget(
-          ledgerId: ledgerId, periodStart: '2026-10-15', amountCents: 0);
+        ledgerId: ledgerId,
+        periodStart: '2026-10-15',
+        amountCents: 0,
+      );
       expect(await Repo.totalBudgetCents(ledgerId, '2026-10-15'), isNull);
     });
 
     test('分类预算按归属期统计支出', () async {
       // 账单日 15：10-10 的支出属于 09-15 那一期
       await Repo.setSetting(Repo.cycleStartDayKey, '15');
-      await Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: ledgerId,
-        type: TxnType.expense,
-        amountCents: 40000,
-        date: '2026-10-10',
-        categoryId: catFood,
-      ));
+      await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: ledgerId,
+          type: TxnType.expense,
+          amountCents: 40000,
+          date: '2026-10-10',
+          categoryId: catFood,
+        ),
+      );
       await Repo.setBudget(
         ledgerId: ledgerId,
         periodStart: '2026-10-15',
@@ -166,8 +186,11 @@ void main() {
         from: '2026-10-15',
         to: '2026-11-14',
       );
-      expect(inThisPeriod.single.spentCents, 0,
-          reason: '10-10 那笔不算在 10-15 起的这一期');
+      expect(
+        inThisPeriod.single.spentCents,
+        0,
+        reason: '10-10 那笔不算在 10-15 起的这一期',
+      );
 
       final inPrevPeriod = await Repo.budgetStats(
         ledgerId: ledgerId,

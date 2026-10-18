@@ -22,18 +22,31 @@ const _markWidthRatio = 0.88; // 用户选定的 D 方案：标志宽 = 屏宽 8
 const _redDark = Color(0xFFE8493A); // 深色底上的火焰红
 
 Future<void> _loadFont() async {
-  for (final path in [r'C:\Windows\Fonts\Deng.ttf', r'C:\Windows\Fonts\simhei.ttf']) {
+  for (final path in [
+    r'C:\Windows\Fonts\Deng.ttf',
+    r'C:\Windows\Fonts\simhei.ttf',
+  ]) {
     final f = File(path);
     if (!f.existsSync()) continue;
     final l = FontLoader('Roboto')
-      ..addFont(Future.value(ByteData.view(Uint8List.fromList(f.readAsBytesSync()).buffer)));
+      ..addFont(
+        Future.value(
+          ByteData.view(Uint8List.fromList(f.readAsBytesSync()).buffer),
+        ),
+      );
     await l.load();
     return;
   }
 }
 
-void _label(Canvas c, String text, Offset at, double size, Color color,
-    {FontWeight w = FontWeight.w400}) {
+void _label(
+  Canvas c,
+  String text,
+  Offset at,
+  double size,
+  Color color, {
+  FontWeight w = FontWeight.w400,
+}) {
   final tp = TextPainter(
     text: TextSpan(
       text: text,
@@ -68,17 +81,14 @@ class _Variant {
   final LinearGradient? linear;
   final RadialGradient? radial;
   final Color? base;
+
   /// 额外的红色柔光：颜色 + 中心点（相对屏坐标）+ 半径
   final (Color, Offset, double)? glow;
 }
 
 final _variants = <_Variant>[
   // 对照组：当前的纯色深底
-  const _Variant(
-    name: 'A · 纯深色',
-    note: '现状基准，无渐变',
-    base: Color(0xFF14161A),
-  ),
+  const _Variant(name: 'A · 纯深色', note: '现状基准，无渐变', base: Color(0xFF14161A)),
   const _Variant(
     name: 'B · 极暗对角',
     note: '左上 #252A34 → 右下 #090A0D',
@@ -135,14 +145,26 @@ void main() {
     canvas.scale(dpr);
 
     // 舞台底色（浅），让深色屏边界清晰
-    canvas.drawRect(Rect.fromLTWH(0, 0, totalW, totalH),
-        Paint()..color = const Color(0xFFECEEF1));
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, totalW, totalH),
+      Paint()..color = const Color(0xFFECEEF1),
+    );
 
-    _label(canvas, '启动页渐变方案 · 深色底（D 留白 88%）',
-        const Offset(padX, 22), 15, const Color(0xFF14161A),
-        w: FontWeight.w500);
-    _label(canvas, '标志白色 #FFFFFF · 火焰 #E8493A', const Offset(padX, 42), 11.5,
-        const Color(0xFF7B8390));
+    _label(
+      canvas,
+      '启动页渐变方案 · 深色底（D 留白 88%）',
+      const Offset(padX, 22),
+      15,
+      const Color(0xFF14161A),
+      w: FontWeight.w500,
+    );
+    _label(
+      canvas,
+      '标志白色 #FFFFFF · 火焰 #E8493A',
+      const Offset(padX, 42),
+      11.5,
+      const Color(0xFF7B8390),
+    );
 
     for (var i = 0; i < _variants.length; i++) {
       final v = _variants[i];
@@ -158,10 +180,16 @@ void main() {
         canvas.drawRect(screen, Paint()..color = v.base!);
       }
       if (v.linear != null) {
-        canvas.drawRect(screen, Paint()..shader = v.linear!.createShader(screen));
+        canvas.drawRect(
+          screen,
+          Paint()..shader = v.linear!.createShader(screen),
+        );
       }
       if (v.radial != null) {
-        canvas.drawRect(screen, Paint()..shader = v.radial!.createShader(screen));
+        canvas.drawRect(
+          screen,
+          Paint()..shader = v.radial!.createShader(screen),
+        );
       }
       // 红色柔光
       if (v.glow != null) {
@@ -187,8 +215,18 @@ void main() {
       canvas.translate(x + (thumbW - markW) / 2, y + (thumbH - markH) / 2);
       canvas.scale(markW / _vW, markH / _vH);
       canvas.translate(-_vX, -_vY);
-      canvas.drawPath(body, Paint()..color = const Color(0xFFFFFFFF)..isAntiAlias = true);
-      canvas.drawPath(flame, Paint()..color = _redDark..isAntiAlias = true);
+      canvas.drawPath(
+        body,
+        Paint()
+          ..color = const Color(0xFFFFFFFF)
+          ..isAntiAlias = true,
+      );
+      canvas.drawPath(
+        flame,
+        Paint()
+          ..color = _redDark
+          ..isAntiAlias = true,
+      );
       canvas.restore();
 
       canvas.restore();
@@ -203,14 +241,27 @@ void main() {
       );
 
       // 标签
-      _label(canvas, v.name, Offset(x, y + thumbH + 12), 13,
-          const Color(0xFF14161A), w: FontWeight.w500);
-      _label(canvas, v.note, Offset(x, y + thumbH + 30), 11,
-          const Color(0xFF7B8390));
+      _label(
+        canvas,
+        v.name,
+        Offset(x, y + thumbH + 12),
+        13,
+        const Color(0xFF14161A),
+        w: FontWeight.w500,
+      );
+      _label(
+        canvas,
+        v.note,
+        Offset(x, y + thumbH + 30),
+        11,
+        const Color(0xFF7B8390),
+      );
     }
 
-    final image =
-        await recorder.endRecording().toImage((totalW * dpr).toInt(), (totalH * dpr).toInt());
+    final image = await recorder.endRecording().toImage(
+      (totalW * dpr).toInt(),
+      (totalH * dpr).toInt(),
+    );
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     final dir = Directory('build/visual')..createSync(recursive: true);
     File('${dir.path}/splash_gradients.png')

@@ -42,10 +42,9 @@ Future<void> _loadChineseFont() async {
     if (!file.existsSync()) continue;
     final bytes = file.readAsBytesSync();
     for (final family in families) {
-      final loader = FontLoader(family)
-        ..addFont(
-          Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)),
-        );
+      final loader = FontLoader(
+        family,
+      )..addFont(Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)));
       await loader.load();
     }
     // ignore: avoid_print
@@ -64,9 +63,11 @@ Future<void> _loadIconFont() async {
   );
   if (!file.existsSync()) return;
   final loader = FontLoader('MaterialIcons')
-    ..addFont(Future.value(
-      ByteData.view(Uint8List.fromList(file.readAsBytesSync()).buffer),
-    ));
+    ..addFont(
+      Future.value(
+        ByteData.view(Uint8List.fromList(file.readAsBytesSync()).buffer),
+      ),
+    );
   await loader.load();
 }
 
@@ -123,11 +124,14 @@ void main() {
     expect(tester.takeException(), isNull, reason: '明细页有布局溢出');
 
     // ---- 日历卡片（上下滚动，没有左右翻月）----
-    await tester.tap(find.text(periodLabel(Store.i.cycleFrom, Store.i.cycleTo)));
+    await tester.tap(
+      find.text(periodLabel(Store.i.cycleFrom, Store.i.cycleTo)),
+    );
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     // 每日金额是一次异步查询回填的：假时钟里查库永远等不到，必须让出真实事件循环
     await tester.runAsync(
-        () => Future.delayed(const Duration(milliseconds: 300)));
+      () => Future.delayed(const Duration(milliseconds: 300)),
+    );
     await tester.pump();
     await _shot(tester, 'build/visual/shot_14_calendar.png');
     expect(tester.takeException(), isNull, reason: '日历卡片有布局溢出');
@@ -229,11 +233,9 @@ void main() {
         type: TxnType.expense,
       );
       final food = cats.firstWhere((c) => c.name == '餐饮').id;
-      await Store.i.applyFilter(TxnFilter(
-        categoryId: food,
-        minCents: 2000,
-        maxCents: 20000,
-      ));
+      await Store.i.applyFilter(
+        TxnFilter(categoryId: food, minCents: 2000, maxCents: 20000),
+      );
     });
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_9_filter_result.png');
@@ -272,8 +274,9 @@ Future<void> _seedDemoData() async {
 
   final accounts = store.accounts;
   final cash = accounts.isEmpty ? null : accounts.first.id;
-  final alipay =
-      accounts.length > 1 ? accounts[1].id : (accounts.isEmpty ? null : accounts.first.id);
+  final alipay = accounts.length > 1
+      ? accounts[1].id
+      : (accounts.isEmpty ? null : accounts.first.id);
 
   final rows = <(int, String, TxnType, int, int?, int?, String)>[
     (12, '$month-01', TxnType.expense, 2800, food, cash, '早餐'),
@@ -289,31 +292,39 @@ Future<void> _seedDemoData() async {
   ];
 
   for (final r in rows) {
-    await Repo.insertTxn(Txn(
-      id: 0,
-      ledgerId: ledgerId,
-      type: r.$3,
-      amountCents: r.$4,
-      date: r.$2,
-      categoryId: r.$5,
-      accountId: r.$6,
-      note: r.$7,
-    ));
+    await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: ledgerId,
+        type: r.$3,
+        amountCents: r.$4,
+        date: r.$2,
+        categoryId: r.$5,
+        accountId: r.$6,
+        note: r.$7,
+      ),
+    );
   }
 
-  await Repo.insertTxn(Txn(
-    id: 0,
-    ledgerId: ledgerId,
-    type: TxnType.income,
-    amountCents: 1280000,
-    date: '$month-10',
-    categoryId: salary,
-    accountId: alipay,
-    note: '10月工资',
-  ));
+  await Repo.insertTxn(
+    Txn(
+      id: 0,
+      ledgerId: ledgerId,
+      type: TxnType.income,
+      amountCents: 1280000,
+      date: '$month-10',
+      categoryId: salary,
+      accountId: alipay,
+      note: '10月工资',
+    ),
+  );
 
   // 预算：总预算 + 一个必然超支的分类（用于验证红色警示）
-  await Repo.setBudget(ledgerId: ledgerId, periodStart: '$month-01', amountCents: 600000);
+  await Repo.setBudget(
+    ledgerId: ledgerId,
+    periodStart: '$month-01',
+    amountCents: 600000,
+  );
   if (food != null) {
     await Repo.setBudget(
       ledgerId: ledgerId,
@@ -332,72 +343,86 @@ Future<void> _seedDemoData() async {
   }
 
   // 储蓄目标
-  await Repo.insertGoal(const SavingGoal(
-    id: 0,
-    name: '旅行基金',
-    icon: 'plane',
-    targetCents: 2000000,
-    savedCents: 850000,
-    dueMonth: '2027-06',
-  ));
-  await Repo.insertGoal(const SavingGoal(
-    id: 0,
-    name: '换电脑',
-    icon: 'laptop',
-    targetCents: 800000,
-    savedCents: 230000,
-  ));
-  await Repo.insertGoal(const SavingGoal(
-    id: 0,
-    name: '应急金',
-    icon: 'wallet',
-    targetCents: 3000000,
-    savedCents: 1260000,
-  ));
+  await Repo.insertGoal(
+    const SavingGoal(
+      id: 0,
+      name: '旅行基金',
+      icon: 'plane',
+      targetCents: 2000000,
+      savedCents: 850000,
+      dueMonth: '2027-06',
+    ),
+  );
+  await Repo.insertGoal(
+    const SavingGoal(
+      id: 0,
+      name: '换电脑',
+      icon: 'laptop',
+      targetCents: 800000,
+      savedCents: 230000,
+    ),
+  );
+  await Repo.insertGoal(
+    const SavingGoal(
+      id: 0,
+      name: '应急金',
+      icon: 'wallet',
+      targetCents: 3000000,
+      savedCents: 1260000,
+    ),
+  );
 
   // 记账模板：四张，「早餐」「地铁」用过几次 —— 顶部那排模板的排序靠它
-  final tplBreakfast = await Repo.insertTemplate(TxnTemplate(
-    id: 0,
-    ledgerId: ledgerId,
-    name: '早餐',
-    icon: 'food',
-    type: TxnType.expense,
-    amountCents: 1200,
-    categoryId: food,
-    accountId: cash,
-    note: '包子 + 豆浆',
-  ));
-  final tplMetro = await Repo.insertTemplate(TxnTemplate(
-    id: 0,
-    ledgerId: ledgerId,
-    name: '地铁',
-    icon: 'transport',
-    type: TxnType.expense,
-    amountCents: 600,
-    categoryId: transport,
-    accountId: cash,
-  ));
-  await Repo.insertTemplate(TxnTemplate(
-    id: 0,
-    ledgerId: ledgerId,
-    name: '房租',
-    icon: 'home',
-    type: TxnType.expense,
-    amountCents: 150000,
-    categoryId: home,
-    accountId: alipay,
-    note: '每月 5 号',
-  ));
-  await Repo.insertTemplate(TxnTemplate(
-    id: 0,
-    ledgerId: ledgerId,
-    name: '奶茶',
-    icon: 'food',
-    type: TxnType.expense,
-    amountCents: 0,
-    categoryId: food,
-    accountId: alipay,
-  ));
+  final tplBreakfast = await Repo.insertTemplate(
+    TxnTemplate(
+      id: 0,
+      ledgerId: ledgerId,
+      name: '早餐',
+      icon: 'food',
+      type: TxnType.expense,
+      amountCents: 1200,
+      categoryId: food,
+      accountId: cash,
+      note: '包子 + 豆浆',
+    ),
+  );
+  final tplMetro = await Repo.insertTemplate(
+    TxnTemplate(
+      id: 0,
+      ledgerId: ledgerId,
+      name: '地铁',
+      icon: 'transport',
+      type: TxnType.expense,
+      amountCents: 600,
+      categoryId: transport,
+      accountId: cash,
+    ),
+  );
+  await Repo.insertTemplate(
+    TxnTemplate(
+      id: 0,
+      ledgerId: ledgerId,
+      name: '房租',
+      icon: 'home',
+      type: TxnType.expense,
+      amountCents: 150000,
+      categoryId: home,
+      accountId: alipay,
+      note: '每月 5 号',
+    ),
+  );
+  await Repo.insertTemplate(
+    TxnTemplate(
+      id: 0,
+      ledgerId: ledgerId,
+      name: '奶茶',
+      icon: 'food',
+      type: TxnType.expense,
+      amountCents: 0,
+      categoryId: food,
+      accountId: alipay,
+    ),
+  );
   for (var i = 0; i < 3; i++) {
     await Repo.touchTemplate(tplBreakfast);
   }

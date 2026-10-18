@@ -35,9 +35,11 @@ const Map<String, String> kIcons = {
   'tag': r'<path d="M11.4 3.6H20v8.6l-8.6 8.6-8.6-8.6z"/><circle cx="16" cy="7.6" r="1.4"/>',
   'bell': r'<path d="M6.4 10.2a5.6 5.6 0 1 1 11.2 0c0 4 1.6 5.4 1.6 5.4H4.8s1.6-1.4 1.6-5.4z"/><path d="M10.2 18.6a2 2 0 0 0 3.6 0"/>',
   'coin': r'<circle cx="12" cy="12" r="8.4"/><path d="M12 7.4v9.2M14.6 9.4H10.3a1.9 1.9 0 0 0 0 3.8h3.4a1.9 1.9 0 0 1 0 3.8H9.4"/>',
-  'moon': r'<path d="M20.2 14.2A8.6 8.6 0 0 1 9.8 3.8a8.8 8.8 0 1 0 10.4 10.4z"/>',
+  'moon':
+      r'<path d="M20.2 14.2A8.6 8.6 0 0 1 9.8 3.8a8.8 8.8 0 1 0 10.4 10.4z"/>',
   'doc': r'<path d="M6.4 4.6a2 2 0 0 1 2-2h5.4l4.8 4.8v11.6a2 2 0 0 1-2 2H8.4a2 2 0 0 1-2-2z"/><path d="M13.6 2.6v5h5"/><path d="M9.6 12.6h6M9.6 16h4"/>',
-  'info': r'<circle cx="12" cy="12" r="8.6"/><path d="M12 11.2v5.2M12 7.9v.01"/>',
+  'info':
+      r'<circle cx="12" cy="12" r="8.6"/><path d="M12 11.2v5.2M12 7.9v.01"/>',
 
   // ---- 计划页与储蓄目标 ----
   'target': r'<circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r=".9"/>',
@@ -64,9 +66,9 @@ const Map<String, String> kIcons = {
 final Map<String, Path> _pathCache = {};
 
 Path lineIconPath(String name) => _pathCache.putIfAbsent(
-      name,
-      () => parseSvgFragment(kIcons[name] ?? kIcons['more']!),
-    );
+  name,
+  () => parseSvgFragment(kIcons[name] ?? kIcons['more']!),
+);
 
 /// 线稿图标。
 ///
@@ -141,9 +143,7 @@ class _LineIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _LineIconPainter old) =>
-      old.path != path ||
-      old.color != color ||
-      old.strokeWidth != strokeWidth;
+      old.path != path || old.color != color || old.strokeWidth != strokeWidth;
 }
 
 /// 品牌标志。视图框 455×944，主体实心、火焰叠红。
@@ -181,10 +181,14 @@ class _BrandMarkPainter extends CustomPainter {
   final Color fg;
   final Color flameColor;
 
-  static final Path _body =
-      parseSvgPath(kMarkPath, fillType: PathFillType.evenOdd);
-  static final Path _flame =
-      parseSvgPath(kFlamePath, fillType: PathFillType.evenOdd);
+  static final Path _body = parseSvgPath(
+    kMarkPath,
+    fillType: PathFillType.evenOdd,
+  );
+  static final Path _flame = parseSvgPath(
+    kFlamePath,
+    fillType: PathFillType.evenOdd,
+  );
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -193,8 +197,18 @@ class _BrandMarkPainter extends CustomPainter {
     // 视图框 9,5,437,932 → 缩放到目标尺寸
     canvas.scale(size.width / 455.0, size.height / 944.0);
     canvas.translate(-9, -5);
-    canvas.drawPath(_body, Paint()..color = fg..isAntiAlias = true);
-    canvas.drawPath(_flame, Paint()..color = flameColor..isAntiAlias = true);
+    canvas.drawPath(
+      _body,
+      Paint()
+        ..color = fg
+        ..isAntiAlias = true,
+    );
+    canvas.drawPath(
+      _flame,
+      Paint()
+        ..color = flameColor
+        ..isAntiAlias = true,
+    );
     canvas.restore();
   }
 

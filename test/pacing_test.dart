@@ -10,11 +10,11 @@ import 'package:ledger/data/pacing.dart';
 void main() {
   // 2026 年 10 月有 31 天
   Pacing at(String today, {int? total, required int used}) => Pacing.of(
-        month: '2026-10',
-        totalCents: total,
-        usedCents: used,
-        today: today,
-      );
+    month: '2026-10',
+    totalCents: total,
+    usedCents: used,
+    today: today,
+  );
 
   group('天数口径', () {
     test('月中：含今天，剩余天数把今天算进去', () {

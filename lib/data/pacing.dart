@@ -85,7 +85,9 @@ class Pacing {
     } else {
       passed = _daysBetween(from, now) + 1; // 含今天
     }
-    final remain = finished ? 0 : (passed == 0 ? totalDays : totalDays - passed + 1);
+    final remain = finished
+        ? 0
+        : (passed == 0 ? totalDays : totalDays - passed + 1);
 
     return Pacing(
       totalCents: totalCents,
@@ -116,8 +118,7 @@ class Pacing {
       (totalCents == null || totalDays == 0) ? 0 : totalCents! ~/ totalDays;
 
   /// 实际日均：已花 / 已过天数
-  int get perDayRealCents =>
-      passedDays == 0 ? 0 : usedCents ~/ passedDays;
+  int get perDayRealCents => passedDays == 0 ? 0 : usedCents ~/ passedDays;
 
   /// 从今天起，每天还能花多少。剩不到一天时按 1 天算，不除以 0。
   int get canSpendPerDayCents {

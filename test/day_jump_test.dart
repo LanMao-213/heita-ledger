@@ -50,16 +50,18 @@ void main() {
       final acc = Store.i.accounts.first.id;
       // 3 号两笔、10 号一笔 —— 3 号那根柱子有数据，才允许点
       for (final d in [targetDay, targetDay, 10]) {
-        await Repo.insertTxn(Txn(
-          id: 0,
-          ledgerId: Store.i.ledgerId,
-          type: TxnType.expense,
-          amountCents: 1000,
-          date: '$month-${d.toString().padLeft(2, '0')}',
-          categoryId: cat,
-          accountId: acc,
-          note: '测试',
-        ));
+        await Repo.insertTxn(
+          Txn(
+            id: 0,
+            ledgerId: Store.i.ledgerId,
+            type: TxnType.expense,
+            amountCents: 1000,
+            date: '$month-${d.toString().padLeft(2, '0')}',
+            categoryId: cat,
+            accountId: acc,
+            note: '测试',
+          ),
+        );
       }
       await Store.i.afterTxnChange();
     });
@@ -79,7 +81,9 @@ void main() {
     // 点第 3 天的柱子
     final rect = tester.getRect(bars);
     final slot = rect.width / 31;
-    await tester.tapAt(Offset(rect.left + slot * (targetDay - 0.5), rect.center.dy));
+    await tester.tapAt(
+      Offset(rect.left + slot * (targetDay - 0.5), rect.center.dy),
+    );
     await tester.pumpAndSettle();
     // 筛选要真查一次库：假时钟里 await 不到，先让真实事件循环跑一下
     await tester.runAsync(

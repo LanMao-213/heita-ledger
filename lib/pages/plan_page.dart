@@ -99,10 +99,14 @@ class _TotalBudgetCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text(Fmt.money(s.expenseCents),
-                    style: T.hero.copyWith(fontSize: 30)),
-                Text('  /  ${Fmt.money(budget)}',
-                    style: T.body2.copyWith(fontSize: 14)),
+                Text(
+                  Fmt.money(s.expenseCents),
+                  style: T.hero.copyWith(fontSize: 30),
+                ),
+                Text(
+                  '  /  ${Fmt.money(budget)}',
+                  style: T.body2.copyWith(fontSize: 14),
+                ),
               ],
             ),
             const SizedBox(height: S.md),
@@ -110,7 +114,10 @@ class _TotalBudgetCard extends StatelessWidget {
             const SizedBox(height: S.sm),
             Row(
               children: [
-                Text('已用 ${(used * 100).toStringAsFixed(0)}%', style: T.caption),
+                Text(
+                  '已用 ${(used * 100).toStringAsFixed(0)}%',
+                  style: T.caption,
+                ),
                 const Spacer(),
                 if (over)
                   Text(
@@ -118,8 +125,10 @@ class _TotalBudgetCard extends StatelessWidget {
                     style: T.amountSm.copyWith(color: C.over, fontSize: 13.5),
                   )
                 else
-                  Text('剩余 ${Fmt.money(s.budgetLeftCents)}',
-                      style: T.amountSm.copyWith(fontSize: 13.5)),
+                  Text(
+                    '剩余 ${Fmt.money(s.budgetLeftCents)}',
+                    style: T.amountSm.copyWith(fontSize: 13.5),
+                  ),
               ],
             ),
             // 预算节奏：把「还剩多少」翻成「还剩几天、每天能花多少」。
@@ -146,7 +155,10 @@ class _TotalBudgetCard extends StatelessWidget {
                 color: C.bg3,
                 borderRadius: BorderRadius.circular(R.sm),
               ),
-              child: Text(pacing.sentence, style: T.caption.copyWith(height: 1.6)),
+              child: Text(
+                pacing.sentence,
+                style: T.caption.copyWith(height: 1.6),
+              ),
             ),
           ],
         ],
@@ -206,8 +218,10 @@ class _CategoryBudgets extends StatelessWidget {
               child: TextButton.icon(
                 onPressed: () => _addCategoryBudget(context),
                 icon: const LineIcon('plus', size: 16, color: C.ink2),
-                label: const Text('为分类设置额度',
-                    style: TextStyle(fontSize: 13, color: C.ink2)),
+                label: const Text(
+                  '为分类设置额度',
+                  style: TextStyle(fontSize: 13, color: C.ink2),
+                ),
               ),
             ),
           ),
@@ -276,7 +290,10 @@ class _BudgetRow extends StatelessWidget {
             children: [
               LineIcon(stat.icon, size: 18, color: C.ink2),
               const SizedBox(width: S.md),
-              Text(stat.name, style: T.body.copyWith(fontWeight: FontWeight.w500)),
+              Text(
+                stat.name,
+                style: T.body.copyWith(fontWeight: FontWeight.w500),
+              ),
               const Spacer(),
               if (hasBudget)
                 Text(
@@ -305,8 +322,10 @@ class _BudgetRow extends StatelessWidget {
                     style: T.caption.copyWith(color: C.over),
                   ),
                   const Spacer(),
-                  Text('${(ratio * 100).toStringAsFixed(0)}%',
-                      style: T.caption.copyWith(color: C.over)),
+                  Text(
+                    '${(ratio * 100).toStringAsFixed(0)}%',
+                    style: T.caption.copyWith(color: C.over),
+                  ),
                 ],
               ),
             ],
@@ -367,7 +386,14 @@ class _Goals extends StatelessWidget {
     var icon = goal?.icon ?? 'flag';
 
     const iconChoices = [
-      'flag', 'plane', 'laptop', 'car', 'wallet', 'target', 'home', 'coin',
+      'flag',
+      'plane',
+      'laptop',
+      'car',
+      'wallet',
+      'target',
+      'home',
+      'coin',
     ];
 
     final ok = await showDialog<bool>(
@@ -405,8 +431,11 @@ class _Goals extends StatelessWidget {
                           borderRadius: BorderRadius.circular(11),
                         ),
                         child: Center(
-                          child: LineIcon(k,
-                              size: 19, color: icon == k ? C.bg : C.ink2),
+                          child: LineIcon(
+                            k,
+                            size: 19,
+                            color: icon == k ? C.bg : C.ink2,
+                          ),
                         ),
                       ),
                     ),
@@ -437,15 +466,19 @@ class _Goals extends StatelessWidget {
     }
 
     if (goal == null) {
-      await Repo.insertGoal(SavingGoal(
-        id: 0,
-        name: name,
-        icon: icon,
-        targetCents: target,
-        savedCents: 0,
-      ));
+      await Repo.insertGoal(
+        SavingGoal(
+          id: 0,
+          name: name,
+          icon: icon,
+          targetCents: target,
+          savedCents: 0,
+        ),
+      );
     } else {
-      await Repo.updateGoal(goal.copyWith(name: name, icon: icon, targetCents: target));
+      await Repo.updateGoal(
+        goal.copyWith(name: name, icon: icon, targetCents: target),
+      );
     }
     await s.afterGoalChange();
     if (context.mounted) showToast(context, '已保存');
@@ -487,19 +520,25 @@ class _GoalCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(goal.name,
-                              style: T.body.copyWith(fontWeight: FontWeight.w600)),
+                          Text(
+                            goal.name,
+                            style: T.body.copyWith(fontWeight: FontWeight.w600),
+                          ),
                           if (goal.done) ...[
                             const SizedBox(width: S.sm),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 1),
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
                               decoration: BoxDecoration(
                                 color: C.ink,
                                 borderRadius: BorderRadius.circular(5),
                               ),
-                              child: const Text('已达成',
-                                  style: TextStyle(fontSize: 10, color: C.bg)),
+                              child: const Text(
+                                '已达成',
+                                style: TextStyle(fontSize: 10, color: C.bg),
+                              ),
                             ),
                           ],
                         ],
@@ -519,8 +558,10 @@ class _GoalCard extends StatelessWidget {
                     minimumSize: const Size(0, 30),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('存一笔',
-                      style: TextStyle(fontSize: 13, color: C.ink2)),
+                  child: const Text(
+                    '存一笔',
+                    style: TextStyle(fontSize: 13, color: C.ink2),
+                  ),
                 ),
               ],
             ),
@@ -529,7 +570,10 @@ class _GoalCard extends StatelessWidget {
             const SizedBox(height: S.sm),
             Row(
               children: [
-                Text('${(goal.progress * 100).toStringAsFixed(1)}%', style: T.caption),
+                Text(
+                  '${(goal.progress * 100).toStringAsFixed(1)}%',
+                  style: T.caption,
+                ),
                 const Spacer(),
                 if (goal.dueMonth != null)
                   Text('目标 ${Fmt.monthLabel(goal.dueMonth!)}', style: T.caption)

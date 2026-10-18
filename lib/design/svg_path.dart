@@ -31,7 +31,9 @@ Path parseSvgPath(String d, {PathFillType fillType = PathFillType.nonZero}) {
 /// `<path d="M5 13h14a7 7 0 0 1-14 0z"/><circle cx="9" cy="13.6" r="1"/>`
 Path parseSvgFragment(String fragment) {
   final path = Path()..fillType = PathFillType.nonZero;
-  final tagRe = RegExp(r'<(path|circle|rect|line|polyline|polygon)\b([^>]*)/?>');
+  final tagRe = RegExp(
+    r'<(path|circle|rect|line|polyline|polygon)\b([^>]*)/?>',
+  );
   final attrRe = RegExp(r'([a-zA-Z-]+)\s*=\s*"([^"]*)"');
 
   for (final tag in tagRe.allMatches(fragment)) {
@@ -47,10 +49,9 @@ Path parseSvgFragment(String fragment) {
       case 'path':
         path.addPath(parseSvgPath(attrs['d'] ?? ''), Offset.zero);
       case 'circle':
-        path.addOval(Rect.fromCircle(
-          center: Offset(f('cx'), f('cy')),
-          radius: f('r'),
-        ));
+        path.addOval(
+          Rect.fromCircle(center: Offset(f('cx'), f('cy')), radius: f('r')),
+        );
       case 'rect':
         final r = Rect.fromLTWH(f('x'), f('y'), f('width'), f('height'));
         final rx = f('rx');
@@ -93,7 +94,11 @@ class _SvgScanner {
   void _skip() {
     while (i < src.length) {
       final c = src.codeUnitAt(i);
-      if (c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D || c == 0x0C ||
+      if (c == 0x20 ||
+          c == 0x09 ||
+          c == 0x0A ||
+          c == 0x0D ||
+          c == 0x0C ||
           c == 0x2C) {
         i++;
       } else {
@@ -178,8 +183,8 @@ class _PathBuilder {
   double cx = 0, cy = 0; // 当前点
   double sx = 0, sy = 0; // 当前子路径起点（Z 回调用）
   double lastC2x = 0, lastC2y = 0; // 上一个三次曲线的第二控制点（S 反射用）
-  double lastQx = 0, lastQy = 0;   // 上一个二次曲线的控制点（T 反射用）
-  String prevCmd = '';             // 上一条命令（判断能否反射）
+  double lastQx = 0, lastQy = 0; // 上一个二次曲线的控制点（T 反射用）
+  String prevCmd = ''; // 上一条命令（判断能否反射）
 
   void run(String d) {
     final sc = _SvgScanner(d);
@@ -306,8 +311,15 @@ class _PathBuilder {
 
   /// 端点参数（SVG 写法）→ 中心参数，再按 ≤90° 切段转三次贝塞尔。
   /// 算法出自 SVG 规范附录 F.6。
-  void _arcTo(double rx, double ry, double rotDeg, bool large, bool sweep,
-      double x2, double y2) {
+  void _arcTo(
+    double rx,
+    double ry,
+    double rotDeg,
+    bool large,
+    bool sweep,
+    double x2,
+    double y2,
+  ) {
     final x1 = cx, y1 = cy;
     if (x1 == x2 && y1 == y2) return;
 
@@ -378,9 +390,12 @@ class _PathBuilder {
       final p1x = px(t), p1y = py(t);
       final p2x = px(t2), p2y = py(t2);
       path.cubicTo(
-        p1x + k * dpx(t), p1y + k * dpy(t),
-        p2x - k * dpx(t2), p2y - k * dpy(t2),
-        p2x, p2y,
+        p1x + k * dpx(t),
+        p1y + k * dpy(t),
+        p2x - k * dpx(t2),
+        p2y - k * dpy(t2),
+        p2x,
+        p2y,
       );
       t = t2;
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../design/haptics.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -24,6 +25,12 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   bool _recurringNotified = false;
 
+  /// 页码的唯一真源是 `store.tabIndex`，这个 controller 只是它的投影：
+  /// 点 tab、手指横滑、以及统计页的「看明细」调 `switchTab`，都从 [_syncPage] 汇进来
+  late final PageController _page = PageController(
+    initialPage: Store.i.tabIndex,
+  );
+
   static const _tabs = [
     (icon: 'list', label: '明细'),
     (icon: 'pie', label: '图表'),
@@ -34,7 +41,42 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    Store.i.addListener(_syncPage);
     WidgetsBinding.instance.addPostFrameCallback((_) => _notifyRecurring());
+  }
+
+  @override
+  void dispose() {
+    Store.i.removeListener(_syncPage);
+    _page.dispose();
+    super.dispose();
+  }
+
+  /// store 里的 tab 变了 → 页面滑过去（自己滑过去的情况在这里会直接 return）
+  void _syncPage() {
+    final want = Store.i.tabIndex;
+    if (!mounted || !_page.hasClients) return;
+    if ((_page.page?.round() ?? 0) == want) return;
+    _page.animateToPage(
+      want,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// 点底部 tab
+  void _select(int i) {
+    if (i == Store.i.tabIndex) return;
+    Haptics.tap();
+    // 只改 store，滑动交给 _syncPage —— 两处都动会互相打架
+    Store.i.switchTab(i);
+  }
+
+  /// 手指横滑到位
+  void _onSwipe(int i) {
+    if (i == Store.i.tabIndex) return;
+    Haptics.tap();
+    Store.i.switchTab(i);
   }
 
   /// 周期账单补记只提示一次，不打扰
@@ -50,6 +92,7 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _openRecord() async {
     final saved = await showRecordSheet(context);
     if (saved == true && mounted) {
+      Haptics.success();
       showToast(context, '已记账');
     }
   }
@@ -57,30 +100,60 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final store = Store.i;
-    return AnimatedBuilder(
-      animation: store,
-      builder: (context, _) => Scaffold(
-        backgroundColor: C.bg,
-        body: SafeArea(
-          bottom: false,
-          child: IndexedStack(
-            index: store.tabIndex,
-            children: const [
-              DetailPage(),
-              StatsPage(),
-              PlanPage(),
-              MinePage(),
-            ],
-          ),
+    // 只有 tabbar 挂在这个 AnimatedBuilder 上：页面各自监听 store，
+    // 套在最外层会让整棵 PageView 跟着每次记账重建一遍
+    return Scaffold(
+      backgroundColor: C.bg,
+      body: SafeArea(
+        bottom: false,
+        // 四页用 PageView 铺开，左右滑就能换页。
+        // 每页都套 _Keep：不加的话滑走的那页会被销毁，切回来列表回到顶部
+        child: PageView(
+          controller: _page,
+          onPageChanged: _onSwipe,
+          children: const [
+            _Keep(child: DetailPage()),
+            _Keep(child: StatsPage()),
+            _Keep(child: PlanPage()),
+            _Keep(child: MinePage()),
+          ],
         ),
-        bottomNavigationBar: _TabBar(
+      ),
+      bottomNavigationBar: AnimatedBuilder(
+        animation: store,
+        builder: (context, _) => _TabBar(
           index: store.tabIndex,
           tabs: _tabs,
-          onSelect: store.switchTab,
+          onSelect: _select,
           onRecord: _openRecord,
         ),
       ),
     );
+  }
+}
+
+/// 让 PageView 里的页面常驻。
+///
+/// PageView 默认会把滑出屏幕的页销毁（连同它的滚动位置），切回来时列表
+/// 从顶部重新开始 —— 记账应用里这很致命：看了半天明细，去图表转一圈回来
+/// 就得重新找位置。
+class _Keep extends StatefulWidget {
+  const _Keep({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_Keep> createState() => _KeepState();
+}
+
+class _KeepState extends State<_Keep> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 
@@ -108,15 +181,7 @@ class _TabBar extends StatelessWidget {
         top: false,
         child: SizedBox(
           height: 60,
-          child: Row(
-            children: [
-              _tab(0),
-              _tab(1),
-              _fab(),
-              _tab(2),
-              _tab(3),
-            ],
-          ),
+          child: Row(children: [_tab(0), _tab(1), _fab(), _tab(2), _tab(3)]),
         ),
       ),
     );
@@ -127,6 +192,7 @@ class _TabBar extends StatelessWidget {
     final t = tabs[i];
     return Expanded(
       child: InkWell(
+        key: ValueKey('tab-$i'),
         onTap: () => onSelect(i),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -171,7 +237,12 @@ class _TabBar extends StatelessWidget {
                 ],
               ),
               child: const Center(
-                child: LineIcon('plus', size: 24, color: C.bg, strokeWidth: 1.8),
+                child: LineIcon(
+                  'plus',
+                  size: 24,
+                  color: C.bg,
+                  strokeWidth: 1.8,
+                ),
               ),
             ),
           ),

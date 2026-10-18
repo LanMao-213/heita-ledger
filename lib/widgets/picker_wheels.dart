@@ -10,10 +10,7 @@ import 'common.dart';
 ///
 /// [note] 为 null 表示「用户选了自定义，别动我原来的备注」；为空串表示「清掉备注」。
 class NotePick {
-  const NotePick({
-    required this.categoryId,
-    required this.note,
-  });
+  const NotePick({required this.categoryId, required this.note});
 
   final int categoryId;
   final String? note;
@@ -71,9 +68,9 @@ class _NoteWheelSheetState extends State<_NoteWheelSheet> {
   late FixedExtentScrollController _hintCtrl;
 
   List<String> _hintsOf(int catIndex) => [
-        ...noteHintsFor(widget.type, widget.cats[catIndex].name),
-        _custom,
-      ];
+    ...noteHintsFor(widget.type, widget.cats[catIndex].name),
+    _custom,
+  ];
 
   @override
   void initState() {
@@ -143,9 +140,10 @@ class _NoteWheelSheetState extends State<_NoteWheelSheet> {
                     scrollController: _catCtrl,
                     itemExtent: 40,
                     onSelectedItemChanged: _onCatChanged,
-                    selectionOverlay: const CupertinoPickerDefaultSelectionOverlay(
-                      background: C.inkWash,
-                    ),
+                    selectionOverlay:
+                        const CupertinoPickerDefaultSelectionOverlay(
+                          background: C.inkWash,
+                        ),
                     children: [
                       for (var i = 0; i < cats.length; i++)
                         Center(child: _wheelText(cats[i].name, i == _catIndex)),
@@ -159,10 +157,12 @@ class _NoteWheelSheetState extends State<_NoteWheelSheet> {
                     key: ValueKey('hint-$_catIndex'),
                     scrollController: _hintCtrl,
                     itemExtent: 40,
-                    onSelectedItemChanged: (i) => setState(() => _hintIndex = i),
-                    selectionOverlay: const CupertinoPickerDefaultSelectionOverlay(
-                      background: C.inkWash,
-                    ),
+                    onSelectedItemChanged: (i) =>
+                        setState(() => _hintIndex = i),
+                    selectionOverlay:
+                        const CupertinoPickerDefaultSelectionOverlay(
+                          background: C.inkWash,
+                        ),
                     children: [
                       for (var i = 0; i < hints.length; i++)
                         Center(child: _wheelText(hints[i], i == _hintIndex)),

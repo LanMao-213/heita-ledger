@@ -47,18 +47,20 @@ void main() {
 
     await tester.runAsync(() => Store.i.boot());
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: Builder(
-          builder: (ctx) => Center(
-            child: ElevatedButton(
-              onPressed: () => showRecordSheet(ctx),
-              child: const Text('记一笔'),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => Center(
+              child: ElevatedButton(
+                onPressed: () => showRecordSheet(ctx),
+                child: const Text('记一笔'),
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('记一笔'));
@@ -83,12 +85,16 @@ void main() {
     // 写入路径要读账单日设置与分类白名单，是几次真实的数据库往返。
     // `pumpAndSettle` 只推进假时钟，不会等真实 IO —— 这里让出一次真实事件循环
     // 再查库，否则查到的是「还没写完」，会误判成保存失败。
-    await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 200)));
+    await tester.runAsync(
+      () => Future.delayed(const Duration(milliseconds: 200)),
+    );
 
-    final rows = await tester.runAsync(() => Repo.listTxns(
-          ledgerId: Store.i.ledgerId,
-          month: Fmt.month(DateTime.now()),
-        ));
+    final rows = await tester.runAsync(
+      () => Repo.listTxns(
+        ledgerId: Store.i.ledgerId,
+        month: Fmt.month(DateTime.now()),
+      ),
+    );
     expect(rows, isNotNull);
     expect(rows!.length, 1);
     expect(rows.first.amountCents, 500);
@@ -101,27 +107,27 @@ void main() {
     addTearDown(tester.view.reset);
 
     await tester.runAsync(() => Store.i.boot());
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: Builder(
-          builder: (ctx) => Center(
-            child: ElevatedButton(
-              onPressed: () => showRecordSheet(ctx),
-              child: const Text('记一笔'),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => Center(
+              child: ElevatedButton(
+                onPressed: () => showRecordSheet(ctx),
+                child: const Text('记一笔'),
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('记一笔'));
     await tester.pumpAndSettle();
 
     // 按键要在键盘范围内找：金额显示区也会出现 '-' 和数字
-    Finder key(String t) => find.descendant(
-          of: find.byType(CalcKeypad),
-          matching: find.text(t),
-        );
+    Finder key(String t) =>
+        find.descendant(of: find.byType(CalcKeypad), matching: find.text(t));
 
     // 行首按减号 → 负数
     await tester.tap(key('-'));
@@ -132,13 +138,20 @@ void main() {
 
     await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
-    await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 200)));
+    await tester.runAsync(
+      () => Future.delayed(const Duration(milliseconds: 200)),
+    );
 
-    final rows = await tester.runAsync(() => Repo.listTxns(
-          ledgerId: Store.i.ledgerId,
-          month: Fmt.month(DateTime.now()),
-        ));
-    expect(rows!.any((t) => t.amountCents == -2000), isTrue,
-        reason: '应有一条 −20.00 的记录');
+    final rows = await tester.runAsync(
+      () => Repo.listTxns(
+        ledgerId: Store.i.ledgerId,
+        month: Fmt.month(DateTime.now()),
+      ),
+    );
+    expect(
+      rows!.any((t) => t.amountCents == -2000),
+      isTrue,
+      reason: '应有一条 −20.00 的记录',
+    );
   });
 }

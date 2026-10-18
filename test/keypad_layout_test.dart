@@ -34,11 +34,13 @@ void main() {
 
     // 量按键本身（GestureDetector = 整个键位格子），不是字形
     Rect key(String label) => tester.getRect(
-          find.ancestor(
+      find
+          .ancestor(
             of: find.text(label),
             matching: find.byType(GestureDetector),
-          ).first,
-        );
+          )
+          .first,
+    );
 
     final plus = key('+');
     final confirm = key('确认');
@@ -51,27 +53,35 @@ void main() {
     final zero = key('0');
 
     // 1) 确认键和「+」同宽、左右边严格一致（之前宽 3px、右移 0）
-    expect(confirm.width, moreOrLessEquals(plus.width, epsilon: 0.01),
-        reason: '确认键比上面的键宽：${confirm.width} vs ${plus.width}');
+    expect(
+      confirm.width,
+      moreOrLessEquals(plus.width, epsilon: 0.01),
+      reason: '确认键比上面的键宽：${confirm.width} vs ${plus.width}',
+    );
     expect(confirm.left, moreOrLessEquals(plus.left, epsilon: 0.01));
     expect(confirm.right, moreOrLessEquals(plus.right, epsilon: 0.01));
 
     // 2) 底排 1 / 2 / 3 与上排 7 / 8 / 9、4 / 5 / 6 同列
-    for (final pair in [
-      (key('7'), one),
-      (key('8'), two),
-      (nine, three),
-    ]) {
-      expect(pair.$2.left, moreOrLessEquals(pair.$1.left, epsilon: 0.01),
-          reason: '底排与上排左边没对齐');
-      expect(pair.$2.right, moreOrLessEquals(pair.$1.right, epsilon: 0.01),
-          reason: '底排与上排右边没对齐');
+    for (final pair in [(key('7'), one), (key('8'), two), (nine, three)]) {
+      expect(
+        pair.$2.left,
+        moreOrLessEquals(pair.$1.left, epsilon: 0.01),
+        reason: '底排与上排左边没对齐',
+      );
+      expect(
+        pair.$2.right,
+        moreOrLessEquals(pair.$1.right, epsilon: 0.01),
+        reason: '底排与上排右边没对齐',
+      );
     }
     expect(six.left, moreOrLessEquals(three.left, epsilon: 0.01));
 
     // 3) 「.」和「3 / 6 / 9」同列
-    expect(dot.left, moreOrLessEquals(three.left, epsilon: 0.01),
-        reason: '「.」没和「3」对齐');
+    expect(
+      dot.left,
+      moreOrLessEquals(three.left, epsilon: 0.01),
+      reason: '「.」没和「3」对齐',
+    );
     expect(dot.right, moreOrLessEquals(three.right, epsilon: 0.01));
 
     // 4) 「0」占两列：左边接「1」，右边接「2」
@@ -86,14 +96,20 @@ void main() {
       ('确认', confirm),
     ]) {
       final glyph = tester.getRect(find.text(label));
-      expect(glyph.center.dx, moreOrLessEquals(cell.center.dx, epsilon: 1),
-          reason: '「$label」没在格子里水平居中：字形 ${glyph.center.dx}，格子 ${cell.center.dx}');
+      expect(
+        glyph.center.dx,
+        moreOrLessEquals(cell.center.dx, epsilon: 1),
+        reason: '「$label」没在格子里水平居中：字形 ${glyph.center.dx}，格子 ${cell.center.dx}',
+      );
     }
 
     // 6) 键高：普通键 = keyHeight，确认 = 两键 + 一个缝；确认块与左边两行齐平
     for (final label in ['C', '7', '4', '1', '0', '+']) {
-      expect(key(label).height, moreOrLessEquals(46, epsilon: 0.01),
-          reason: '「$label」高度不等于 keyHeight（多半是没给显式高度，被文字撑成了 33）');
+      expect(
+        key(label).height,
+        moreOrLessEquals(46, epsilon: 0.01),
+        reason: '「$label」高度不等于 keyHeight（多半是没给显式高度，被文字撑成了 33）',
+      );
     }
     expect(confirm.height, moreOrLessEquals(46 * 2 + 6, epsilon: 0.01));
     expect(confirm.top, moreOrLessEquals(key('1').top, epsilon: 0.01));
@@ -102,8 +118,11 @@ void main() {
     // 7) 全键盘只有一种键宽
     for (final label in ['C', '7', '4', '1', '2', '0']) {
       if (label == '0') continue; // 两格宽，本就不同
-      expect(key(label).width, moreOrLessEquals(plus.width, epsilon: 0.01),
-          reason: '「$label」的宽度和「+」不一致');
+      expect(
+        key(label).width,
+        moreOrLessEquals(plus.width, epsilon: 0.01),
+        reason: '「$label」的宽度和「+」不一致',
+      );
     }
   });
 
@@ -140,8 +159,11 @@ void main() {
     // 数字 / 运算符 / C / 确认 —— 四类键都必须有底，且普通键是同一块色。
     // 之前一半透明一半 bg2，键盘看起来像两套东西拼的。
     for (final label in ['7', '0', '.', '+', '×', '÷', 'C', '确认']) {
-      expect(cap(label), isNot(Colors.transparent),
-          reason: '「$label」没有底色：不能有的有、有的没有');
+      expect(
+        cap(label),
+        isNot(Colors.transparent),
+        reason: '「$label」没有底色：不能有的有、有的没有',
+      );
     }
     for (final label in ['7', '0', '.', '+', '×', '÷', 'C']) {
       expect(cap(label), C.bg2, reason: '「$label」的底色和别的普通键不一致');

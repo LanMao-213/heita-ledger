@@ -46,27 +46,36 @@ void main() {
     String icon = 'tpl',
     int? categoryId,
     int? accountId,
-  }) =>
-      Repo.insertTemplate(TxnTemplate(
-        id: 0,
-        ledgerId: ledgerId,
-        name: name,
-        icon: icon,
-        type: TxnType.expense,
-        amountCents: cents,
-        categoryId: categoryId,
-        accountId: accountId,
-      ));
+  }) => Repo.insertTemplate(
+    TxnTemplate(
+      id: 0,
+      ledgerId: ledgerId,
+      name: name,
+      icon: icon,
+      type: TxnType.expense,
+      amountCents: cents,
+      categoryId: categoryId,
+      accountId: accountId,
+    ),
+  );
 
   test('模板增删改：排序值自动递增，编辑不影响排序', () async {
     await Db.open();
     final ledgerId = await Repo.currentLedgerId();
-    final cat =
-        (await Repo.listCategories(ledgerId, type: TxnType.expense)).first;
+    final cat = (await Repo.listCategories(
+      ledgerId,
+      type: TxnType.expense,
+    )).first;
     final acc = (await Repo.listAccounts()).first;
 
-    final id1 = await add(ledgerId, '早餐', 1200,
-        icon: 'food', categoryId: cat.id, accountId: acc.id);
+    final id1 = await add(
+      ledgerId,
+      '早餐',
+      1200,
+      icon: 'food',
+      categoryId: cat.id,
+      accountId: acc.id,
+    );
     final id2 = await add(ledgerId, '房租', 300000, icon: 'home');
 
     var list = await Repo.listTemplates(ledgerId);
@@ -137,22 +146,31 @@ void main() {
   test('用模板记一笔：template_id 落到账目上，使用次数 +1', () async {
     await Db.open();
     final ledgerId = await Repo.currentLedgerId();
-    final cat =
-        (await Repo.listCategories(ledgerId, type: TxnType.expense)).first;
-    final acc = (await Repo.listAccounts()).first;
-    final tplId = await add(ledgerId, '早餐', 1200,
-        categoryId: cat.id, accountId: acc.id);
-
-    await Repo.insertTxn(Txn(
-      id: 0,
-      ledgerId: ledgerId,
+    final cat = (await Repo.listCategories(
+      ledgerId,
       type: TxnType.expense,
-      amountCents: 1200,
-      date: Fmt.today(),
+    )).first;
+    final acc = (await Repo.listAccounts()).first;
+    final tplId = await add(
+      ledgerId,
+      '早餐',
+      1200,
       categoryId: cat.id,
       accountId: acc.id,
-      templateId: tplId,
-    ));
+    );
+
+    await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: ledgerId,
+        type: TxnType.expense,
+        amountCents: 1200,
+        date: Fmt.today(),
+        categoryId: cat.id,
+        accountId: acc.id,
+        templateId: tplId,
+      ),
+    );
     await Repo.touchTemplate(tplId);
 
     final db = await Db.open();

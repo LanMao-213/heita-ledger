@@ -112,8 +112,7 @@ class _SplashScreen extends StatelessWidget {
     final size = MediaQuery.sizeOf(context);
     // 用户选定的「D · 留白 88%」：标志宽 = 屏宽 × 0.88，
     // 高度按标志自身比例 455:944 推导；再夹一道屏高上限，防止平板上撑爆。
-    final markH =
-        math.min(size.width * 0.88 * 944 / 455, size.height * 0.92);
+    final markH = math.min(size.width * 0.88 * 944 / 455, size.height * 0.92);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       // 深色底必须配浅色状态栏图标，否则时间和电量会看不见

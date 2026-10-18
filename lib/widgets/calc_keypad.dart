@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../design/haptics.dart';
 import '../design/tokens.dart';
 
 /// 键的类型 —— 只决定长相，不决定行为。
@@ -31,10 +32,10 @@ class CalcKeySpec {
 
   /// 键面文字：`*` `/` 换成真正的数学符号；`del` 画图标（见 [_KeyCap]）
   String get label => switch (key) {
-        '*' => '×',
-        '/' => '÷',
-        _ => key,
-      };
+    '*' => '×',
+    '/' => '÷',
+    _ => key,
+  };
 }
 
 /// 金额键盘。排列按用户指定：
@@ -158,11 +159,7 @@ class CalcKeypad extends StatelessWidget {
     );
   }
 
-  Widget _row(
-    List<CalcKeySpec> specs,
-    double keyW, {
-    bool gapAfter = true,
-  }) {
+  Widget _row(List<CalcKeySpec> specs, double keyW, {bool gapAfter = true}) {
     return Padding(
       padding: EdgeInsets.only(bottom: gapAfter ? _gap : 0),
       child: Row(
@@ -174,10 +171,7 @@ class CalcKeypad extends StatelessWidget {
               // 高度必须显式给：Row 里高度是无界的，只给宽度的话键会缩成
               // 一行字的高（33 而不是 46），确认块还会比左边两行高出一截
               height: _h,
-              child: _KeyCap(
-                spec: specs[i],
-                onTap: () => onKey(specs[i].key),
-              ),
+              child: _KeyCap(spec: specs[i], onTap: () => onKey(specs[i].key)),
             ),
           ],
         ],
@@ -211,6 +205,12 @@ class _KeyCapState extends State<_KeyCap> {
     if (_down != v) setState(() => _down = v);
   }
 
+  /// 只有确认键震：数字键一次记账要按十几下，每下都震反而吵
+  void _handleTap() {
+    if (widget.spec.kind == CalcKeyKind.confirm) Haptics.key();
+    widget.onTap?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final kind = widget.spec.kind;
@@ -219,12 +219,10 @@ class _KeyCapState extends State<_KeyCap> {
       // 不再出现「有底的按下去变深、没底的按下去才长出底」两套规则。
       CalcKeyKind.digit ||
       CalcKeyKind.operator ||
-      CalcKeyKind.utility =>
-        _down ? C.line2 : C.bg2,
+      CalcKeyKind.utility => _down ? C.line2 : C.bg2,
       // 重色块不能靠「变淡」表达按下，会看起来像禁用；往白里提 16%
-      CalcKeyKind.confirm => !_enabled
-          ? C.bg2
-          : (_down ? Color.lerp(C.ink, C.bg, 0.16)! : C.ink),
+      CalcKeyKind.confirm =>
+        !_enabled ? C.bg2 : (_down ? Color.lerp(C.ink, C.bg, 0.16)! : C.ink),
     };
     final Color fg = switch (kind) {
       // 数字与运算符同色，靠字号区分（23 / 21）；运算符再压一档会显得「不可用」
@@ -238,7 +236,7 @@ class _KeyCapState extends State<_KeyCap> {
       onTapDown: _enabled ? (_) => _setDown(true) : null,
       onTapUp: _enabled ? (_) => _setDown(false) : null,
       onTapCancel: _enabled ? () => _setDown(false) : null,
-      onTap: widget.onTap,
+      onTap: _enabled ? _handleTap : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 90),
         curve: Curves.easeOut,

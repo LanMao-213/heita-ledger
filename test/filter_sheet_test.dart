@@ -57,16 +57,18 @@ void main() {
       final acc = Store.i.accounts.isEmpty ? null : Store.i.accounts.first.id;
       final now = Fmt.today();
       for (final cents in [1200, 3500, 9900]) {
-        await Repo.insertTxn(Txn(
-          id: 0,
-          ledgerId: Store.i.ledgerId,
-          type: TxnType.expense,
-          amountCents: cents,
-          date: now,
-          categoryId: foodId,
-          accountId: acc,
-          note: '测试',
-        ));
+        await Repo.insertTxn(
+          Txn(
+            id: 0,
+            ledgerId: Store.i.ledgerId,
+            type: TxnType.expense,
+            amountCents: cents,
+            date: now,
+            categoryId: foodId,
+            accountId: acc,
+            note: '测试',
+          ),
+        );
       }
       await Store.i.afterTxnChange();
     });
@@ -84,10 +86,9 @@ void main() {
     expect(find.text('选一个条件'), findsOneWidget);
 
     // 选「餐饮」
-    await tester.tap(find.descendant(
-      of: find.byType(CategoryGrid),
-      matching: find.text('餐饮'),
-    ));
+    await tester.tap(
+      find.descendant(of: find.byType(CategoryGrid), matching: find.text('餐饮')),
+    );
     await tester.pump(const Duration(milliseconds: 260)); // 走完去抖
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 120)),
@@ -133,15 +134,17 @@ void main() {
         type: TxnType.expense,
       );
       final other = cats.firstWhere((c) => c.id != foodId).id;
-      await Repo.insertTxn(Txn(
-        id: 0,
-        ledgerId: Store.i.ledgerId,
-        type: TxnType.expense,
-        amountCents: 700,
-        date: Fmt.today(),
-        categoryId: other,
-        note: '打车',
-      ));
+      await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: Store.i.ledgerId,
+          type: TxnType.expense,
+          amountCents: 700,
+          date: Fmt.today(),
+          categoryId: other,
+          note: '打车',
+        ),
+      );
       await Store.i.afterTxnChange();
     });
     await tester.pumpAndSettle();
