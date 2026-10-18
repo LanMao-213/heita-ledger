@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import '../data/pacing.dart';
 import '../data/repo.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
@@ -51,6 +52,11 @@ class _TotalBudgetCard extends StatelessWidget {
     final budget = s.totalBudgetCents;
     final over = s.overBudget;
     final used = budget == null || budget <= 0 ? 0.0 : s.monthExpenseCents / budget;
+    final pacing = Pacing.of(
+      month: s.month,
+      totalCents: budget,
+      usedCents: s.monthExpenseCents,
+    );
 
     return SectionCard(
       child: Column(
@@ -109,6 +115,32 @@ class _TotalBudgetCard extends StatelessWidget {
                   Text('剩余 ${Fmt.money(s.budgetLeftCents)}',
                       style: T.amountSm.copyWith(fontSize: 13.5)),
               ],
+            ),
+            // 预算节奏：把「还剩多少」翻成「还剩几天、每天能花多少」。
+            // 数字看完还得自己心算的东西，等于没给。
+            const SizedBox(height: S.sm),
+            Row(
+              children: [
+                Text('还剩 ${pacing.remainDays} 天', style: T.caption),
+                const Spacer(),
+                Text(
+                  '每天可花 ${Fmt.money(pacing.canSpendPerDayCents)}',
+                  style: T.caption.copyWith(
+                    color: C.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: S.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(S.md),
+              decoration: BoxDecoration(
+                color: C.bg3,
+                borderRadius: BorderRadius.circular(R.sm),
+              ),
+              child: Text(pacing.sentence, style: T.caption.copyWith(height: 1.6)),
             ),
           ],
         ],

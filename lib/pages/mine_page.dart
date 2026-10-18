@@ -97,15 +97,19 @@ class MinePage extends StatelessWidget {
                   subtitle: '按导出格式即可批量导入',
                   onTap: () => _import(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
-                SettingRow(
-                  icon: 'more',
-                  title: '清空全部数据',
-                  subtitle: '恢复成刚装好的样子',
-                  danger: true,
-                  onTap: () => _wipe(context),
-                ),
               ],
+            ),
+          ),
+          // 「清空」单独拎出来：它和导出/导入不是一类操作，混在一张卡里容易误触
+          const SectionTitle('危险操作'),
+          SectionCard(
+            padding: EdgeInsets.zero,
+            child: SettingRow(
+              icon: 'more',
+              title: '清空全部数据',
+              subtitle: '不可撤销，恢复成刚装好的样子',
+              danger: true,
+              onTap: () => _wipe(context),
             ),
           ),
           const SectionTitle('关于'),
@@ -133,6 +137,15 @@ class MinePage extends StatelessWidget {
               '所有数据保存在这台设备上，应用不会发起任何网络请求。\n'
               '换手机或重装前，记得先导出 Excel 备份。',
               style: T.caption,
+            ),
+          ),
+          // 版本脚注：出问题时用户第一时间要报的就是这个号
+          const Padding(
+            padding: EdgeInsets.fromLTRB(S.xl, S.xl, S.xl, S.lg),
+            child: Text(
+              '$kAppName v$kAppVersion · 本地版',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11.5, color: C.ink4),
             ),
           ),
         ],

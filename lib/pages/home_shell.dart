@@ -166,6 +166,8 @@ class _TabBar extends StatelessWidget {
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
+                  // 3px 白色描边：让按钮从 tabbar 上「切」出来，不然只是浮着
+                  const BoxShadow(color: C.bg, spreadRadius: 3),
                 ],
               ),
               child: const Center(
