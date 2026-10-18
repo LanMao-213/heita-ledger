@@ -107,7 +107,7 @@ void main() {
     }
   });
 
-  testWidgets('按下浮出底色，抬手恢复（数字键没有底色，没反馈就像没点着）', (tester) async {
+  testWidgets('按下变深、抬手恢复；所有键常态都有底色，不许半有半无', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -137,14 +137,23 @@ void main() {
       return (c.decoration as BoxDecoration?)?.color;
     }
 
-    expect(cap('7'), Colors.transparent, reason: '数字键常态不该有底色');
+    // 数字 / 运算符 / C / 确认 —— 四类键都必须有底，且普通键是同一块色。
+    // 之前一半透明一半 bg2，键盘看起来像两套东西拼的。
+    for (final label in ['7', '0', '.', '+', '×', '÷', 'C', '确认']) {
+      expect(cap(label), isNot(Colors.transparent),
+          reason: '「$label」没有底色：不能有的有、有的没有');
+    }
+    for (final label in ['7', '0', '.', '+', '×', '÷', 'C']) {
+      expect(cap(label), C.bg2, reason: '「$label」的底色和别的普通键不一致');
+    }
+    expect(cap('确认'), C.ink, reason: '确认键是唯一的重色块');
 
     final g = await tester.startGesture(tester.getCenter(find.text('7')));
     await tester.pump(const Duration(milliseconds: 200));
-    expect(cap('7'), C.line, reason: '按下没有可见反馈');
+    expect(cap('7'), C.line2, reason: '按下没有可见的变深');
 
     await g.up();
     await tester.pump(const Duration(milliseconds: 200));
-    expect(cap('7'), Colors.transparent, reason: '抬手后底色没退回去');
+    expect(cap('7'), C.bg2, reason: '抬手后底色没退回去');
   });
 }

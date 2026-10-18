@@ -4,12 +4,14 @@ import '../design/tokens.dart';
 
 /// 键的类型 —— 只决定长相，不决定行为。
 ///
-/// 视觉分工（这一版重做的核心）：
-/// - **数字不铺底色**：12 个灰块排在一起，视觉重量全压在「键」上，金额反而被
-///   埋掉；去掉底色后字号能放大，读数更快。
-/// - **运算符保留淡底**：÷ × − + 是四个「动作」，需要被一眼定位。
-/// - **C / ⌫ 退成浅字**：低频，按错了代价也小，不该和数字抢注意力。
-/// - **确认键是唯一的重色块**：它是这一步的终点，竖跨两行做视觉锚点。
+/// 视觉规则只有一条：**要么全都铺底，要么全都不铺、用短线段隔开**。
+/// 混着来（一半有底一半没有）会让键盘看起来像两套东西拼起来的，也不好看清
+/// 哪个键到哪儿为止。这里选「全都铺底」：
+/// - 数字 0–9、`.`：`bg2` 淡底 + 23px 数字，点击面一眼可见
+/// - ÷ × − +：同样的底，靠字形与字号区分，不另起一套填充
+/// - C / ⌫：同样的底，文字退成 `ink2`（低频，不该和数字抢注意力）
+/// - 确认键：`ink` 重色块，竖跨两行；禁用态落回 `bg2` + `ink4` 文字
+/// - 按下：`bg2` → `line2`（比常态深一档），全键盘同一个动作
 enum CalcKeyKind { digit, operator, utility, confirm }
 
 /// 一个键的静态描述。
@@ -186,9 +188,8 @@ class CalcKeypad extends StatelessWidget {
 
 /// 单个键。样式全部由 [CalcKeySpec.kind] 决定，按压反馈统一在这里做。
 ///
-/// 为什么必须自己做按压态：数字键现在没有底色，不给反馈的话按下去像没反应。
-/// 统一点一下「浮出一层淡底」（90ms 淡入淡出）—— 不引入新颜色，也不会像涟漪
-/// 那样扩散到隔壁键上。
+/// 填充色只有两种来源：`bg2`（所有普通键的常态）与 `ink`（确认键）。
+/// 不为某个 kind 单独开一套填充 —— 半有底半没底会让键盘看起来是拼的。
 class _KeyCap extends StatefulWidget {
   const _KeyCap({required this.spec, required this.onTap});
 
@@ -214,18 +215,19 @@ class _KeyCapState extends State<_KeyCap> {
   Widget build(BuildContext context) {
     final kind = widget.spec.kind;
     final Color bg = switch (kind) {
-      // 全键盘统一一条规则：按下 = line（#E8EAEC）。
-      // 无底色的键必须「长出」一块看得见的底，否则按了像没反应；
-      // 运算符从 bg2 压到 line，是同一条规则的另一半。
-      CalcKeyKind.digit => _down ? C.line : Colors.transparent,
-      CalcKeyKind.operator => _down ? C.line : C.bg2,
-      CalcKeyKind.utility => _down ? C.line : Colors.transparent,
+      // 普通键只有一种常态：bg2。按下统一压到 line2（深一档），
+      // 不再出现「有底的按下去变深、没底的按下去才长出底」两套规则。
+      CalcKeyKind.digit ||
+      CalcKeyKind.operator ||
+      CalcKeyKind.utility =>
+        _down ? C.line2 : C.bg2,
       // 重色块不能靠「变淡」表达按下，会看起来像禁用；往白里提 16%
       CalcKeyKind.confirm => !_enabled
           ? C.bg2
           : (_down ? Color.lerp(C.ink, C.bg, 0.16)! : C.ink),
     };
     final Color fg = switch (kind) {
+      // 数字与运算符同色，靠字号区分（23 / 21）；运算符再压一档会显得「不可用」
       CalcKeyKind.digit || CalcKeyKind.operator => C.ink,
       CalcKeyKind.utility => C.ink2,
       CalcKeyKind.confirm => _enabled ? C.bg : C.ink4,
