@@ -14,6 +14,11 @@ import '../design/tokens.dart';
 ///
 /// 「0」横跨两格，「确认」竖跨两行。没有 `±` 键是刻意的 ——
 /// 负数靠在最前面打 `-`（规则见 `data/calc.dart`）。
+///
+/// 整张键盘只有**一种列宽**：4 等分的 `keyW`。
+/// 之前的写法是上面 4 个 `Expanded`、下面左右 `flex: 3 / 1`，两边算出来的宽度
+/// 并不相等（366 的可用宽度下：键 87、底排 86、确认 90），于是「3 / .」比
+/// 「9 / 6」偏左几像素、确认键比「+」宽一截 —— 一眼就能看出来。
 class CalcKeypad extends StatelessWidget {
   const CalcKeypad({
     super.key,
@@ -35,62 +40,85 @@ class CalcKeypad extends StatelessWidget {
 
   double get _h => keyHeight;
 
-  /// 键盘整体高度（不含外边距），给面板算可用空间用
-  static double heightFor(double keyHeight) => keyHeight * 5 + _gap * 4;
-
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(S.md, S.sm, S.md, S.md),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _row([_key('C', weak: true), _key('/', op: true), _key('*', op: true), _key('del', weak: true)]),
-          _row([_key('7'), _key('8'), _key('9'), _key('-', op: true)]),
-          _row([_key('4'), _key('5'), _key('6'), _key('+', op: true)]),
-          _bottomRows(),
-        ],
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final keyW = (box.maxWidth - _gap * 3) / 4;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _line(keyW, [
+                _key('C', weak: true),
+                _key('/', op: true),
+                _key('*', op: true),
+                _key('del', weak: true),
+              ]),
+              _line(keyW, [
+                _key('7'),
+                _key('8'),
+                _key('9'),
+                _key('-', op: true),
+              ]),
+              _line(keyW, [
+                _key('4'),
+                _key('5'),
+                _key('6'),
+                _key('+', op: true),
+              ]),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 左三列的宽度 = 3 个键 + 2 个缝，正好和上面三行对齐
+                  SizedBox(
+                    width: keyW * 3 + _gap * 2,
+                    child: Column(
+                      children: [
+                        _line(keyW, [_key('1'), _key('2'), _key('3')]),
+                        Row(
+                          children: [
+                            // 「0」占第 1–2 列：两键 + 中间那个缝
+                            SizedBox(
+                              width: keyW * 2 + _gap,
+                              child: _key('0'),
+                            ),
+                            const SizedBox(width: _gap),
+                            SizedBox(width: keyW, child: _key('.')),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: _gap),
+                  // 确认键就是第 4 列，宽度与其它键一致，竖跨最后两行
+                  SizedBox(
+                    width: keyW,
+                    height: _h * 2 + _gap,
+                    child: _confirm(),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _row(List<Widget> keys) {
+  /// 一行按键，每个都是固定宽度 —— 不用 Expanded，避免和下面三列的算法打架
+  Widget _line(double keyW, List<Widget> keys) {
     return Padding(
       padding: const EdgeInsets.only(bottom: _gap),
       child: Row(
         children: [
           for (var i = 0; i < keys.length; i++) ...[
             if (i > 0) const SizedBox(width: _gap),
-            Expanded(child: keys[i]),
+            SizedBox(width: keyW, child: keys[i]),
           ],
         ],
       ),
-    );
-  }
-
-  /// 最后两行：左 3/4 是 `1 2 3` + `0(两格) .`，右侧 1/4 是竖跨两行的确认
-  Widget _bottomRows() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 3,
-          child: Column(
-            children: [
-              _row([_key('1'), _key('2'), _key('3')]),
-              Row(
-                children: [
-                  Expanded(flex: 2, child: _key('0')),
-                  const SizedBox(width: _gap),
-                  Expanded(child: _key('.')),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: _gap),
-        Expanded(child: _confirm()),
-      ],
     );
   }
 
@@ -132,7 +160,6 @@ class CalcKeypad extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: canConfirm ? onConfirm : null,
       child: Container(
-        height: _h * 2 + _gap,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: canConfirm ? C.ink : C.bg2,
