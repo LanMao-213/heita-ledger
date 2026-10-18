@@ -132,6 +132,9 @@ git push -u origin feat/budget-by-category
 - 分支用 `feat/xxx`、`fix/xxx`，`main` 始终保持可运行。
 - 合并前必须 analyze 干净 + 测试全过；界面有改动的，把 `build/visual/` 的截图贴进 PR。
 
+**第一次在新机器上配环境**（认证、出网、依赖、已知坑）看 [`CONTRIBUTING.md`](CONTRIBUTING.md)：
+五六分钟能把「能拉、能跑、能推」全部搞定，第 8 节列了每一条踩过的坑。
+
 ## 设计资产
 
 `docs/设计资产/` 下：
