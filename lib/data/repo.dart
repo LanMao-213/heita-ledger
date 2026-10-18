@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
+import 'cycle.dart';
 import 'db.dart';
 import 'models.dart';
 
@@ -185,20 +186,171 @@ class Repo {
     });
   }
 
+  // --------------------------------------------------------------- 周期（F5）
+
+  /// 账单日（周期起始日）设置键。默认 1 = 自然月，老用户升级后行为完全不变。
+  static const cycleStartDayKey = 'cycle_start_day';
+
+  /// 抬期池（D23）：只有这三类收入默认算进「下一期」。
+  /// 兼职 / 理财 / 红包 / 其他不进池 —— 零星收入按真实日期更准，抬期反而失真。
+  static const liftableIncomeNames = {'工资', '奖金', '提成'};
+
+  /// 当前账单日，1–31；非法值一律回落到 1。
+  static Future<int> cycleStartDay() async {
+    final raw = await getSetting(cycleStartDayKey);
+    return (int.tryParse(raw ?? '') ?? 1).clamp(1, 31);
+  }
+
+  /// 某账本里属于「抬期池」的收入分类 id。
+  ///
+  /// 白名单只按**分类名**判定，用户改名/删掉分类后自动失效 —— 这正是设计里
+  /// 「白名单只决定默认值」的意思：真正落库前每笔仍可手动改（阶段 5 的开关）。
+  static Future<Set<int>> liftableCategoryIds(int ledgerId) async {
+    final db = await Db.open();
+    return _liftableCategoryIds(db, ledgerId);
+  }
+
+  static Future<Set<int>> _liftableCategoryIds(
+    DatabaseExecutor db,
+    int ledgerId,
+  ) async {
+    final keys = liftableIncomeNames.toList();
+    final rows = await db.query(
+      'category',
+      columns: ['id'],
+      where: 'ledger_id = ? AND type = ? '
+          'AND name IN (${List.filled(keys.length, '?').join(',')})',
+      whereArgs: [ledgerId, TxnType.income.code, ...keys],
+    );
+    return rows.map((r) => r['id'] as int).toSet();
+  }
+
+  /// 一条记录算在哪一期 —— 判定「这笔该不该抬期」的唯一入口。
+  /// 区间与抬期规则本身在 `cycle.dart` 的 [periodStartOf] 里，不在这里重写一遍。
+  static String periodFor(Txn t, int startDay, Set<int> liftableIds) {
+    final lift = t.type.isIncome &&
+        t.categoryId != null &&
+        liftableIds.contains(t.categoryId);
+    return periodStartOf(t.date, startDay, liftToNext: lift);
+  }
+
+  /// 写入用的行（补上 `period_start`）。
+  ///
+  /// `Txn.toMap()` 故意不带这个字段：归属期是派生值，只能由 [periodFor] 算。
+  /// 别处不要自己拼 map 直接 insert —— 漏算一条，这笔就会从某一期里凭空消失，
+  /// 而且列表条数和合计对不上时极难定位。
+  static Map<String, Object?> _txnRow(Txn t, String period) => {
+        ...t.toMap(),
+        'period_start': period,
+      };
+
+  /// 重算某账本全部记录的归属期（改账单日后必须调，否则历史全部错位）。
+  ///
+  /// 返回真正被改写的行数。实现是「一次查询 + 一次 batch」，不是逐条 await：
+  /// 几千行仍在毫秒级，且只写有变化的行。为什么不写成一条 SQL —— 短月收拢
+  /// （D14）和抬期白名单（D23）落到 SQL 里要两层 CASE + julianday，还会跟
+  /// [periodStartOf] 各维护一份口径；口径漂移的代价远大于几毫秒。
+  static Future<int> rebuildPeriods(int ledgerId) =>
+      _recomputePeriods(ledgerId: ledgerId);
+
+  /// 补齐 `period_start` 为空的记录（升级到 v4 后首次启动 / 从旧备份恢复后）。
+  static Future<int> backfillMissingPeriods() =>
+      _recomputePeriods(onlyMissing: true);
+
+  static Future<int> _recomputePeriods({
+    int? ledgerId,
+    bool onlyMissing = false,
+  }) async {
+    final db = await Db.open();
+    final startDay = await cycleStartDay();
+
+    final where = StringBuffer();
+    final args = <Object?>[];
+    if (ledgerId != null) {
+      where.write('ledger_id = ?');
+      args.add(ledgerId);
+    }
+    if (onlyMissing) {
+      if (where.isNotEmpty) where.write(' AND ');
+      where.write('period_start IS NULL');
+    }
+
+    final rows = await db.query(
+      'txn',
+      columns: [
+        'id',
+        'ledger_id',
+        'type',
+        'date',
+        'category_id',
+        'period_start',
+      ],
+      where: where.isEmpty ? null : where.toString(),
+      whereArgs: args.isEmpty ? null : args,
+    );
+    if (rows.isEmpty) return 0;
+
+    // 每个账本的白名单各查一次，不按行查
+    final liftable = <int, Set<int>>{};
+    for (final lid in rows.map((r) => r['ledger_id'] as int).toSet()) {
+      liftable[lid] = await _liftableCategoryIds(db, lid);
+    }
+
+    final updates = <(int, String)>[];
+    for (final r in rows) {
+      final type = TxnType.fromCode((r['type'] as String?) ?? 'expense');
+      final categoryId = r['category_id'] as int?;
+      final ids = liftable[r['ledger_id']] ?? const <int>{};
+      final period = periodStartOf(
+        r['date'] as String,
+        startDay,
+        liftToNext:
+            type.isIncome && categoryId != null && ids.contains(categoryId),
+      );
+      if (period != r['period_start']) {
+        updates.add((r['id'] as int, period));
+      }
+    }
+    if (updates.isEmpty) return 0;
+
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final (id, period) in updates) {
+        batch.update(
+          'txn',
+          {'period_start': period},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+      await batch.commit(noResult: true);
+    });
+    return updates.length;
+  }
+
   // ------------------------------------------------------------------- 交易
 
   static Future<int> insertTxn(Txn t) async {
     final db = await Db.open();
-    final id = await db.insert('txn', t.toMap());
+    final startDay = await cycleStartDay();
+    final liftable = await _liftableCategoryIds(db, t.ledgerId);
+    final id = await db.insert('txn', _txnRow(t, periodFor(t, startDay, liftable)));
     await _applyBalanceDelta(db, t, reverse: false);
     return id;
   }
 
   static Future<void> updateTxn(Txn old, Txn now) async {
     final db = await Db.open();
+    final startDay = await cycleStartDay();
+    final liftable = await _liftableCategoryIds(db, now.ledgerId);
     await db.transaction((txn) async {
       await _applyBalanceDelta(txn, old, reverse: true);
-      await txn.update('txn', now.toMap(), where: 'id = ?', whereArgs: [now.id]);
+      await txn.update(
+        'txn',
+        _txnRow(now, periodFor(now, startDay, liftable)),
+        where: 'id = ?',
+        whereArgs: [now.id],
+      );
       await _applyBalanceDelta(txn, now, reverse: false);
     });
   }
@@ -494,6 +646,8 @@ class Repo {
         await batch.commit(noResult: true);
       }
     });
+    // 旧备份（v3 及更早）里没有 period_start，回填一次即可；新备份自带，等于空跑
+    await backfillMissingPeriods();
     return counts;
   }
 
@@ -780,6 +934,10 @@ class Repo {
       orderBy: 'next_run_date',
     );
 
+    // 归属期在补记时一次算好，跟手动记一笔同口径（周期账单不抬期由白名单决定）
+    final startDay = await cycleStartDay();
+    final liftable = await _liftableCategoryIds(db, ledgerId);
+
     var created = 0;
     for (final row in rows) {
       var rule = RecurringRule.fromMap(row);
@@ -802,7 +960,10 @@ class Repo {
             note: rule.note.isEmpty ? '周期账单' : rule.note,
             recurringId: rule.id,
           );
-          await txn.insert('txn', t.toMap());
+          await txn.insert(
+            'txn',
+            _txnRow(t, periodFor(t, startDay, liftable)),
+          );
           await _applyBalanceDelta(txn, t, reverse: false);
           created++;
         });

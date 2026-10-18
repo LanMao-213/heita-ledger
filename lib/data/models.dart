@@ -315,6 +315,7 @@ class Txn {
     this.templateId,
     this.recurringId,
     this.createdAt = '',
+    this.periodStart,
   });
 
   final int id;
@@ -329,6 +330,13 @@ class Txn {
   final int? templateId;
   final int? recurringId;
   final String createdAt;
+
+  /// 归属期（`YYYY-MM-DD`，该期第一天）。
+  ///
+  /// **只读派生字段**：由 `Repo` 在写入时按 `date + 账单日 + 抬期规则` 算出来落库，
+  /// 所以 [toMap] 故意不含它 —— 谁写库谁负责算，避免调用方漏传。
+  /// 为 null 表示这条记录还没回填过（v4 之前的库，`boot()` 会补齐）。
+  final String? periodStart;
 
   /// 支出记为负、收入记为正 —— 用于求和
   int get signedCents => type.isIncome ? amountCents : -amountCents;
@@ -346,6 +354,7 @@ class Txn {
         templateId: m['template_id'] as int?,
         recurringId: m['recurring_id'] as int?,
         createdAt: (m['created_at'] as String?) ?? '',
+        periodStart: m['period_start'] as String?,
       );
 
   Map<String, Object?> toMap() => {
@@ -387,6 +396,8 @@ class Txn {
         templateId: templateId,
         recurringId: recurringId,
         createdAt: createdAt,
+        // 改了日期，旧的归属期就不再成立，等 Repo 写入时重算
+        periodStart: date == null ? periodStart : null,
       );
 }
 

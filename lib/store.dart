@@ -103,6 +103,9 @@ class Store extends ChangeNotifier {
   /// 首屏启动：建表/开库 → 补记周期账单 → 载入全部数据
   Future<void> boot() async {
     await Db.open();
+    // v3 → v4 升级后 `period_start` 是空的，先补齐。账单日默认 1 时回填结果
+    // 等于月初，与升级前完全一致 —— 这一步不改任何查询口径。
+    await Repo.backfillMissingPeriods();
     // 界面实验开关（类型 chips / 空态第二行）从 setting 表读覆盖值
     await UiFlags.load();
     ledgerId = await Repo.currentLedgerId();

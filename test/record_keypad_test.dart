@@ -80,6 +80,11 @@ void main() {
     await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
 
+    // 写入路径要读账单日设置与分类白名单，是几次真实的数据库往返。
+    // `pumpAndSettle` 只推进假时钟，不会等真实 IO —— 这里让出一次真实事件循环
+    // 再查库，否则查到的是「还没写完」，会误判成保存失败。
+    await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 200)));
+
     final rows = await tester.runAsync(() => Repo.listTxns(
           ledgerId: Store.i.ledgerId,
           month: Fmt.month(DateTime.now()),
@@ -127,6 +132,7 @@ void main() {
 
     await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
+    await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 200)));
 
     final rows = await tester.runAsync(() => Repo.listTxns(
           ledgerId: Store.i.ledgerId,

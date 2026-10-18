@@ -20,7 +20,9 @@ class Db {
   static String fileName = _fileName;
 
   /// 2：`txn_template` 增加 `use_count` / `last_used_at`（模板按使用频率排序）
-  static const _version = 3;
+  /// 3：收入分类补「提成」
+  /// 4：`txn` 增加 `period_start`（归属期，F5 阶段 2 —— 加列但**不改查询**）
+  static const _version = 4;
 
   /// 当前 schema 版本。备份文件里会记下来，恢复时用来判断兼容性。
   static int get schemaVersion => _version;
@@ -51,6 +53,9 @@ class Db {
         if (oldVersion < 3) {
           // 补后加的种子分类。用户自己建过同名的就不插，避免出现两个「提成」
           await _addMissingIncomeCategories(db);
+        }
+        if (oldVersion < 4) {
+          await _addPeriodStartColumn(db);
         }
       },
     );
@@ -124,6 +129,7 @@ class Db {
         account_id    INTEGER,
         to_account_id INTEGER,
         date          TEXT    NOT NULL,
+        period_start  TEXT,
         note          TEXT    NOT NULL DEFAULT '',
         template_id   INTEGER,
         recurring_id  INTEGER,
@@ -134,6 +140,8 @@ class Db {
 
       // 月统计与明细列表的核心索引
       'CREATE INDEX idx_txn_ledger_date ON txn (ledger_id, date)',
+      // 周期归集：按「归属期」取明细/合计/统计（F5 阶段 3 起才会被查询用到）
+      'CREATE INDEX idx_txn_ledger_period ON txn (ledger_id, period_start)',
       'CREATE INDEX idx_txn_category ON txn (category_id)',
       'CREATE INDEX idx_txn_account ON txn (account_id)',
 
@@ -363,5 +371,31 @@ class Db {
         });
       }
     }
+  }
+
+  /// v3 → v4：`txn` 加归属期列 + 索引。
+  ///
+  /// **只加列，不改任何查询** —— 加完这一列，明细/合计/统计仍然按 `date` 走，
+  /// 行为 100% 与 v3 相同。回填也不在这里做：算归属期要读 `cycle_start_day`
+  /// 设置和分类白名单，交给 `Repo.backfillMissingPeriods()` 在 `boot()` 里跑，
+  /// 迁移代码保持「只动结构、不读业务数据」。
+  ///
+  /// 幂等 + 容错：缺表跳过、列已存在跳过、索引建过跳过。迁移链是多版本叠加的，
+  /// 升级阶段抛异常会让 App 直接打不开，比少一列严重得多。
+  static Future<void> _addPeriodStartColumn(Database db) async {
+    final hasTable = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'txn'",
+    );
+    if (hasTable.isEmpty) return;
+
+    final cols = await db.rawQuery('PRAGMA table_info(txn)');
+    final hasColumn = cols.any((c) => c['name'] == 'period_start');
+    if (!hasColumn) {
+      await db.execute('ALTER TABLE txn ADD COLUMN period_start TEXT');
+    }
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_txn_ledger_period '
+      'ON txn (ledger_id, period_start)',
+    );
   }
 }
