@@ -10,6 +10,7 @@
 // 这里直接量每个键的矩形，钉死「所有键同宽、同列左右边一致」。
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ledger/design/tokens.dart';
 import 'package:ledger/widgets/calc_keypad.dart';
 
 void main() {
@@ -77,11 +78,73 @@ void main() {
     expect(zero.left, moreOrLessEquals(one.left, epsilon: 0.01));
     expect(zero.right, moreOrLessEquals(two.right, epsilon: 0.01));
 
-    // 5) 全键盘只有一种键宽
+    // 5) 文字必须落在格子的正中（「0」跨两格时居中于两格之间）
+    for (final (label, cell) in [
+      ('7', key('7')),
+      ('0', zero),
+      ('+', plus),
+      ('确认', confirm),
+    ]) {
+      final glyph = tester.getRect(find.text(label));
+      expect(glyph.center.dx, moreOrLessEquals(cell.center.dx, epsilon: 1),
+          reason: '「$label」没在格子里水平居中：字形 ${glyph.center.dx}，格子 ${cell.center.dx}');
+    }
+
+    // 6) 键高：普通键 = keyHeight，确认 = 两键 + 一个缝；确认块与左边两行齐平
+    for (final label in ['C', '7', '4', '1', '0', '+']) {
+      expect(key(label).height, moreOrLessEquals(46, epsilon: 0.01),
+          reason: '「$label」高度不等于 keyHeight（多半是没给显式高度，被文字撑成了 33）');
+    }
+    expect(confirm.height, moreOrLessEquals(46 * 2 + 6, epsilon: 0.01));
+    expect(confirm.top, moreOrLessEquals(key('1').top, epsilon: 0.01));
+    expect(confirm.bottom, moreOrLessEquals(zero.bottom, epsilon: 0.01));
+
+    // 7) 全键盘只有一种键宽
     for (final label in ['C', '7', '4', '1', '2', '0']) {
       if (label == '0') continue; // 两格宽，本就不同
       expect(key(label).width, moreOrLessEquals(plus.width, epsilon: 0.01),
           reason: '「$label」的宽度和「+」不一致');
     }
+  });
+
+  testWidgets('按下浮出底色，抬手恢复（数字键没有底色，没反馈就像没点着）', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 366,
+              child: CalcKeypad(
+                onKey: (_) {},
+                onConfirm: () {},
+                canConfirm: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Color? cap(String label) {
+      final c = tester.widget<AnimatedContainer>(
+        find
+            .ancestor(
+              of: find.text(label),
+              matching: find.byType(AnimatedContainer),
+            )
+            .first,
+      );
+      return (c.decoration as BoxDecoration?)?.color;
+    }
+
+    expect(cap('7'), Colors.transparent, reason: '数字键常态不该有底色');
+
+    final g = await tester.startGesture(tester.getCenter(find.text('7')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(cap('7'), C.line, reason: '按下没有可见反馈');
+
+    await g.up();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(cap('7'), Colors.transparent, reason: '抬手后底色没退回去');
   });
 }

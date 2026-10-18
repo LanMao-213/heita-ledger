@@ -2,11 +2,44 @@ import 'package:flutter/material.dart';
 
 import '../design/tokens.dart';
 
+/// 键的类型 —— 只决定长相，不决定行为。
+///
+/// 视觉分工（这一版重做的核心）：
+/// - **数字不铺底色**：12 个灰块排在一起，视觉重量全压在「键」上，金额反而被
+///   埋掉；去掉底色后字号能放大，读数更快。
+/// - **运算符保留淡底**：÷ × − + 是四个「动作」，需要被一眼定位。
+/// - **C / ⌫ 退成浅字**：低频，按错了代价也小，不该和数字抢注意力。
+/// - **确认键是唯一的重色块**：它是这一步的终点，竖跨两行做视觉锚点。
+enum CalcKeyKind { digit, operator, utility, confirm }
+
+/// 一个键的静态描述。
+///
+/// 键位表就是数据：加键、换行、跨格只改下面的 `_upper` / `_lower`，
+/// 不用碰布局代码。
+class CalcKeySpec {
+  const CalcKeySpec(this.key, this.kind, {this.span = 1});
+
+  /// 交给 `Calc.press` 的逻辑键（`/`、`*`、`del` 也走这套）
+  final String key;
+
+  final CalcKeyKind kind;
+
+  /// 横向占几格（「0」占两格）
+  final int span;
+
+  /// 键面文字：`*` `/` 换成真正的数学符号；`del` 画图标（见 [_KeyCap]）
+  String get label => switch (key) {
+        '*' => '×',
+        '/' => '÷',
+        _ => key,
+      };
+}
+
 /// 金额键盘。排列按用户指定：
 ///
 /// ```
 ///  C    ÷    ×    ⌫
-///  7    8    9    −
+///  7    8    9    -
 ///  4    5    6    +
 ///  1    2    3   ┐
 ///  0 ───────  .  ┘ 确认
@@ -15,10 +48,9 @@ import '../design/tokens.dart';
 /// 「0」横跨两格，「确认」竖跨两行。没有 `±` 键是刻意的 ——
 /// 负数靠在最前面打 `-`（规则见 `data/calc.dart`）。
 ///
-/// 整张键盘只有**一种列宽**：4 等分的 `keyW`。
-/// 之前的写法是上面 4 个 `Expanded`、下面左右 `flex: 3 / 1`，两边算出来的宽度
-/// 并不相等（366 的可用宽度下：键 87、底排 86、确认 90），于是「3 / .」比
-/// 「9 / 6」偏左几像素、确认键比「+」宽一截 —— 一眼就能看出来。
+/// 列宽只有一个来源：`keyW = (可用宽 - 3 个缝) / 4`。所有键（含跨格、含确认）
+/// 都按它算宽度 —— 之前上下两半各用一套算法，算出 87 / 86 / 90 三种宽度，
+/// 「3 / .」偏左、确认比「+」宽，肉眼就能看出来。
 class CalcKeypad extends StatelessWidget {
   const CalcKeypad({
     super.key,
@@ -33,10 +65,47 @@ class CalcKeypad extends StatelessWidget {
   final bool canConfirm;
 
   /// 单个键的高度。面板按屏幕高度算好再传进来 —— 小屏机型上固定 46 会让
-  /// 最后一排（0 / . / 确认）被裁掉一条，那正是「键盘尺寸有问题」的真身。
+  /// 最后一排被裁掉一条。
   final double keyHeight;
 
   static const _gap = 6.0;
+
+  static const _confirmSpec = CalcKeySpec('确认', CalcKeyKind.confirm);
+
+  /// 上面三行，各 4 列
+  static const _upper = <List<CalcKeySpec>>[
+    [
+      CalcKeySpec('C', CalcKeyKind.utility),
+      CalcKeySpec('/', CalcKeyKind.operator),
+      CalcKeySpec('*', CalcKeyKind.operator),
+      CalcKeySpec('del', CalcKeyKind.utility),
+    ],
+    [
+      CalcKeySpec('7', CalcKeyKind.digit),
+      CalcKeySpec('8', CalcKeyKind.digit),
+      CalcKeySpec('9', CalcKeyKind.digit),
+      CalcKeySpec('-', CalcKeyKind.operator),
+    ],
+    [
+      CalcKeySpec('4', CalcKeyKind.digit),
+      CalcKeySpec('5', CalcKeyKind.digit),
+      CalcKeySpec('6', CalcKeyKind.digit),
+      CalcKeySpec('+', CalcKeyKind.operator),
+    ],
+  ];
+
+  /// 最后两行的左半部分（第 4 列是竖跨两行的确认键）
+  static const _lower = <List<CalcKeySpec>>[
+    [
+      CalcKeySpec('1', CalcKeyKind.digit),
+      CalcKeySpec('2', CalcKeyKind.digit),
+      CalcKeySpec('3', CalcKeyKind.digit),
+    ],
+    [
+      CalcKeySpec('0', CalcKeyKind.digit, span: 2),
+      CalcKeySpec('.', CalcKeyKind.digit),
+    ],
+  ];
 
   double get _h => keyHeight;
 
@@ -50,53 +119,33 @@ class CalcKeypad extends StatelessWidget {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _line(keyW, [
-                _key('C', weak: true),
-                _key('/', op: true),
-                _key('*', op: true),
-                _key('del', weak: true),
-              ]),
-              _line(keyW, [
-                _key('7'),
-                _key('8'),
-                _key('9'),
-                _key('-', op: true),
-              ]),
-              _line(keyW, [
-                _key('4'),
-                _key('5'),
-                _key('6'),
-                _key('+', op: true),
-              ]),
+              for (final row in _upper) _row(row, keyW),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 左三列的宽度 = 3 个键 + 2 个缝，正好和上面三行对齐
+                  // 左三列：宽度 = 3 个键 + 2 个缝，与上面三行严格对齐
                   SizedBox(
                     width: keyW * 3 + _gap * 2,
                     child: Column(
                       children: [
-                        _line(keyW, [_key('1'), _key('2'), _key('3')]),
-                        Row(
-                          children: [
-                            // 「0」占第 1–2 列：两键 + 中间那个缝
-                            SizedBox(
-                              width: keyW * 2 + _gap,
-                              child: _key('0'),
-                            ),
-                            const SizedBox(width: _gap),
-                            SizedBox(width: keyW, child: _key('.')),
-                          ],
-                        ),
+                        for (var i = 0; i < _lower.length; i++)
+                          _row(
+                            _lower[i],
+                            keyW,
+                            // 最后一行不留缝：确认键高 2h+g，正好贴齐
+                            gapAfter: i < _lower.length - 1,
+                          ),
                       ],
                     ),
                   ),
                   const SizedBox(width: _gap),
-                  // 确认键就是第 4 列，宽度与其它键一致，竖跨最后两行
                   SizedBox(
                     width: keyW,
                     height: _h * 2 + _gap,
-                    child: _confirm(),
+                    child: _KeyCap(
+                      spec: _confirmSpec,
+                      onTap: canConfirm ? onConfirm : null,
+                    ),
                   ),
                 ],
               ),
@@ -107,73 +156,114 @@ class CalcKeypad extends StatelessWidget {
     );
   }
 
-  /// 一行按键，每个都是固定宽度 —— 不用 Expanded，避免和下面三列的算法打架
-  Widget _line(double keyW, List<Widget> keys) {
+  Widget _row(
+    List<CalcKeySpec> specs,
+    double keyW, {
+    bool gapAfter = true,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: _gap),
+      padding: EdgeInsets.only(bottom: gapAfter ? _gap : 0),
       child: Row(
         children: [
-          for (var i = 0; i < keys.length; i++) ...[
+          for (var i = 0; i < specs.length; i++) ...[
             if (i > 0) const SizedBox(width: _gap),
-            SizedBox(width: keyW, child: keys[i]),
+            SizedBox(
+              width: keyW * specs[i].span + _gap * (specs[i].span - 1),
+              // 高度必须显式给：Row 里高度是无界的，只给宽度的话键会缩成
+              // 一行字的高（33 而不是 46），确认块还会比左边两行高出一截
+              height: _h,
+              child: _KeyCap(
+                spec: specs[i],
+                onTap: () => onKey(specs[i].key),
+              ),
+            ),
           ],
         ],
       ),
     );
   }
+}
 
-  Widget _key(String label, {bool op = false, bool weak = false}) {
-    final text = switch (label) {
-      '*' => '×',
-      '/' => '÷',
-      // 连字符保持 ASCII：U+2212（−）在部分中文字体里没有字形，会渲染成空白
-      'del' => '',
-      _ => label,
+/// 单个键。样式全部由 [CalcKeySpec.kind] 决定，按压反馈统一在这里做。
+///
+/// 为什么必须自己做按压态：数字键现在没有底色，不给反馈的话按下去像没反应。
+/// 统一点一下「浮出一层淡底」（90ms 淡入淡出）—— 不引入新颜色，也不会像涟漪
+/// 那样扩散到隔壁键上。
+class _KeyCap extends StatefulWidget {
+  const _KeyCap({required this.spec, required this.onTap});
+
+  final CalcKeySpec spec;
+
+  /// null = 当前不可按（金额还不合法时的确认键）
+  final VoidCallback? onTap;
+
+  @override
+  State<_KeyCap> createState() => _KeyCapState();
+}
+
+class _KeyCapState extends State<_KeyCap> {
+  bool _down = false;
+
+  bool get _enabled => widget.onTap != null;
+
+  void _setDown(bool v) {
+    if (_down != v) setState(() => _down = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final kind = widget.spec.kind;
+    final Color bg = switch (kind) {
+      // 全键盘统一一条规则：按下 = line（#E8EAEC）。
+      // 无底色的键必须「长出」一块看得见的底，否则按了像没反应；
+      // 运算符从 bg2 压到 line，是同一条规则的另一半。
+      CalcKeyKind.digit => _down ? C.line : Colors.transparent,
+      CalcKeyKind.operator => _down ? C.line : C.bg2,
+      CalcKeyKind.utility => _down ? C.line : Colors.transparent,
+      // 重色块不能靠「变淡」表达按下，会看起来像禁用；往白里提 16%
+      CalcKeyKind.confirm => !_enabled
+          ? C.bg2
+          : (_down ? Color.lerp(C.ink, C.bg, 0.16)! : C.ink),
     };
+    final Color fg = switch (kind) {
+      CalcKeyKind.digit || CalcKeyKind.operator => C.ink,
+      CalcKeyKind.utility => C.ink2,
+      CalcKeyKind.confirm => _enabled ? C.bg : C.ink4,
+    };
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => onKey(label),
-      child: Container(
-        height: _h,
+      onTapDown: _enabled ? (_) => _setDown(true) : null,
+      onTapUp: _enabled ? (_) => _setDown(false) : null,
+      onTapCancel: _enabled ? () => _setDown(false) : null,
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 90),
+        curve: Curves.easeOut,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: op ? C.bg3 : C.bg2,
+          color: bg,
           borderRadius: BorderRadius.circular(R.md),
-          border: op ? Border.all(color: C.line) : null,
         ),
-        child: label == 'del'
-            ? const Icon(Icons.backspace_outlined, size: 19, color: C.ink2)
-            : Text(
-                text,
-                style: TextStyle(
-                  fontSize: weak ? 16 : 20,
-                  fontWeight: FontWeight.w500,
-                  color: weak ? C.ink2 : C.ink,
-                ),
-              ),
+        child: _content(fg),
       ),
     );
   }
 
-  Widget _confirm() {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: canConfirm ? onConfirm : null,
-      child: Container(
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: canConfirm ? C.ink : C.bg2,
-          borderRadius: BorderRadius.circular(R.md),
-        ),
-        child: Text(
-          '确认',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: canConfirm ? C.bg : C.ink4,
-          ),
-        ),
-      ),
+  Widget _content(Color fg) {
+    final spec = widget.spec;
+    if (spec.key == 'del') {
+      return Icon(Icons.backspace_outlined, size: 20, color: fg);
+    }
+    final (size, weight) = switch (spec.kind) {
+      CalcKeyKind.digit => (23.0, FontWeight.w500),
+      CalcKeyKind.operator => (21.0, FontWeight.w500),
+      CalcKeyKind.utility => (17.0, FontWeight.w500),
+      CalcKeyKind.confirm => (16.0, FontWeight.w600),
+    };
+    return Text(
+      spec.label,
+      style: TextStyle(fontSize: size, fontWeight: weight, color: fg),
     );
   }
 }
