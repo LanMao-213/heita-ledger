@@ -371,8 +371,9 @@ class _RecordSheetState extends State<RecordSheet> {
     final body = LayoutBuilder(
       builder: (context, box) {
         // 键高跟着可用高度走：先给头部 / 金额 / 信息区留 380，剩下 5 排均分。
-        // 46 是设计值，只有小屏才往下收 —— 宁可键矮一点，也不要裁掉「确认」。
-        final keyH = ((box.maxHeight - 380) / 5).clamp(38.0, 46.0);
+        // 52 是设计值（原来 46，键偏矮不好按），只有矮屏才往下收 ——
+        // 宁可键矮一点，也不要裁掉「确认」。
+        final keyH = ((box.maxHeight - 380) / 5).clamp(38.0, 52.0);
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
