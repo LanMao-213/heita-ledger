@@ -161,6 +161,16 @@ void main() {
     return row.first['period_start'] as String?;
   }
 
+  /// 按 id 读回整条记录。
+  ///
+  /// 不能用 `listTxns(month:)` 读：阶段 3 起它按**归属期**筛，账单日 15 时
+  /// 10-10 那笔属于 09-15 期，按月查会查不到 —— 那正是这个阶段要的效果。
+  Future<Txn> byId(int id) async {
+    final db = await Db.open();
+    final row = await db.query('txn', where: 'id = ?', whereArgs: [id]);
+    return Txn.fromMap(row.first);
+  }
+
   group('账单日默认 1（= 自然月，老用户行为不变）', () {
     test('支出落在月初', () async {
       expect(
@@ -266,8 +276,7 @@ void main() {
           columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
       expect(row.first['period_start'], '2026-10-15');
 
-      final old = (await Repo.listTxns(ledgerId: ledgerId, month: '2026-10'))
-          .firstWhere((t) => t.id == id);
+      final old = await byId(id);
       await Repo.updateTxn(old, old.copyWith(date: '2026-10-10'));
 
       row = await db.query('txn',
@@ -292,8 +301,7 @@ void main() {
           columns: ['period_start'], where: 'id = ?', whereArgs: [id]);
       expect(before.first['period_start'], '2026-09-15');
 
-      final old = (await Repo.listTxns(ledgerId: ledgerId, month: '2026-10'))
-          .firstWhere((t) => t.id == id);
+      final old = await byId(id);
       await Repo.updateTxn(
         old,
         Txn(

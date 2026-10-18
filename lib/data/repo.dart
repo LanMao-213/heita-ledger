@@ -395,7 +395,7 @@ class Repo {
     );
   }
 
-  /// 某月明细（按月倒排日期、同日按 id 倒排）
+  /// 某月明细（按月倒排日期、同日按 id 倒排）—— [rangeListTxns] 的薄委托。
   static Future<List<Txn>> listTxns({
     required int ledgerId,
     required String month,
@@ -404,13 +404,35 @@ class Repo {
     String? keyword,
     int limit = 500,
     int offset = 0,
+  }) =>
+      rangeListTxns(
+        ledgerId: ledgerId,
+        from: monthStart(month),
+        to: monthEnd(month),
+        type: type,
+        categoryId: categoryId,
+        keyword: keyword,
+        limit: limit,
+        offset: offset,
+      );
+
+  /// 某一期的明细，条件打在 `period_start` 上；排序仍按真实 `date`。
+  static Future<List<Txn>> rangeListTxns({
+    required int ledgerId,
+    required String from,
+    required String to,
+    TxnType? type,
+    int? categoryId,
+    String? keyword,
+    int limit = 500,
+    int offset = 0,
   }) async {
     final db = await Db.open();
-    final where = StringBuffer('ledger_id = ? AND date BETWEEN ? AND ?');
+    final where = StringBuffer('ledger_id = ? AND period_start BETWEEN ? AND ?');
     final args = <Object?>[
       ledgerId,
-      monthStart(month),
-      monthEnd(month),
+      from,
+      to,
     ];
     if (type != null) {
       where.write(' AND type = ?');
@@ -660,17 +682,31 @@ class Repo {
     };
   }
 
-  /// 月收支合计
+  /// 月收支合计。
+  ///
+  /// 阶段 3 起只是 [rangeTotals] 的薄委托：`month` 折算成月初/月末。账单日
+  /// 默认 1 时 `period_start` 就是月初，结果与按 `date` 查完全一致。
   static Future<(int expense, int income, int count)> monthTotals(
     int ledgerId,
     String month,
+  ) =>
+      rangeTotals(ledgerId, monthStart(month), monthEnd(month));
+
+  /// 某一期的收支合计。[from] / [to] 是该期的首尾日期（含两端）。
+  ///
+  /// 条件打在 **`period_start`** 上，不是 `date` —— 这是周期归集的口径：
+  /// 10-10 到账的工资被抬进 10-15 那一期后，就该算在那一期里。
+  static Future<(int expense, int income, int count)> rangeTotals(
+    int ledgerId,
+    String from,
+    String to,
   ) async {
     final db = await Db.open();
     final r = await db.rawQuery(
       // 负数交叉归集：支出里的负数算进收入，收入里的负数算进支出
       'SELECT $_expSumSql AS exp, $_incSumSql AS inc, COUNT(*) AS cnt '
-      'FROM txn WHERE ledger_id = ? AND date BETWEEN ? AND ?',
-      [ledgerId, monthStart(month), monthEnd(month)],
+      'FROM txn WHERE ledger_id = ? AND period_start BETWEEN ? AND ?',
+      [ledgerId, from, to],
     );
     final row = r.first;
     return (
@@ -685,12 +721,26 @@ class Repo {
     required int ledgerId,
     required String month,
     required TxnType type,
+  }) =>
+      rangeCategoryStats(
+        ledgerId: ledgerId,
+        from: monthStart(month),
+        to: monthEnd(month),
+        type: type,
+      );
+
+  /// 某一期的分类聚合（[categoryStats] 的区间版）
+  static Future<List<CatStat>> rangeCategoryStats({
+    required int ledgerId,
+    required String from,
+    required String to,
+    required TxnType type,
   }) async {
     final db = await Db.open();
     // 对侧类型：支出饼要吸收「收入里的负数」，反之亦然
     final other = type == TxnType.income ? TxnType.expense : TxnType.income;
     final rows = await db.rawQuery(
-      // 本侧的正数 + 对侧的负数（金额取绝对值）—— 与 monthTotals 的口径保持一致，
+      // 本侧的正数 + 对侧的负数（金额取绝对值）—— 与 rangeTotals 的口径保持一致，
       // 否则饼图分项之和会跟合计对不上
       'SELECT t.category_id AS cid, '
       "  COALESCE(c.name, '未分类') AS name, "
@@ -699,12 +749,12 @@ class Repo {
       '          ELSE t.amount_cents END) AS total, '
       '  COUNT(*) AS cnt '
       'FROM txn t LEFT JOIN category c ON c.id = t.category_id '
-      'WHERE t.ledger_id = ? AND t.date BETWEEN ? AND ? '
+      'WHERE t.ledger_id = ? AND t.period_start BETWEEN ? AND ? '
       '  AND ((t.type = ? AND t.amount_cents >= 0)'
       '    OR (t.type = ? AND t.amount_cents < 0)) '
       'GROUP BY t.category_id '
       'ORDER BY total DESC',
-      [ledgerId, monthStart(month), monthEnd(month), type.code, other.code],
+      [ledgerId, from, to, type.code, other.code],
     );
     return rows
         .map((m) => CatStat(
@@ -717,11 +767,20 @@ class Repo {
         .toList();
   }
 
-  /// 每日收支（趋势图）
+  /// 每日收支（趋势图）—— 月的薄委托，见 [rangeDailyTotals]。
   static Future<List<(String date, int expense, int income)>> dailyTotals(
     int ledgerId,
     String month,
-  ) async {
+  ) =>
+      rangeDailyTotals(ledgerId, monthStart(month), monthEnd(month));
+
+  /// 某一期的每日收支（趋势图）。
+  ///
+  /// **筛的是归属期，分组仍按真实 `date`** —— 趋势图的柱子代表「那天花了多少」，
+  /// 把它挪到账单日会变成谎报。所以一笔 10-10 的工资在 10-15 那一期里，
+  /// 仍然显示在 10-10 这根柱子上。
+  static Future<List<(String date, int expense, int income)>>
+      rangeDailyTotals(int ledgerId, String from, String to) async {
     final db = await Db.open();
     final rows = await db.rawQuery(
       'SELECT date, '
@@ -733,9 +792,9 @@ class Repo {
       "    WHEN type = 'income'  AND amount_cents >= 0 THEN amount_cents "
       "    WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
       '    ELSE 0 END), 0) AS inc '
-      'FROM txn WHERE ledger_id = ? AND date BETWEEN ? AND ? '
+      'FROM txn WHERE ledger_id = ? AND period_start BETWEEN ? AND ? '
       'GROUP BY date ORDER BY date',
-      [ledgerId, monthStart(month), monthEnd(month)],
+      [ledgerId, from, to],
     );
     return rows
         .map((m) => (
