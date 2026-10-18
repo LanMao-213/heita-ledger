@@ -157,15 +157,39 @@ void main() {
     expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
     expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
 
-    // 点这一颗 → 日历卡片（上下滚动，不是左右翻月）
-    await tester.tap(find.byIcon(Icons.calendar_month_rounded));
+    // 点这行日期文字 → 日历卡片（上下滚动，不是左右翻月）
+    await tester.tap(find.text(cycleLabel(s.cycleFrom, s.cycleTo)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('跳到哪一期'), findsOneWidget);
-    // 日历是纵向列表，不是 PageView：没有左右切月的按钮
+    // 不加标题、不加提示、不给「回到今天」按钮 —— 顶上只剩年份和周几
+    expect(find.text('跳到哪一期'), findsNothing);
+    expect(find.text('今天'), findsNothing);
+    expect(find.textContaining('账单日'), findsNothing);
+    expect(find.text(DateTime.now().year.toString()), findsWidgets);
     expect(find.byType(ListView), findsWidgets);
     expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+  });
+
+  testWidgets('日历吸顶的年份跟着滚动走，不写死今年', (tester) async {
+    await seed(tester);
+    await pumpDetail(tester);
+    final s = Store.i;
+
+    await tester.tap(find.text(cycleLabel(s.cycleFrom, s.cycleTo)));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    final thisYear = DateTime.now().year;
+    expect(find.text('$thisYear'), findsOneWidget);
+
+    // 往前滑 12 个月（块高 342），年份必须跟着变 —— 而不是一直显示今年。
+    // 页面里还有别的 ListView，所以从月份标签上起手拖
+    await tester.dragFrom(
+      tester.getCenter(find.text('${DateTime.now().month} 月')),
+      const Offset(0, -342.0 * 12),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('$thisYear'), findsNothing);
+    expect(find.text('${thisYear - 1}'), findsOneWidget);
   });
 
   testWidgets('日历里点上个月的 1 号 → 明细跳到那一期', (tester) async {
@@ -173,16 +197,20 @@ void main() {
     await pumpDetail(tester);
     final s = Store.i;
 
-    await tester.tap(find.byIcon(Icons.calendar_month_rounded));
+    await tester.tap(find.text(cycleLabel(s.cycleFrom, s.cycleTo)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    // 列表最新在上：第 0 块是本月，第 1 块是上月
+    // 列表最新在上：第 0 块是本月，第 1 块是上月。
+    // 每个月是一段 Column（不再是 GridView），按年月标签定位第 1 块。
     final prev = DateTime(DateTime.now().year, DateTime.now().month - 1, 1);
     final prevYm =
         '${prev.year}-${prev.month.toString().padLeft(2, '0')}';
     await tester.tap(find.descendant(
-      of: find.byType(GridView).at(1),
+      of: find.ancestor(
+        of: find.text('${prev.month} 月'),
+        matching: find.byType(Column),
+      ).first,
       matching: find.text('1'),
     ));
     await settle(tester);

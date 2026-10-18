@@ -234,6 +234,11 @@ Widget _barArrow(IconData icon, VoidCallback onTap, Color color) => IconButton(
 ///
 /// 日历图案贴在文字**里面**（右侧），不另起一个按钮：它表达的是
 /// 「这个时间段是可点的」，不是一个并列的入口。
+/// 周期标签：「10-15 → 11-14」，点它开日历挑日期。
+///
+/// 不加外框、不带日历图标 —— 它就在概览卡里，外面再套一层胶囊会把
+/// 「一张卡里的一个数字」变成「卡里又长出来一个控件」。日历入口靠可点性
+/// 本身表达，不必再画一遍。
 class PeriodChip extends StatelessWidget {
   const PeriodChip({
     super.key,
@@ -253,18 +258,11 @@ class PeriodChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = onDark ? C.bg : C.ink;
-    final iconColor = onDark ? C.bg.withValues(alpha: 0.8) : C.ink2;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        height: 34,
-        padding: const EdgeInsets.only(left: 12, right: 10),
-        decoration: BoxDecoration(
-          color: onDark ? C.bg.withValues(alpha: 0.10) : C.bg,
-          borderRadius: BorderRadius.circular(999),
-          border: onDark ? null : Border.all(color: C.line),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -275,7 +273,7 @@ class PeriodChip extends StatelessWidget {
                   cycleLabel(from, to),
                   maxLines: 1,
                   style: TextStyle(
-                    fontSize: 14.5,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: fg,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -283,8 +281,6 @@ class PeriodChip extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 6),
-            Icon(Icons.calendar_month_rounded, size: 16, color: iconColor),
           ],
         ),
       ),

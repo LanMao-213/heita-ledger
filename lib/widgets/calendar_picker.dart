@@ -11,12 +11,12 @@ import '../store.dart';
 /// 左右翻月要一次一次点，翻到三个月前得点三下，每翻一次整块日历都重画、
 /// 眼睛还要重新定位。上下滚动把时间直接铺成一条线，一次滑动就能跨半年，
 /// 而且「往上=更早、往下=更近」是所有人都熟悉的方向感。
+///
+/// 顶上是**真正吸顶**的两行（年份 + 周几）：它们不在滚动区里，滑多远都在。
 Future<String?> showCalendarPicker(
   BuildContext context, {
-  required String title,
   required String from,
   required String to,
-  String? hint,
   String? initialMonth,
 }) {
   return showModalBottomSheet<String>(
@@ -25,10 +25,8 @@ Future<String?> showCalendarPicker(
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.35),
     builder: (_) => _CalendarPicker(
-      title: title,
       from: from,
       to: to,
-      hint: hint,
       initialMonth: initialMonth,
     ),
   );
@@ -47,13 +45,9 @@ Future<void> showCalendarAndGo(
   final to = byMonth ? Repo.monthEnd(s.month) : s.cycleTo;
   final date = await showCalendarPicker(
     context,
-    title: byMonth ? '跳到哪个月' : '跳到哪一期',
     from: from,
     to: to,
     initialMonth: byMonth ? s.month : null,
-    hint: byMonth
-        ? null
-        : '账单日 ${s.cycleStartDay} 号起算一期 · 点某天跳到它所在的期',
   );
   if (date == null) return;
   if (byMonth) {
@@ -63,21 +57,31 @@ Future<void> showCalendarAndGo(
   }
 }
 
+/// 日历里一天的金额怎么显示：格子只有 44 宽，整元/千位要压缩，
+/// 否则「1,234.00」会把格子撑破。
+String amountLabel(int cents) {
+  final yuan = cents / 100;
+  if (yuan >= 1000) return '${(yuan / 1000).toStringAsFixed(1)}k';
+  if (yuan >= 100) return yuan.round().toString();
+  // 34.00 → 34；12.50 → 12.5（末尾的零全部去掉，不只去一个）
+  var s = yuan.toStringAsFixed(2);
+  while (s.endsWith('0')) {
+    s = s.substring(0, s.length - 1);
+  }
+  if (s.endsWith('.')) s = s.substring(0, s.length - 1);
+  return s;
+}
+
 class _CalendarPicker extends StatefulWidget {
   const _CalendarPicker({
-    required this.title,
     required this.from,
     required this.to,
-    this.hint,
     this.initialMonth,
   });
-
-  final String title;
 
   /// 高亮区间（含两端）：周期视图给期首尾，月份视图给月初月末
   final String from;
   final String to;
-  final String? hint;
 
   /// 打开时滚到哪个月，默认从高亮区间的第一天取
   final String? initialMonth;
@@ -89,12 +93,18 @@ class _CalendarPicker extends StatefulWidget {
 class _CalendarPickerState extends State<_CalendarPicker> {
   /// 每个月的块高固定 —— 只有定高，`initialScrollOffset` 才能一次算准，
   /// 否则要在首帧之后才知道要滚多远，打开时会闪一下。
-  /// 内容是 275 左右，留 10 的余量给「系统字体放大」那种情况。
-  static const _blockH = 286.0;
+  /// 34（月份标签带）+ 6 行 × 50 + 8 余量。
+  static const _blockH = 342.0;
 
   late final List<String> _months;
   late final ScrollController _ctl;
   late final int _initialIndex;
+
+  /// 吸顶那一行显示哪一年 —— 跟着滚动走，不是写死的今年
+  late String _visibleYm;
+
+  /// 日 → 当日支出（分）。打开后一次查完，滚动时只读不发请求
+  Map<String, int> _daily = const {};
 
   @override
   void initState() {
@@ -113,7 +123,29 @@ class _CalendarPickerState extends State<_CalendarPicker> {
       ym = _shiftYm(ym, -1);
     }
     _initialIndex = _months.indexOf(anchor).clamp(0, _months.length - 1);
-    _ctl = ScrollController(initialScrollOffset: _initialIndex * _blockH);
+    _visibleYm = _months[_initialIndex];
+    _ctl = ScrollController(initialScrollOffset: _initialIndex * _blockH)
+      ..addListener(_onScroll);
+    _loadDaily();
+  }
+
+  void _onScroll() {
+    final i = (_ctl.offset / _blockH).round().clamp(0, _months.length - 1);
+    final ym = _months[i];
+    if (ym != _visibleYm) setState(() => _visibleYm = ym);
+  }
+
+  /// 一次把这两年多的每日支出取完：一次查询，滚动时不再发请求
+  Future<void> _loadDaily() async {
+    final ledgerId = Store.i.ledgerId;
+    final rows = await Repo.rangeDailyTotals(
+      ledgerId,
+      Repo.monthStart(_months.last),
+      Repo.monthEnd(_months.first),
+      basis: DateBasis.date,
+    );
+    if (!mounted) return;
+    setState(() => _daily = {for (final r in rows) r.$1: r.$2});
   }
 
   @override
@@ -161,57 +193,65 @@ class _CalendarPickerState extends State<_CalendarPicker> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(S.xl, S.md, S.sm, S.sm),
-              child: Row(
-                children: [
-                  Text(widget.title, style: T.section),
-                  const Spacer(),
-                  TextButton(
-                    // 没有左右翻月之后，滚远了要有个一键回到今天的出口
-                    onPressed: () =>
-                        Navigator.pop(context, Fmt.today()),
-                    child: Text(
-                      '今天',
-                      style: T.caption.copyWith(
-                        color: C.ink,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (widget.hint != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(S.xl, 0, S.xl, S.sm),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    widget.hint!,
-                    style: T.caption.copyWith(fontSize: 11.5),
-                  ),
-                ),
-              ),
+            _stickyHead(),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 430),
+              constraints: BoxConstraints(
+                maxHeight: (media.size.height * 0.58).clamp(320.0, 470.0),
+              ),
               child: ListView.builder(
                 controller: _ctl,
                 itemExtent: _blockH,
                 itemCount: _months.length,
-                padding: const EdgeInsets.symmetric(horizontal: S.md),
+                padding: EdgeInsets.zero,
                 itemBuilder: (context, i) => _monthBlock(_months[i]),
               ),
             ),
-            const SizedBox(height: S.sm),
-            Text(
-              '点某一天，跳到它所在的期',
-              style: T.caption.copyWith(fontSize: 11.5),
-            ),
-            const SizedBox(height: S.md),
           ],
         ),
       ),
+    );
+  }
+
+  /// 吸顶头：年份 + 周几。两行都在滚动区外，滑到哪一年都看得见
+  Widget _stickyHead() {
+    final year = _visibleYm.substring(0, 4);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              year,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: C.ink,
+                letterSpacing: 0.5,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: S.lg),
+          child: Row(
+            children: [
+              for (final w in const ['日', '一', '二', '三', '四', '五', '六'])
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      w,
+                      style: T.caption.copyWith(fontSize: 11),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: S.sm),
+        Container(height: 1, color: C.line),
+      ],
     );
   }
 
@@ -222,97 +262,119 @@ class _CalendarPickerState extends State<_CalendarPicker> {
     // 周日开头：DateTime.weekday 是 1(一)…7(日)
     final offset = DateTime(y, m, 1).weekday % 7;
     final today = Fmt.today();
+    final cells = <int>[
+      ...List.filled(offset, 0),
+      for (var d = 1; d <= totalDays; d++) d,
+    ];
+    while (cells.length < 42) {
+      cells.add(0);
+    }
 
-    return Column(
-      children: [
-        SizedBox(
-          height: 30,
-          child: Center(
-            child: Text(
-              Fmt.monthLabel(ym),
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: C.ink,
+    return SizedBox(
+      height: _blockH,
+      child: Stack(
+        children: [
+          // 月份做背景：整块铺一个超大淡字，日期压在上面。
+          // 2% 的浓度只提供「现在是几月」的空间感，不参与读数。
+          Positioned.fill(
+            child: Center(
+              child: Text(
+                '$m',
+                style: const TextStyle(
+                  fontSize: 190,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0x0814161A),
+                  height: 1,
+                ),
               ),
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Row(
+          Column(
             children: [
-              for (final w in const ['日', '一', '二', '三', '四', '五', '六'])
-                Expanded(
-                  child: Text(
-                    w,
-                    textAlign: TextAlign.center,
-                    style: T.caption.copyWith(fontSize: 11),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: 216, // 6 行 × 36
-          child: GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisExtent: 36,
-              crossAxisSpacing: 2,
-              mainAxisSpacing: 0,
-            ),
-            itemCount: 42,
-            itemBuilder: (context, i) {
-              final day = i - offset + 1;
-              if (day < 1 || day > totalDays) return const SizedBox.shrink();
-
-              final date = '$ym-${day.toString().padLeft(2, '0')}';
-              final selected = date == widget.from;
-              // 当前这一期铺一层浅灰，期有多长、跨了两个月哪几天，
-              // 一眼就能看出来 —— 这是日历比列表多出来的那点信息。
-              final inRange =
-                  date.compareTo(widget.from) >= 0 && date.compareTo(widget.to) <= 0;
-              final isToday = date == today;
-
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => Navigator.pop(context, date),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 1),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? C.ink
-                        : (inRange ? C.bg2 : Colors.transparent),
-                    borderRadius: BorderRadius.circular(10),
-                    border: isToday && !selected
-                        ? Border.all(color: C.ink, width: 1.4)
-                        : null,
-                  ),
-                  child: Text(
-                    '$day',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.1,
-                      fontWeight: selected || isToday
-                          ? FontWeight.w600
-                          : FontWeight.w400,
-                      color: selected ? C.bg : C.ink,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+              SizedBox(
+                height: 34,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(S.lg, 14, S.lg, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '$m 月',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: C.ink2,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                 ),
-              );
-            },
+              ),
+              for (var w = 0; w < 6; w++)
+                Row(
+                  children: [
+                    for (var i = 0; i < 7; i++)
+                      Expanded(
+                        child: cells[w * 7 + i] == 0
+                            ? const SizedBox(height: 50)
+                            : _dayCell(ym, cells[w * 7 + i], today),
+                      ),
+                  ],
+                ),
+            ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dayCell(String ym, int day, String today) {
+    final date = '$ym-${day.toString().padLeft(2, '0')}';
+    final isToday = date == today;
+    // 这一期之外的日子用浅一档的字色：不给整片涂底，也能看出期从哪天起
+    final inPeriod =
+        date.compareTo(widget.from) >= 0 && date.compareTo(widget.to) <= 0;
+    final cents = _daily[date] ?? 0;
+
+    return SizedBox(
+      height: 50,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.pop(context, date),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: isToday
+                  ? const BoxDecoration(color: C.ink, shape: BoxShape.circle)
+                  : null,
+              child: Text(
+                '$day',
+                style: TextStyle(
+                  fontSize: 16.5,
+                  height: 1.1,
+                  fontWeight: isToday ? FontWeight.w600 : FontWeight.w500,
+                  color: isToday ? C.bg : (inPeriod ? C.ink : C.ink3),
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+            if (cents > 0)
+              Text(
+                amountLabel(cents),
+                maxLines: 1,
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  height: 1.3,
+                  color: C.ink4,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+          ],
         ),
-        const SizedBox(height: S.sm),
-        Container(height: 1, color: C.line),
-      ],
+      ),
     );
   }
 }
