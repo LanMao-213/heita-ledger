@@ -456,6 +456,20 @@ class TxnFilter {
 
   bool get isNotEmpty => !isEmpty;
 
+  /// 只换收支类型，其余条件原样保留。
+  ///
+  /// 明细页顶部那排「全部/支出/收入/转账」快捷筛选用它：点一下只改 type，
+  /// 用户已经设好的分类、金额区间、时间段不能被顺手清掉。
+  TxnFilter withType(TxnType? type) => TxnFilter(
+        type: type,
+        categoryId: categoryId,
+        accountId: accountId,
+        minCents: minCents,
+        maxCents: maxCents,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+      );
+
   /// 金额区间的短标签，如「¥50–200」「≥ ¥50」「≤ ¥200」。
   ///
   /// 分类名、账户名不在这里拼：模型层拿不到 Store 里的分类/账户字典，

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import '../data/ui_flags.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 
@@ -153,6 +154,8 @@ class MonthBar extends StatelessWidget {
     required this.onPrev,
     required this.onNext,
     this.onTapLabel,
+    this.onDark = false,
+    this.trailing,
   });
 
   final String month;
@@ -160,12 +163,20 @@ class MonthBar extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback? onTapLabel;
 
+  /// 放在深色卡里时用（首页 hero）：文字与箭头的对比度要跟着换
+  final bool onDark;
+
+  /// 右侧附加按钮（首页放「日历」入口）
+  final Widget? trailing;
+
   @override
   Widget build(BuildContext context) {
+    final label = onDark ? C.bg : C.ink;
+    final arrow = onDark ? C.bg.withValues(alpha: 0.72) : C.ink2;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _arrow(Icons.chevron_left_rounded, onPrev),
+        _arrow(Icons.chevron_left_rounded, onPrev, arrow),
         GestureDetector(
           onTap: onTapLabel,
           behavior: HitTestBehavior.opaque,
@@ -173,22 +184,23 @@ class MonthBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             child: Text(
               Fmt.monthLabel(month),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: C.ink,
+                color: label,
               ),
             ),
           ),
         ),
-        _arrow(Icons.chevron_right_rounded, onNext),
+        _arrow(Icons.chevron_right_rounded, onNext, arrow),
+        if (trailing != null) ...[const Spacer(), trailing!],
       ],
     );
   }
 
-  Widget _arrow(IconData icon, VoidCallback onTap) => IconButton(
+  Widget _arrow(IconData icon, VoidCallback onTap, Color color) => IconButton(
         onPressed: onTap,
-        icon: Icon(icon, size: 22, color: C.ink2),
+        icon: Icon(icon, size: 22, color: color),
         splashRadius: 20,
         constraints: const BoxConstraints.tightFor(width: 36, height: 36),
         padding: EdgeInsets.zero,
@@ -219,7 +231,9 @@ class EmptyHint extends StatelessWidget {
           LineIcon(icon, size: 40, color: C.ink4),
           const SizedBox(height: S.md),
           Text(text, style: T.body2),
-          if (hint != null) ...[
+          // 第二行是「下一步该干嘛」。留了开关（UiFlags.emptyHints），
+          // 后期看效果决定要不要常驻
+          if (hint != null && UiFlags.emptyHints) ...[
             const SizedBox(height: S.xs),
             Text(hint!, style: T.caption),
           ],

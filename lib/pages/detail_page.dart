@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import '../data/pacing.dart';
 import '../data/repo.dart';
+import '../data/ui_flags.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
+import '../widgets/calendar_sheet.dart';
 import '../widgets/common.dart';
 import '../widgets/filter_sheet.dart';
 import '../widgets/record_sheet.dart';
@@ -23,6 +26,8 @@ class DetailPage extends StatelessWidget {
         return Column(
           children: [
             const _TopBar(),
+            // 类型快捷筛选：留了开关（UiFlags.typeChips），后期看效果决定去留
+            if (UiFlags.typeChips) const _TypeChips(),
             if (s.filtering) _FilterBar(),
             Expanded(
               child: ListView(
@@ -65,8 +70,16 @@ class DetailPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(S.xl, S.lg, S.xl, S.sm),
         child: Row(
           children: [
-            Text(Fmt.friendly(date), style: T.caption),
-            const Spacer(),
+            // 日期让出剩余宽度：某天既有收入又有支出、数字又长时，
+            // 三个 Text 并排会顶出屏幕（真机上表现为右侧被裁掉一截）
+            Expanded(
+              child: Text(
+                Fmt.friendly(date),
+                style: T.caption,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (dayIncome > 0)
               Padding(
                 padding: const EdgeInsets.only(right: S.sm),
@@ -254,6 +267,10 @@ class _SearchDelegate extends SearchDelegate<String> {
       );
 }
 
+/// 首页概览卡（深色 hero）。
+///
+/// 只用 `C.ink` 作底、`C.bg` 作字，不引入任何新颜色；超支时用为深底准备的
+/// `C.overD`。一整屏白底黑字里需要一个「先看这里」的落点，卡片就是它。
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard();
 
@@ -268,61 +285,133 @@ class _SummaryCard extends StatelessWidget {
     // 笔数也用聚合里的真实值：列表可能被截到 500 条，但「共几笔」不该跟着少算
     final count = filtering ? s.filterCount : s.monthTxnCount;
 
-    return SectionCard(
-      margin: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, 0),
+    final dim = C.bg.withValues(alpha: 0.62);
+    final budget = s.totalBudgetCents;
+
+    // 预算节奏只在「按月看」时算：跨月筛选的合计和月度预算本来就不是一回事
+    final pacing = !filtering && budget != null
+        ? Pacing.of(
+            month: s.month,
+            totalCents: budget,
+            usedCents: s.monthExpenseCents,
+          )
+        : null;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
+      padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.lg),
+      decoration: BoxDecoration(
+        color: C.ink,
+        borderRadius: BorderRadius.circular(R.lg),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (filtering)
-            _FilterHead()
-          else
-            MonthBar(
-              month: s.month,
-              onPrev: () => s.shiftMonth(-1),
-              onNext: () => s.shiftMonth(1),
+          SizedBox(
+            height: 44,
+            child: filtering
+                ? const _FilterHead(onDark: true)
+                : MonthBar(
+                    month: s.month,
+                    onPrev: () => s.shiftMonth(-1),
+                    onNext: () => s.shiftMonth(1),
+                    onDark: true,
+                    trailing: _CalButton(
+                      onTap: () => showMonthCalendar(context),
+                    ),
+                  ),
+          ),
+          Text(
+            filtering ? '筛选支出' : '本月支出',
+            style: TextStyle(fontSize: 12, color: dim),
+          ),
+          const SizedBox(height: 2),
+          // 金额到六位数时用 FittedBox 收一点，保证永远单行
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              Fmt.money(expense),
+              maxLines: 1,
+              style: T.hero.copyWith(color: C.bg, fontSize: 34),
             ),
+          ),
           const SizedBox(height: S.md),
-          const Divider(height: 1, color: C.line),
-          const SizedBox(height: S.lg),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              Expanded(child: _HeroStat(label: '收入', value: Fmt.money(income))),
+              const SizedBox(width: S.md),
               Expanded(
-                child: _Metric(
-                  label: '支出',
-                  value: Fmt.money(expense),
-                  emphasize: true,
+                child: _HeroStat(
+                  label: filtering ? '收支差' : '结余',
+                  value: Fmt.money(income - expense, sign: true),
                 ),
               ),
-              Container(width: 1, height: 34, color: C.line),
-              Expanded(
-                child: _Metric(
-                  label: '收入',
-                  value: Fmt.money(income),
-                  align: CrossAxisAlignment.end,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: S.md),
-          Row(
-            children: [
-              Text(filtering ? '收支差' : '结余', style: T.caption),
               const SizedBox(width: S.sm),
-              Text(
-                Fmt.money(income - expense, sign: true),
-                style: T.amountSm.copyWith(
-                  color: C.ink2,
-                  fontSize: 13.5,
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  '$count 笔',
+                  style: TextStyle(fontSize: 12, color: dim),
                 ),
               ),
-              const Spacer(),
-              Text('$count 笔', style: T.caption),
             ],
           ),
-          if (!filtering && s.totalBudgetCents != null) ...[
+          if (pacing != null) ...[
             const SizedBox(height: S.lg),
-            _BudgetLine(),
+            Container(height: 1, color: C.bg.withValues(alpha: 0.12)),
+            const SizedBox(height: S.md),
+            Row(
+              children: [
+                Text(
+                  '本月预算 ${Fmt.money(s.monthExpenseCents)} / '
+                  '${Fmt.money(budget!)}',
+                  style: TextStyle(fontSize: 12, color: dim),
+                ),
+                const Spacer(),
+                Text(
+                  s.overBudget
+                      ? '超支 ${Fmt.money(s.overBudgetCents)}'
+                      : '剩 ${Fmt.money(s.budgetLeftCents)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: s.overBudget ? C.overD : dim,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: S.sm),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: pacing.usedRatio.clamp(0.0, 1.0),
+                minHeight: 6,
+                backgroundColor: C.bg.withValues(alpha: 0.14),
+                valueColor: AlwaysStoppedAnimation(
+                  s.overBudget ? C.overD : C.bg,
+                ),
+              ),
+            ),
+            const SizedBox(height: S.sm),
+            Row(
+              children: [
+                Text(
+                  '还剩 ${pacing.remainDays} 天',
+                  style: TextStyle(fontSize: 11.5, color: dim),
+                ),
+                const Spacer(),
+                Text(
+                  '每天可花 ${Fmt.money(pacing.canSpendPerDayCents)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: C.bg,
+                  ),
+                ),
+              ],
+            ),
           ],
         ],
       ),
@@ -330,21 +419,156 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-/// 筛选态下替代月份条的那行：说清「这是筛选结果，共几笔，覆盖哪段时间」
-class _FilterHead extends StatelessWidget {
-  const _FilterHead();
+/// hero 里的一格小数字（收入 / 结余）
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            color: C.bg.withValues(alpha: 0.62),
+          ),
+        ),
+        const SizedBox(height: 2),
+        // 金额可能很长（收入五位数 + 结余带符号），等比缩一点保证单行
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: T.amountSm.copyWith(
+              color: C.bg,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// hero 右上角的日历入口
+class _CalButton extends StatelessWidget {
+  const _CalButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: C.bg.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Icon(
+          Icons.calendar_month_rounded,
+          size: 18,
+          color: C.bg.withValues(alpha: 0.9),
+        ),
+      ),
+    );
+  }
+}
+
+/// 顶部类型快捷筛选：全部 / 支出 / 收入 / 转账。
+///
+/// 只改 `TxnFilter.type`，用户已经设好的分类、金额区间、时间段原样保留
+/// （`TxnFilter.withType`），否则点一下「支出」就把别的条件清掉了。
+class _TypeChips extends StatelessWidget {
+  const _TypeChips();
+
+  static const _items = <(TxnType?, String)>[
+    (null, '全部'),
+    (TxnType.expense, '支出'),
+    (TxnType.income, '收入'),
+    (TxnType.transfer, '转账'),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
+    final cur = s.filter.type;
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: S.xl, vertical: 2),
+        itemCount: _items.length,
+        separatorBuilder: (_, _) => const SizedBox(width: S.sm),
+        itemBuilder: (context, i) {
+          final (type, label) = _items[i];
+          final on = cur == type;
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              final f = s.filter.withType(type);
+              if (f.isEmpty) {
+                s.clearFilter();
+              } else {
+                s.applyFilter(f);
+              }
+            },
+            child: Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: on ? C.ink : C.bg2,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: on ? C.bg : C.ink2,
+                  fontWeight: on ? FontWeight.w500 : FontWeight.w400,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// 筛选态下替代月份条的那行：说清「这是筛选结果，共几笔，覆盖哪段时间」
+class _FilterHead extends StatelessWidget {
+  const _FilterHead({this.onDark = false});
+
+  final bool onDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    final title = onDark ? C.bg : C.ink;
+    final sub = onDark ? C.bg.withValues(alpha: 0.62) : C.ink3;
     return Row(
       children: [
-        const Text('筛选结果', style: T.section),
+        Text(
+          '筛选结果',
+          style: T.section.copyWith(color: title),
+        ),
         const Spacer(),
         Flexible(
           child: Text(
             s.filter.dateLabel ?? '全部时间',
-            style: T.caption,
+            style: T.caption.copyWith(color: sub),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.end,
@@ -425,87 +649,7 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-class _BudgetLine extends StatelessWidget {
-  const _BudgetLine();
 
-  @override
-  Widget build(BuildContext context) {
-    final s = Store.i;
-    final budget = s.totalBudgetCents!;
-    final used = budget <= 0 ? 0.0 : s.monthExpenseCents / budget;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text('本月预算', style: T.caption),
-            const SizedBox(width: S.sm),
-            Text(
-              '${Fmt.money(s.monthExpenseCents)} / ${Fmt.money(budget)}',
-              style: T.amountSm.copyWith(fontSize: 13),
-            ),
-            const Spacer(),
-            if (s.overBudget)
-              Text(
-                '超支 ${Fmt.money(s.overBudgetCents)}',
-                style: T.caption.copyWith(
-                  color: C.over,
-                  fontWeight: FontWeight.w500,
-                ),
-              )
-            else
-              Text(
-                '剩余 ${Fmt.money(s.budgetLeftCents)}',
-                style: T.caption,
-              ),
-          ],
-        ),
-        const SizedBox(height: S.sm),
-        Bar(ratio: used, over: s.overBudget),
-      ],
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  const _Metric({
-    required this.label,
-    required this.value,
-    this.emphasize = false,
-    this.align = CrossAxisAlignment.start,
-  });
-
-  final String label;
-  final String value;
-  final bool emphasize;
-  final CrossAxisAlignment align;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: align,
-      children: [
-        Text(label, style: T.caption),
-        const SizedBox(height: 4),
-        // 金额到五位数（比如房租 1,953,500.00）会超出半张卡片的宽度，
-        // 原来会折成「1,953,500.」+「00」两行 —— 用 FittedBox 等比缩一点，
-        // 始终单行显示。数字短时 scaleDown 不会放大，字号不变。
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: align == CrossAxisAlignment.end
-              ? Alignment.centerRight
-              : Alignment.centerLeft,
-          child: Text(
-            value,
-            maxLines: 1,
-            style: T.hero.copyWith(fontSize: emphasize ? 30 : 24),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 /// 单条交易。点按进入编辑，长按删除。
 class _TxnRow extends StatelessWidget {
