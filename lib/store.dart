@@ -65,6 +65,12 @@ class Store extends ChangeNotifier {
   List<Txn> filteredTxns = [];
   bool filterTruncated = false;
 
+  // 筛选合计走独立聚合（D20），不受 filteredTxns 的 500 条上限影响。
+  // 存在这里而不是每次现算，是因为合计要在概览卡里同步显示。
+  int _filterExpenseCents = 0;
+  int _filterIncomeCents = 0;
+  int filterCount = 0;
+
   /// 当前月每日汇总（日期升序），供趋势图使用
   List<(String date, int expense, int income)> dailyTotals = [];
 
@@ -215,12 +221,15 @@ class Store extends ChangeNotifier {
   /// 明细页的展示源：筛选生效时看筛选结果，否则看当月全部
   List<Txn> get visibleTxns => filtering ? filteredTxns : monthTxns;
 
-  /// 筛选结果的支出合计（不含转账，与 monthTotals 同口径）
-  /// 筛选结果的支出合计。负数按交叉归集：支出里的负数算收入，反之亦然
-  int get filteredExpenseCents => sumBySide(filteredTxns, TxnType.expense);
+  /// 筛选结果的支出合计。
+  ///
+  /// 来自 SQL 聚合（[Repo.sumFiltered]），**不是**把 [filteredTxns] 相加 ——
+  /// 列表最多 500 条，相加会把合计算小（D20）。负数按交叉归集：
+  /// 支出里的负数算收入，反之亦然；转账两侧都不参与。
+  int get filteredExpenseCents => _filterExpenseCents;
 
-  /// 筛选结果的收入合计（同上口径，转账两侧都不参与）
-  int get filteredIncomeCents => sumBySide(filteredTxns, TxnType.income);
+  /// 筛选结果的收入合计（同上口径）
+  int get filteredIncomeCents => _filterIncomeCents;
 
   /// 应用筛选。空条件等价于「清空筛选」。
   ///
@@ -232,11 +241,19 @@ class Store extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final (items, truncated) =
-        await Repo.searchTxns(ledgerId: ledgerId, filter: f);
+    // 列表与合计并发查：合计单独聚合（D20），不跟着 500 条上限截断。
+    // 用 record 的 .wait 而不是两次 await，是为了「筛选只等一次 I/O」——
+    // 时序上也更自然：两者本来就该同时发起。
+    final ((items, truncated), (expense, income, count)) = await (
+      Repo.searchTxns(ledgerId: ledgerId, filter: f),
+      Repo.sumFiltered(ledgerId: ledgerId, filter: f),
+    ).wait;
     filter = f;
     filteredTxns = items;
     filterTruncated = truncated;
+    _filterExpenseCents = expense;
+    _filterIncomeCents = income;
+    filterCount = count;
     notifyListeners();
   }
 
@@ -246,6 +263,9 @@ class Store extends ChangeNotifier {
     filter = TxnFilter.none;
     filteredTxns = [];
     filterTruncated = false;
+    _filterExpenseCents = 0;
+    _filterIncomeCents = 0;
+    filterCount = 0;
   }
 
   /// 把当前月明细按日期分组（日期倒序，组内 id 倒序）

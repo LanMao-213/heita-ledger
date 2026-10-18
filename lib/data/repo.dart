@@ -288,14 +288,34 @@ class Repo {
   /// 返回 `(结果, 是否被上限截断)`。多查一条来判定截断 —— 只返回列表的话，
   /// 「正好 500 条」和「500 条之外还有」在调用方无法区分，界面上那句
   /// 「仅显示前 500 条」就落不了地。
+  ///
+  /// ★ 列表有上限，**合计没有**（D20）：合计走 [sumFiltered] 单独聚合。
+  ///   拿列表相加当合计，超过 [searchLimit] 时数字会偏小，而条件条上还写着
+  ///   「仅显示前 500 条」—— 用户看到两个互相矛盾的数字。
   static const int searchLimit = 500;
 
-  static Future<(List<Txn>, bool)> searchTxns({
+  /// 交叉归集的求和表达式（支出侧 / 收入侧）。
+  ///
+  /// 负数按交叉口径：支出里的负数算进收入，收入里的负数算进支出。
+  /// [monthTotals] 与 [sumFiltered] 共用这两段，避免两处口径漂移。
+  static const _expSumSql = 'COALESCE(SUM(CASE '
+      "  WHEN type = 'expense' AND amount_cents >= 0 THEN amount_cents "
+      "  WHEN type = 'income'  AND amount_cents <  0 THEN -amount_cents "
+      '  ELSE 0 END), 0)';
+  static const _incSumSql = 'COALESCE(SUM(CASE '
+      "  WHEN type = 'income'  AND amount_cents >= 0 THEN amount_cents "
+      "  WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
+      '  ELSE 0 END), 0)';
+
+  /// 明细查询的公共 WHERE。
+  ///
+  /// 列表（[searchTxns]）与合计（[sumFiltered]）必须共用同一份条件，
+  /// 否则「列表 500 条、合计却按 501 条算」这类错位迟早会出现。
+  static (String, List<Object?>) _txnWhere({
     required int ledgerId,
     String? keyword,
     TxnFilter? filter,
-    int limit = searchLimit,
-  }) async {
+  }) {
     final where = <String>['ledger_id = ?'];
     final args = <Object?>[ledgerId];
 
@@ -336,11 +356,25 @@ class Repo {
       where.add('date <= ?');
       args.add(filter!.dateTo);
     }
+    return (where.join(' AND '), args);
+  }
+
+  static Future<(List<Txn>, bool)> searchTxns({
+    required int ledgerId,
+    String? keyword,
+    TxnFilter? filter,
+    int limit = searchLimit,
+  }) async {
+    final (whereSql, args) = _txnWhere(
+      ledgerId: ledgerId,
+      keyword: keyword,
+      filter: filter,
+    );
 
     final db = await Db.open();
     final rows = await db.query(
       'txn',
-      where: where.join(' AND '),
+      where: whereSql,
       whereArgs: args,
       orderBy: 'date DESC, id DESC',
       limit: limit + 1, // 多取一条，只为判断有没有被截断
@@ -348,6 +382,36 @@ class Repo {
     final truncated = rows.length > limit;
     final page = truncated ? rows.sublist(0, limit) : rows;
     return (page.map(Txn.fromMap).toList(), truncated);
+  }
+
+  /// 筛选结果的合计：`(支出, 收入, 笔数)`。
+  ///
+  /// 与 [searchTxns] 共用同一份 WHERE，但**不受 [searchLimit] 截断影响**（D20）：
+  /// 汇总交给 SQLite 做，笔数永远是真实的。口径与 [monthTotals] 一致
+  /// （负数交叉归集，转账两侧都不参与）。
+  static Future<(int expense, int income, int count)> sumFiltered({
+    required int ledgerId,
+    String? keyword,
+    TxnFilter? filter,
+  }) async {
+    final (whereSql, args) = _txnWhere(
+      ledgerId: ledgerId,
+      keyword: keyword,
+      filter: filter,
+    );
+
+    final db = await Db.open();
+    final r = await db.rawQuery(
+      'SELECT $_expSumSql AS exp, $_incSumSql AS inc, COUNT(*) AS cnt '
+      'FROM txn WHERE $whereSql',
+      args,
+    );
+    final row = r.first;
+    return (
+      (row['exp'] as int?) ?? 0,
+      (row['inc'] as int?) ?? 0,
+      (row['cnt'] as int?) ?? 0,
+    );
   }
 
   /// 月收支合计
@@ -358,16 +422,7 @@ class Repo {
     final db = await Db.open();
     final r = await db.rawQuery(
       // 负数交叉归集：支出里的负数算进收入，收入里的负数算进支出
-      'SELECT '
-      '  COALESCE(SUM(CASE '
-      "    WHEN type = 'expense' AND amount_cents >= 0 THEN amount_cents "
-      "    WHEN type = 'income'  AND amount_cents <  0 THEN -amount_cents "
-      '    ELSE 0 END), 0) AS exp, '
-      '  COALESCE(SUM(CASE '
-      "    WHEN type = 'income'  AND amount_cents >= 0 THEN amount_cents "
-      "    WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
-      '    ELSE 0 END), 0) AS inc, '
-      '  COUNT(*) AS cnt '
+      'SELECT $_expSumSql AS exp, $_incSumSql AS inc, COUNT(*) AS cnt '
       'FROM txn WHERE ledger_id = ? AND date BETWEEN ? AND ?',
       [ledgerId, monthStart(month), monthEnd(month)],
     );

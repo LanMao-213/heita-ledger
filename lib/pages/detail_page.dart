@@ -265,7 +265,8 @@ class _SummaryCard extends StatelessWidget {
     final filtering = s.filtering;
     final expense = filtering ? s.filteredExpenseCents : s.monthExpenseCents;
     final income = filtering ? s.filteredIncomeCents : s.monthIncomeCents;
-    final count = filtering ? s.filteredTxns.length : s.monthTxnCount;
+    // 笔数也用聚合里的真实值：列表可能被截到 500 条，但「共几笔」不该跟着少算
+    final count = filtering ? s.filterCount : s.monthTxnCount;
 
     return SectionCard(
       margin: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, 0),

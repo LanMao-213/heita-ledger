@@ -188,10 +188,12 @@ void main() {
     expect(exact.$2, isFalse);
   });
 
-  // 这条不是在测「功能对不对」，而是在钉住一个**已知的取舍**：
-  // 超过 500 条时列表被截断，界面上那句合计是按「被截断后的 500 条」算的，
-  // 会比真实总量小。哪天有人改成 count 查询、或者改成不截断，这条会先红。
-  test('超过 500 条：列表截断，合计口径只覆盖前 500 条', () async {
+  // D20：列表有 500 条上限，但合计不能跟着截。
+  //
+  // 旧实现是把 filteredTxns 相加当合计，501 笔时界面只有 50000 分（真实 50100），
+  // 而条件条上还写着「仅显示前 500 条」—— 两个数字互相矛盾。
+  // 现在合计走 Repo.sumFiltered 独立聚合，笔数与金额都是真实值。
+  test('超过 500 条：列表截断，但合计覆盖全部', () async {
     final db = await Db.open();
     final batch = db.batch();
     for (var i = 1; i <= 501; i++) {
@@ -215,13 +217,97 @@ void main() {
     expect(items.length, Repo.searchLimit);
     expect(truncated, isTrue);
 
-    // 真实总量 501 笔 × 1.00 = 50100 分，但界面能算到的只有 50000 分
+    // 合计与笔数走聚合：501 笔 × 1.00 = 50100 分，一分不少
+    final (expense, income, count) = await Repo.sumFiltered(ledgerId: ledgerId);
+    expect(expense, 50100);
+    expect(income, 0);
+    expect(count, 501);
+
+    // 列表相加只有 50000 —— 这正是旧实现会显示的数，别再退回去
     final shown = items.fold<int>(0, (a, t) => a + t.amountCents);
     expect(shown, 50000);
-    final real = await db.rawQuery(
-      'SELECT SUM(amount_cents) AS s FROM txn WHERE ledger_id = ?',
-      [ledgerId],
+  });
+
+  // 合计换了统计方式，就必须和内存侧同口径，否则「饼图分项之和 ≠ 合计」
+  // 那类自相矛盾会以另一种形式回来。
+  test('sumFiltered 与 sumBySide 同口径（含转账与负数）', () async {
+    await add(
+      type: TxnType.expense,
+      cents: 30000,
+      date: '2026-09-01',
+      cat: catFood,
+      acc: accCash,
     );
-    expect(real.first['s'], 50100);
+    // 支出里的负数：算进收入
+    await add(
+      type: TxnType.expense,
+      cents: -5000,
+      date: '2026-09-02',
+      cat: catFood,
+      acc: accCash,
+    );
+    await add(
+      type: TxnType.income,
+      cents: 1000000,
+      date: '2026-09-03',
+      cat: catSalary,
+      acc: accBank,
+    );
+    // 收入里的负数：算进支出
+    await add(
+      type: TxnType.income,
+      cents: -2000,
+      date: '2026-09-04',
+      cat: catSalary,
+      acc: accBank,
+    );
+    // 转账两侧都不参与合计，但算一笔
+    await add(
+      type: TxnType.transfer,
+      cents: 50000,
+      date: '2026-09-05',
+      acc: accBank,
+      toAcc: accCash,
+    );
+
+    final (items, _) = await Repo.searchTxns(ledgerId: ledgerId);
+    final (expense, income, count) = await Repo.sumFiltered(ledgerId: ledgerId);
+
+    expect(expense, sumBySide(items, TxnType.expense));
+    expect(income, sumBySide(items, TxnType.income));
+    expect(expense, 32000); // 30000 + |收入里的 −2000|
+    expect(income, 1005000); // 1000000 + |支出里的 −5000|
+    expect(count, 5);
+  });
+
+  test('sumFiltered 跟随筛选条件，不是全表', () async {
+    await add(
+      type: TxnType.expense,
+      cents: 10000,
+      date: '2026-09-01',
+      cat: catFood,
+      acc: accCash,
+    );
+    await add(
+      type: TxnType.expense,
+      cents: 20000,
+      date: '2026-09-15',
+      cat: catFood,
+      acc: accCash,
+    );
+    await add(
+      type: TxnType.expense,
+      cents: 30000,
+      date: '2026-09-30',
+      cat: catFood,
+      acc: accCash,
+    );
+
+    final (expense, _, count) = await Repo.sumFiltered(
+      ledgerId: ledgerId,
+      filter: const TxnFilter(dateFrom: '2026-09-01', dateTo: '2026-09-15'),
+    );
+    expect(expense, 30000); // 只有前两笔
+    expect(count, 2);
   });
 }
