@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' hide Category;
 import 'data/db.dart';
 import 'data/models.dart';
 import 'data/repo.dart';
+import 'data/ui_flags.dart';
 
 /// 全局状态。用最朴素的 ChangeNotifier —— 这个应用的数据量很小，
 /// 引入状态管理框架反而增加理解成本。
@@ -74,6 +75,12 @@ class Store extends ChangeNotifier {
   /// 当前月每日汇总（日期升序），供趋势图使用
   List<(String date, int expense, int income)> dailyTotals = [];
 
+  /// 近 6 个月收支（含当前月，按月升序），统计页的「近 6 个月」用。
+  ///
+  /// 放在 Store 而不是页面里，是因为它跟 month 绑死：换月要重查，
+  /// 页面组件只该读，不该自己管异步生命周期（否则测试里也等不到回包）。
+  List<(String month, int expense, int income)> trendMonths = [];
+
   /// 启动时补记的周期账单条数（>0 时界面给一次提示）
   int recurringJustAdded = 0;
 
@@ -96,6 +103,8 @@ class Store extends ChangeNotifier {
   /// 首屏启动：建表/开库 → 补记周期账单 → 载入全部数据
   Future<void> boot() async {
     await Db.open();
+    // 界面实验开关（类型 chips / 空态第二行）从 setting 表读覆盖值
+    await UiFlags.load();
     ledgerId = await Repo.currentLedgerId();
     recurringJustAdded = await Repo.runDueRecurring(ledgerId);
     await loadAll();
@@ -132,6 +141,11 @@ class Store extends ChangeNotifier {
     budgetStats = await Repo.budgetStats(ledgerId, month);
     monthTxns = await Repo.listTxns(ledgerId: ledgerId, month: month);
     dailyTotals = await Repo.dailyTotals(ledgerId, month);
+    trendMonths = await Repo.recentMonths(
+      ledgerId: ledgerId,
+      endMonth: month,
+      count: 6,
+    );
     monthIsCurrent = month == Fmt.month(DateTime.now());
     notifyListeners();
   }

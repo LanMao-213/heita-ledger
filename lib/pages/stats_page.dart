@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/charts.dart';
@@ -165,6 +166,22 @@ class _StatsPageState extends State<StatsPage> {
                 SectionCard(child: _DailyTrend(onDayTap: _openDay)),
               ],
             ],
+
+            // 下面两块和「支出/收入」切换无关，放在最后
+            const SectionTitle('近 6 个月'),
+            SectionCard(
+              child: s.trendMonths.isEmpty
+                  ? const SizedBox(
+                      height: 90,
+                      child: Center(
+                        child: Text('还没有历史数据', style: T.caption),
+                      ),
+                    )
+                  : _MonthlyTrend(rows: s.trendMonths),
+            ),
+
+            const SectionTitle('账户资产'),
+            _AccountsCard(),
           ],
         );
       },
@@ -219,6 +236,153 @@ class _DailyTrend extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// 近 6 个月：每月两根柱（支出实心 / 收入浅灰），共用同一根基准线。
+///
+/// 只用一个颜色会让两组数分不清，用彩色又违反「黑白灰」——
+/// 所以按明度分工：支出是主角，用 ink；收入是配角，用 ink4。
+class _MonthlyTrend extends StatelessWidget {
+  const _MonthlyTrend({required this.rows});
+
+  final List<(String month, int expense, int income)> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    var maxV = 1;
+    for (final r in rows) {
+      if (r.$2 > maxV) maxV = r.$2;
+      if (r.$3 > maxV) maxV = r.$3;
+    }
+    const barH = 86.0;
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _legend('支出', C.ink),
+            const SizedBox(width: S.lg),
+            _legend('收入', C.ink4),
+          ],
+        ),
+        const SizedBox(height: S.md),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            for (final r in rows)
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        _bar(r.$2, maxV, barH, C.ink),
+                        const SizedBox(width: 3),
+                        _bar(r.$3, maxV, barH, C.ink4),
+                      ],
+                    ),
+                    const SizedBox(height: S.sm),
+                    Text(
+                      '${int.parse(r.$1.substring(5))}月',
+                      style: T.caption.copyWith(fontSize: 10.5),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _legend(String label, Color color) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(label, style: T.caption.copyWith(fontSize: 11.5)),
+        ],
+      );
+
+  /// 零值不画柱：留 2px 会让人以为「那个月花了点钱」。
+  Widget _bar(int value, int maxV, double barH, Color color) {
+    final h = value <= 0 ? 0.0 : value / maxV * barH;
+    return Container(
+      width: 11,
+      height: h,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+      ),
+    );
+  }
+}
+
+/// 账户资产：合计 + 每个账户一行余额。
+///
+/// 账户余额本来只在「我的」里能看到，而统计页才是用户关心「我现在有多少钱」的地方。
+class _AccountsCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    return SectionCard(
+      padding: const EdgeInsets.symmetric(vertical: S.xs),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.md, S.sm, S.md, S.sm),
+            child: Row(
+              children: [
+                Text('合计', style: T.caption),
+                const Spacer(),
+                Text(
+                  Fmt.money(s.netWorthCents),
+                  style: T.amountSm.copyWith(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          for (final a in s.accounts)
+            Container(
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: C.line)),
+              ),
+              padding: const EdgeInsets.fromLTRB(S.md, S.sm + 2, S.md, S.sm + 2),
+              child: Row(
+                children: [
+                  LineIcon(a.icon, size: 17, color: C.ink3),
+                  const SizedBox(width: S.sm),
+                  Expanded(
+                    child: Text(
+                      a.name,
+                      style: T.body.copyWith(fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    Fmt.money(a.balanceCents),
+                    style: T.amountSm.copyWith(
+                      fontSize: 13.5,
+                      color: a.balanceCents < 0 ? C.over : C.ink,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
