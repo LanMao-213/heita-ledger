@@ -26,7 +26,8 @@ class MinePage extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: S.xxl),
         children: [
           const _BrandHeader(),
-          const _NetWorthCard(),
+          // 读 Store 的组件不能用 const 实例化（重建会被跳过）
+          _NetWorthCard(),
           const SectionTitle('管理'),
           SectionCard(
             padding: EdgeInsets.zero,

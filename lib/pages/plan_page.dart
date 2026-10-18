@@ -30,11 +30,13 @@ class PlanPage extends StatelessWidget {
               onNext: () => s.shiftCycle(1),
             ),
           ),
-          const _TotalBudgetCard(),
+          // ⚠️ 不要加 const：这些组件读 Store，const 实例在重建时会被
+          // 判定为「同一个 widget」而跳过 build，界面上就是「改了没反应」
+          _TotalBudgetCard(),
           const SectionTitle('分类预算'),
-          const _CategoryBudgets(),
+          _CategoryBudgets(),
           const SectionTitle('储蓄目标'),
-          const _Goals(),
+          _Goals(),
           const SizedBox(height: S.lg),
         ],
       ),

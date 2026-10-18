@@ -81,10 +81,11 @@ bool isCurrentCycle(String from, String to, {DateTime? now}) {
 }
 
 /// 明细页/周期条上的文案：`10-15 → 11-14`
-String cycleLabel(String from, String to) => '${_short(from)} → ${_short(to)}';
+String cycleLabel(String from, String to) =>
+    '${shortYmd(from)} → ${shortYmd(to)}';
 
-/// `2026-10-15` → `10-15`
-String _short(String ymd) {
+/// `2026-10-15` → `10-15`。UI 里所有「期」的文案都用这个，别各处自己截。
+String shortYmd(String ymd) {
   final p = ymd.split('-');
   return p.length == 3 ? '${p[1]}-${p[2]}' : ymd;
 }

@@ -46,7 +46,7 @@ class DetailPage extends StatelessWidget {
                           )
                         : const EmptyHint(
                             icon: 'doc',
-                            text: '这个月还没有记账',
+                            text: '这一期还没有记账',
                             hint: '点下面的「＋」记第一笔',
                           )
                   else

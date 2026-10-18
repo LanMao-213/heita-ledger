@@ -404,10 +404,12 @@ class _RecordSheetState extends State<RecordSheet> {
                 if (_showLift)
                   _LiftRow(
                     on: _liftOn,
-                    periodLabel: periodStartOf(
-                      _date,
-                      Store.i.cycleStartDay,
-                      liftToNext: _liftOn,
+                    periodLabel: shortYmd(
+                      periodStartOf(
+                        _date,
+                        Store.i.cycleStartDay,
+                        liftToNext: _liftOn,
+                      ),
                     ),
                     onChanged: (v) => setState(() => _liftOverride = v),
                   ),
