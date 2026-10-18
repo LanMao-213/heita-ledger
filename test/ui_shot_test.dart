@@ -173,6 +173,13 @@ void main() {
     await _shot(tester, 'build/visual/shot_5_record.png');
     expect(tester.takeException(), isNull, reason: '记一笔面板有布局溢出');
 
+    // ---- 记一笔：填了金额的样子（确认键变成可用的重色块）----
+    await tester.tap(find.text('1'));
+    await tester.tap(find.text('2'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_15_record_filled.png');
+    expect(tester.takeException(), isNull, reason: '记一笔（有金额）有布局溢出');
+
     // ---- 分类 + 名目双轮盘 ----
     await tester.tap(find.text('选名目，或自己写备注'));
     await tester.pumpAndSettle();
