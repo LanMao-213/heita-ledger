@@ -61,10 +61,12 @@ class _FilterSheetState extends State<_FilterSheet> {
     _dateFrom = f.dateFrom;
     _dateTo = f.dateTo;
     _preset = _matchPreset(f.dateFrom, f.dateTo);
-    if (f.minCents != null)
+    if (f.minCents != null) {
       _minCtrl.text = Fmt.money(f.minCents!, trimZero: true);
-    if (f.maxCents != null)
+    }
+    if (f.maxCents != null) {
       _maxCtrl.text = Fmt.money(f.maxCents!, trimZero: true);
+    }
     _scheduleCount();
   }
 

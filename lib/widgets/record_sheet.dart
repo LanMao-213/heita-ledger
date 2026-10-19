@@ -49,6 +49,11 @@ class _RecordSheetState extends State<RecordSheet> {
   /// 备注框滚到可见位置用（键盘弹起后信息区会被压扁）
   final _scroll = ScrollController();
 
+  /// 备注框自身的位置。键盘弹起时只把**它**滚进视野，
+  /// 不再 `animateTo(maxScrollExtent)` —— 后者会把整个信息区顶上去，
+  /// 和面板收缩叠在一起，看起来就像「关掉一页又开了一页」。
+  final _noteKey = GlobalKey();
+
   /// 正在输入的金额，直接存字符串便于按键操作（避免浮点误差累积）
   String _amountInput = '';
   bool _saving = false;
@@ -130,15 +135,17 @@ class _RecordSheetState extends State<RecordSheet> {
   void _onNoteFocusChanged() {
     if (!mounted) return;
     setState(() {});
-    // 输入法把信息区压扁之后，备注框可能落到可视区下面。滚到底，
-    // 让用户一眼看到自己在写什么 —— 否则会出现「打着字看不见」。
+    // 输入法把信息区压扁之后，备注框可能落到可视区下面。只保证它可见，
+    // 不做整块滚动 —— 滚动幅度越小，越不会被看成「换了一个界面」。
     if (_noteFocus.hasFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_scroll.hasClients) return;
-        _scroll.animateTo(
-          _scroll.position.maxScrollExtent,
+        final ctx = _noteKey.currentContext;
+        if (!mounted || ctx == null) return;
+        Scrollable.ensureVisible(
+          ctx,
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
         );
       });
     }
@@ -453,6 +460,7 @@ class _RecordSheetState extends State<RecordSheet> {
                         onChanged: (v) => setState(() => _liftOverride = v),
                       ),
                     _NoteField(
+                      key: _noteKey,
                       controller: _note,
                       focusNode: _noteFocus,
                       // 输入法的「完成」= 备注写完：收起键盘，数字键盘和确认键回来
@@ -479,26 +487,27 @@ class _RecordSheetState extends State<RecordSheet> {
       },
     );
 
-    // 键盘弹出 / 收起时面板整体滑动，配合动画让「换成输入法」看起来是
-    // 同一个面板在让位，而不是「又打开了一个新页面」。
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
+    // 键盘弹出 / 收起时面板整体让位。
+    //
+    // 这里**故意不加 AnimatedPadding / AnimatedSize**：`viewInsets` 是键盘
+    // 升起过程中逐帧变化的，每变一帧就会重建一次。加了 180ms 动画，等于每帧
+    // 都把动画重新起步，面板永远追不上键盘 —— 表现就是「先僵硬地缩一下、
+    // 卡半拍、再突然跳到终点」，观感正是「关掉一页又开了一页」。
+    //
+    // 直接跟随 viewInsets 反而最顺：键盘推多少，面板就让多少，两者同帧同步。
+    // 代价是「切换收支导致模板条出现/消失」时高度是突变的，但那一下本来也
+    // 不该有慢动作。
+    return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.bottomCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxH),
-          child: ClipRRect(
-            // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
-            // 留白不会跟着变白
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(R.lg),
-            ),
-            child: Container(color: C.bg, child: body),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxH),
+        child: ClipRRect(
+          // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
+          // 留白不会跟着变白
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(R.lg),
           ),
+          child: Container(color: C.bg, child: body),
         ),
       ),
     );
@@ -803,6 +812,7 @@ class _CategoryNoteRow extends StatelessWidget {
 
 class _NoteField extends StatelessWidget {
   const _NoteField({
+    super.key,
     required this.controller,
     this.focusNode,
     this.onSubmitted,

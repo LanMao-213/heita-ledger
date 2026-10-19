@@ -32,6 +32,9 @@ Future<NotePick?> showCategoryNoteWheel(
     context: context,
     // 轮盘自己吃竖直方向的拖动，面板再插一脚会把滚动抢走
     enableDrag: false,
+    // 不放开的话默认只给屏幕高度的 9/16：轮盘从 192 抬到 240 之后，
+    // 矮屏（含 800×600 的测试画布）会被裁掉 38px，确定键直接点不到
+    isScrollControlled: true,
     builder: (_) => _NoteWheelSheet(
       cats: cats,
       categoryId: categoryId,
@@ -130,15 +133,17 @@ class _NoteWheelSheetState extends State<_NoteWheelSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SheetHeader(title: '选择分类'),
+          // 240 / 52：原 192 / 40 的转轮在小屏上只能露出 4 行，选中行偏细、
+          // 单手滚动容易滑过头。抬高到 240 后能稳定露出 5 行，指腹落点更准
           SizedBox(
-            height: 192,
+            height: 240,
             child: Row(
               children: [
                 Expanded(
-                  flex: 3,
+                  flex: 4,
                   child: CupertinoPicker(
                     scrollController: _catCtrl,
-                    itemExtent: 40,
+                    itemExtent: 52,
                     onSelectedItemChanged: _onCatChanged,
                     selectionOverlay:
                         const CupertinoPickerDefaultSelectionOverlay(
@@ -150,13 +155,13 @@ class _NoteWheelSheetState extends State<_NoteWheelSheet> {
                     ],
                   ),
                 ),
-                Container(width: 1, height: 132, color: C.line),
+                Container(width: 1, height: 160, color: C.line),
                 Expanded(
-                  flex: 4,
+                  flex: 5,
                   child: CupertinoPicker(
                     key: ValueKey('hint-$_catIndex'),
                     scrollController: _hintCtrl,
-                    itemExtent: 40,
+                    itemExtent: 52,
                     onSelectedItemChanged: (i) =>
                         setState(() => _hintIndex = i),
                     selectionOverlay:
@@ -226,7 +231,7 @@ class _NoteWheelSheetState extends State<_NoteWheelSheet> {
     return Text(
       text,
       style: TextStyle(
-        fontSize: selected ? 15.5 : 14.5,
+        fontSize: selected ? 18 : 16.5,
         fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
         color: selected ? C.ink : C.ink3,
       ),
