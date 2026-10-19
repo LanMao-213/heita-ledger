@@ -469,6 +469,158 @@ class Repo {
     );
   }
 
+  // ------------------------------------------------------------------- 借贷
+
+  /// 记一笔借贷：建 `debt` 记录 + 本金流水，同一事务，要么都成要么都不成。
+  ///
+  /// 本金流水的方向**由方向决定**（借出=支出、借入=收入），不接受调用方传，
+  /// 否则「借出却记成收入」会让账户余额反向。两条都带 `debt_id`，统计一律排除。
+  static Future<int> createDebt(
+    Debt debt,
+    Txn principal, {
+    bool? liftToNext,
+  }) async {
+    final db = await Db.open();
+    final startDay = await cycleStartDay();
+    final liftable = await _liftableCategoryIds(db, debt.ledgerId);
+    late int debtId;
+    await db.transaction((txn) async {
+      debtId = await txn.insert('debt', debt.toMap());
+      final row = principal.copyWith(
+        debtId: debtId,
+        type: debt.direction.isMoneyOut ? TxnType.expense : TxnType.income,
+      );
+      await txn.insert(
+        'txn',
+        _txnRow(row, periodFor(row, startDay, liftable, liftToNext: liftToNext)),
+      );
+      await _applyBalanceDelta(txn, row, reverse: false);
+    });
+    return debtId;
+  }
+
+  /// 某账本的全部借贷：未结清优先 → 有应还日的在前 → 应还日升序。
+  ///
+  /// `repaid_cents` 在这里按流水汇总，不落库：本金方向是「借出支出 / 借入收入」，
+  /// 还款方向正好相反，所以借出数 income、借入数 expense。
+  static Future<List<Debt>> listDebts({required int ledgerId}) async {
+    final db = await Db.open();
+    final rows = await db.rawQuery('''
+      SELECT d.*,
+        COALESCE((
+          SELECT SUM(t.amount_cents) FROM txn t
+          WHERE t.debt_id = d.id
+            AND t.type = CASE WHEN d.direction = 'out' THEN 'income' ELSE 'expense' END
+        ), 0) AS repaid_cents
+      FROM debt d
+      WHERE d.ledger_id = ?
+      ORDER BY (d.closed_at IS NULL) DESC,
+               CASE WHEN d.due_date IS NULL THEN 1 ELSE 0 END,
+               d.due_date ASC,
+               d.id DESC
+    ''', [ledgerId]);
+    return rows.map(Debt.fromMap).toList();
+  }
+
+  /// 记一笔还款：生成反向流水 + 必要时标记结清。
+  ///
+  /// 金额约束放在这里而不是界面上：任何入口（详情页、以后可能的批量核销）
+  /// 都受同一条规则，不会出现某个入口漏校验、把剩余冲成负数。
+  static Future<void> repayDebt({
+    required Debt debt,
+    required int amountCents,
+    required int accountId,
+    required String date,
+  }) async {
+    if (amountCents <= 0) {
+      throw ArgumentError('还款金额必须大于 0');
+    }
+    final remain = debt.remainingCents;
+    if (amountCents > remain) {
+      throw ArgumentError('还款金额不能超过剩余 ${Fmt.money(remain)}');
+    }
+    final db = await Db.open();
+    final startDay = await cycleStartDay();
+    final liftable = await _liftableCategoryIds(db, debt.ledgerId);
+    final t = Txn(
+      id: 0,
+      ledgerId: debt.ledgerId,
+      type: debt.direction.isMoneyOut ? TxnType.income : TxnType.expense,
+      amountCents: amountCents,
+      date: date,
+      accountId: accountId,
+      debtId: debt.id,
+      note: '${debt.counterparty} 还款',
+    );
+    await db.transaction((txn) async {
+      await txn.insert(
+        'txn',
+        _txnRow(t, periodFor(t, startDay, liftable)),
+      );
+      await _applyBalanceDelta(txn, t, reverse: false);
+      if (amountCents >= remain) {
+        await txn.update(
+          'debt',
+          {'closed_at': DateTime.now().toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [debt.id],
+        );
+      }
+    });
+  }
+
+  /// 手动结清 / 撤销结清。结清只改状态，不动流水与余额 ——
+  /// 「钱已经还完了但流水没记」这种账，用户自己承担，App 不去编造一笔。
+  static Future<void> setDebtClosed(int debtId, {required bool closed}) async {
+    final db = await Db.open();
+    await db.update(
+      'debt',
+      {'closed_at': closed ? DateTime.now().toIso8601String() : null},
+      where: 'id = ?',
+      whereArgs: [debtId],
+    );
+  }
+
+  static Future<void> deleteDebt(int debtId) async {
+    final db = await Db.open();
+    await db.transaction((txn) async {
+      // 先回滚余额：把挂在这笔上的流水逐条反向应用
+      final rows = await txn.query('txn', where: 'debt_id = ?', whereArgs: [debtId]);
+      for (final r in rows) {
+        await _applyBalanceDelta(txn, Txn.fromMap(r), reverse: true);
+      }
+      await txn.delete('txn', where: 'debt_id = ?', whereArgs: [debtId]);
+      await txn.delete('debt', where: 'id = ?', whereArgs: [debtId]);
+    });
+  }
+
+  /// 往来摘要：应收合计、应付合计、这段日期内到期且未结清的笔数。
+  ///
+  /// 金额取**剩余**而不是本金 —— 已经还掉的部分不该再算进「还欠多少」。
+  static Future<({int receivable, int payable, int dueSoon})> debtSummary({
+    required int ledgerId,
+    required String from,
+    required String to,
+  }) async {
+    final debts = await listDebts(ledgerId: ledgerId);
+    var receivable = 0;
+    var payable = 0;
+    var dueSoon = 0;
+    for (final d in debts) {
+      if (d.isClosed) continue;
+      if (d.direction.isReceivable) {
+        receivable += d.remainingCents;
+      } else {
+        payable += d.remainingCents;
+      }
+      final due = d.dueDate;
+      if (due != null && due.compareTo(from) >= 0 && due.compareTo(to) <= 0) {
+        dueSoon++;
+      }
+    }
+    return (receivable: receivable, payable: payable, dueSoon: dueSoon);
+  }
+
   /// 某月明细（按月倒排日期、同日按 id 倒排）—— [rangeListTxns] 的薄委托。
   static Future<List<Txn>> listTxns({
     required int ledgerId,

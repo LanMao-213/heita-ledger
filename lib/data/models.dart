@@ -342,6 +342,7 @@ class Txn {
     this.placeTo,
     this.person,
     this.subject,
+    this.debtId,
     this.templateId,
     this.recurringId,
     this.createdAt = '',
@@ -377,6 +378,10 @@ class Txn {
 
   /// 名称（课程 / 书籍 / 订阅等）
   final String? subject;
+
+  /// 关联的借贷往来（v7）。非空表示这笔是某笔借出/借入的本金或还款流水：
+  /// 统计一律排除，明细里按「借出 · 张三」渲染，金额用中性色。
+  final int? debtId;
 
   /// 归属期（`YYYY-MM-DD`，该期第一天）。
   ///
@@ -431,6 +436,7 @@ class Txn {
     placeTo: _nz(m['place_to'] as String?),
     person: _nz(m['person'] as String?),
     subject: _nz(m['subject'] as String?),
+    debtId: m['debt_id'] as int?,
     templateId: m['template_id'] as int?,
     recurringId: m['recurring_id'] as int?,
     createdAt: (m['created_at'] as String?) ?? '',
@@ -451,6 +457,7 @@ class Txn {
     'place_to': _nz(placeTo),
     'person': _nz(person),
     'subject': _nz(subject),
+    'debt_id': debtId,
     'template_id': templateId,
     'recurring_id': recurringId,
     'created_at': createdAt.isEmpty
@@ -470,6 +477,7 @@ class Txn {
     String? placeTo,
     String? person,
     String? subject,
+    int? debtId,
     bool clearCategory = false,
     bool clearAccount = false,
   }) => Txn(
@@ -486,6 +494,7 @@ class Txn {
     placeTo: placeTo ?? this.placeTo,
     person: person ?? this.person,
     subject: subject ?? this.subject,
+    debtId: debtId ?? this.debtId,
     templateId: templateId,
     recurringId: recurringId,
     createdAt: createdAt,
@@ -913,3 +922,142 @@ class BudgetStat {
 
 /// 饼图切片用的取色：按金额从大到小套灰阶，保证深浅有意义
 Color monoSlot(int index) => kMono[index % kMono.length];
+
+// --------------------------------------------------------------- 借贷往来
+
+/// 借贷方向。
+///
+/// 枚举名避开 Dart 关键字 `in`，但落库的 code 仍是 `in` / `out`，与
+/// `debt.direction` 列一一对应 —— 改 code 就等于改数据，不能动。
+enum DebtDirection {
+  lent('out', '借出'),
+  borrowed('in', '借入');
+
+  const DebtDirection(this.code, this.label);
+
+  final String code;
+  final String label;
+
+  static DebtDirection fromCode(String? c) => DebtDirection.values.firstWhere(
+    (e) => e.code == c,
+    orElse: () => DebtDirection.lent,
+  );
+
+  /// 借出 = 别人欠我（应收）；借入 = 我欠别人（应付）
+  bool get isReceivable => this == DebtDirection.lent;
+
+  /// 本金在账户上的方向：借出是钱出去，借入是钱进来
+  bool get isMoneyOut => this == DebtDirection.lent;
+}
+
+/// 一笔借贷往来。
+///
+/// **已还金额不存库**（[repaidCents] 由 `Repo` 查完流水后填）：存冗余字段迟早
+/// 和流水对不上，而「还剩多少」正是这套功能最核心的数字。
+class Debt {
+  const Debt({
+    required this.id,
+    required this.ledgerId,
+    required this.direction,
+    required this.counterparty,
+    required this.amountCents,
+    required this.date,
+    this.accountId,
+    this.dueDate,
+    this.countInBudget = false,
+    this.closedAt,
+    this.note = '',
+    this.createdAt = '',
+    this.repaidCents = 0,
+  });
+
+  final int id;
+  final int ledgerId;
+  final DebtDirection direction;
+
+  /// 对方名字，必填 —— 「谁欠我多少」全靠它分组
+  final String counterparty;
+
+  /// 本金，单位「分」
+  final int amountCents;
+
+  /// 发生日 `YYYY-MM-DD`
+  final String date;
+
+  /// 资金进出的账户
+  final int? accountId;
+
+  /// 约定还款日 `YYYY-MM-DD`，可空
+  final String? dueDate;
+
+  /// 借入时是否算进本期可用（借出恒为 false）
+  final bool countInBudget;
+
+  /// 非空 = 已结清
+  final String? closedAt;
+
+  final String note;
+  final String createdAt;
+
+  /// 已还金额（派生字段，由查询时按流水汇总，不落库）
+  final int repaidCents;
+
+  bool get isClosed => closedAt != null;
+
+  /// 还剩多少没还。已结清直接为 0 —— 多还的部分不显示成负数。
+  int get remainingCents =>
+      isClosed ? 0 : (amountCents - repaidCents).clamp(0, amountCents);
+
+  /// 逾期天数。未结清、有应还日、且已过当天才算；否则返回 null。
+  int? get overdueDays {
+    if (isClosed) return null;
+    final raw = dueDate;
+    if (raw == null || raw.isEmpty) return null;
+    final due = DateTime.tryParse(raw);
+    if (due == null) return null;
+    final today = DateTime.now();
+    final days = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).difference(DateTime(due.year, due.month, due.day)).inDays;
+    return days > 0 ? days : null;
+  }
+
+  bool get isOverdue => overdueDays != null;
+
+  factory Debt.fromMap(Map<String, Object?> m) => Debt(
+    id: m['id'] as int,
+    ledgerId: m['ledger_id'] as int,
+    direction: DebtDirection.fromCode(m['direction'] as String?),
+    counterparty: (m['counterparty'] as String?) ?? '',
+    amountCents: (m['amount_cents'] as int?) ?? 0,
+    date: m['date'] as String,
+    accountId: m['account_id'] as int?,
+    dueDate: _nz(m['due_date'] as String?),
+    countInBudget: ((m['count_in_budget'] as int?) ?? 0) != 0,
+    closedAt: _nz(m['closed_at'] as String?),
+    note: (m['note'] as String?) ?? '',
+    createdAt: (m['created_at'] as String?) ?? '',
+    // 查询里的派生列（见 Repo.listDebts），没有就是 0
+    repaidCents: (m['repaid_cents'] as int?) ?? 0,
+  );
+
+  /// 落库用。**不含 `repaid_cents`** —— 那是算出来的，不是存的。
+  Map<String, Object?> toMap() => {
+    if (id > 0) 'id': id,
+    'ledger_id': ledgerId,
+    'direction': direction.code,
+    'counterparty': counterparty,
+    'amount_cents': amountCents,
+    'account_id': accountId,
+    'date': date,
+    'due_date': _nz(dueDate),
+    'count_in_budget': countInBudget ? 1 : 0,
+    'closed_at': closedAt,
+    'note': note,
+    'created_at': createdAt.isEmpty
+        ? DateTime.now().toIso8601String()
+        : createdAt,
+  };
+}

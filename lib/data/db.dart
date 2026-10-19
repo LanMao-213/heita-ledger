@@ -28,7 +28,9 @@ class Db {
   /// 6：分类改两级（复用 `parent_id`）+ `txn` 加 4 个详情列。
   ///    **不动任何一笔交易**：老分类靠改名/降级落位，没有对应子分类的记录
   ///    留在父级，明细里显示为一级分类名。
-  static const _version = 6;
+  /// 7：新增 `debt`（借贷往来）+ `txn.debt_id`。借贷产生的流水挂在 debt 上，
+  ///    统计一律排除；老数据 `debt_id` 全为 NULL，行为不变。
+  static const _version = 7;
 
   /// 当前 schema 版本。备份文件里会记下来，恢复时用来判断兼容性。
   static int get schemaVersion => _version;
@@ -76,6 +78,9 @@ class Db {
           await _migrateTwoLevelCategories(db);
           upgradedToTwoLevel = true;
         }
+        if (oldVersion < 7) {
+          await _addDebtTable(db);
+        }
       },
     );
     return _db!;
@@ -104,6 +109,7 @@ class Db {
     final db = await open();
     await db.transaction((txn) async {
       await txn.delete('txn');
+      await txn.delete('debt');
       await txn.delete('budget');
       await txn.delete('saving_goal');
       await txn.delete('recurring');
@@ -168,6 +174,9 @@ class Db {
         place_to      TEXT,
         person        TEXT,
         subject       TEXT,
+        -- 借贷往来（v7）：非空表示这笔是某笔借出/借入的本金或还款，
+        -- 统计一律排除，明细里按「借出 · 张三」渲染
+        debt_id       INTEGER,
         template_id   INTEGER,
         recurring_id  INTEGER,
         created_at    TEXT    NOT NULL DEFAULT '',
@@ -248,6 +257,62 @@ class Db {
     for (final s in statements) {
       await db.execute(s);
     }
+    // 借贷往来表：DDL 只有一份，新建库和 v6→v7 升级共用
+    await _createDebtTable(db);
+  }
+
+  /// 建 `debt` 表与索引（幂等）。
+  ///
+  /// 单独抽出来是因为它有两个调用点：全新安装（[_createSchema]）和
+  /// 老库升级（[_addDebtTable]）。两处各抄一遍 DDL，改字段时必有一处漏掉。
+  static Future<void> _createDebtTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS debt (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        ledger_id       INTEGER NOT NULL,
+        -- out = 借出（别人欠我），in = 借入（我欠别人）
+        direction       TEXT    NOT NULL,
+        counterparty    TEXT    NOT NULL,
+        -- 本金，单位「分」，与全项目一致
+        amount_cents    INTEGER NOT NULL,
+        account_id      INTEGER,
+        date            TEXT    NOT NULL,
+        due_date        TEXT,
+        -- 借入时是否算进本期可用；借出恒为 0
+        count_in_budget INTEGER NOT NULL DEFAULT 0,
+        -- 非空 = 已结清（可能提前结清，所以显式存，不靠剩余金额推算）
+        closed_at       TEXT,
+        note            TEXT    NOT NULL DEFAULT '',
+        created_at      TEXT    NOT NULL DEFAULT '',
+        FOREIGN KEY (ledger_id) REFERENCES ledger(id) ON DELETE CASCADE
+      )''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_debt_ledger ON debt (ledger_id, closed_at)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_debt_due ON debt (ledger_id, due_date)',
+    );
+  }
+
+  /// v6 → v7：建 `debt` 表 + `txn.debt_id`。
+  ///
+  /// 只加表和空列，**不动任何一笔交易**：老记录的 `debt_id` 全是 NULL，
+  /// 「排除借贷流水」的统计条件对它们天然成立，行为与升级前完全一致。
+  static Future<void> _addDebtTable(Database db) async {
+    await _createDebtTable(db);
+    // 升级测试造的是只含 ledger/category 的极简老库，没有 txn 表。
+    // 真实的 v1 以上库一定有，这里只是不让简化库把升级整条打断。
+    final hasTxn = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'txn'",
+    );
+    if (hasTxn.isEmpty) return;
+    final cols = await db.rawQuery('PRAGMA table_info(txn)');
+    if (!cols.any((c) => c['name'] == 'debt_id')) {
+      await db.execute('ALTER TABLE txn ADD COLUMN debt_id INTEGER');
+    }
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_txn_debt ON txn (debt_id)',
+    );
   }
 
   /// 首次安装的默认数据：一个账本、几个常用账户、原型里的全套分类。
