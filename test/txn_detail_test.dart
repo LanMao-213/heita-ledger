@@ -17,6 +17,7 @@ import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/store.dart';
 import 'package:ledger/widgets/calc_keypad.dart';
+import 'package:ledger/widgets/detail/txn_row.dart';
 import 'package:ledger/widgets/record_sheet.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -190,5 +191,83 @@ void main() {
     expect(find.text('＋ 添加详情'), findsNothing);
     expect(find.text('对象'), findsOneWidget);
     expect(find.widgetWithText(TextField, '张三'), findsOneWidget);
+  });
+
+  // 回归：曾经在「打车」里填了起点，改成「书籍」后界面上看不见那两个值，
+  // 保存时却被原样写进库 —— 明细里一笔买书带着「公司 → 家」。
+  group('切换分类不串详情', () {
+    test('新分类用不到的字段一律清空', () {
+      final kept = pruneDetails('书籍', {
+        TxnField.from: '公司',
+        TxnField.to: '家',
+        TxnField.subject: '代码大全',
+      });
+      expect(kept[TxnField.from], '');
+      expect(kept[TxnField.to], '');
+      expect(kept[TxnField.subject], '代码大全');
+    });
+
+    test('同一组字段的分类之间切换，已填内容保留', () {
+      final kept = pruneDetails('打车', {
+        TxnField.from: '公司',
+        TxnField.to: '家',
+      });
+      expect(kept[TxnField.from], '公司');
+      expect(kept[TxnField.to], '家');
+    });
+
+    test('不需要详情的分类，四个字段全部清空', () {
+      final kept = pruneDetails('正餐', {
+        TxnField.from: '公司',
+        TxnField.to: '家',
+        TxnField.person: '张三',
+        TxnField.subject: '课程',
+      });
+      expect(kept.values, everyElement(''));
+    });
+
+    test('值两端的空格被裁掉', () {
+      expect(
+        pruneDetails('打车', {TxnField.from: '  公司  '})[TxnField.from],
+        '公司',
+      );
+    });
+  });
+
+  // 回归：删除确认框曾经拿备注当标题，弹出来只有「午饭」两个字，
+  // 看不出删的是哪一类；列表标题早已改成分类名，两处口径必须一致。
+  testWidgets('删除确认的标题是分类名，备注只作补充', (tester) async {
+    await tester.runAsync(() => Store.i.boot());
+    final meal = Store.i.expenseCats.firstWhere((c) => c.name == '餐饮');
+    final txn = Txn(
+      id: 1,
+      ledgerId: Store.i.ledgerId,
+      type: TxnType.expense,
+      amountCents: 2500,
+      date: Fmt.today(),
+      categoryId: meal.id,
+      accountId: Store.i.accounts.first.id,
+      note: '午饭',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: TxnRow(txn: txn))),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byType(TxnRow));
+    await tester.pumpAndSettle();
+
+    // 列表行本身也显示备注，所以只在对话框里断言，避免把行内文字算进来
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget);
+    expect(
+      find.descendant(of: dialog, matching: find.textContaining('餐饮')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.textContaining('午饭')),
+      findsOneWidget,
+    );
   });
 }

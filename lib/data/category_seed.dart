@@ -244,6 +244,25 @@ final Map<String, List<TxnField>> kSubFieldSpecs = {
 List<TxnField> fieldsOfSub(String? name) =>
     (name == null ? null : kSubFieldSpecs[name]) ?? const [];
 
+/// 按分类过滤详情值：只保留 [fieldsOfSub] 认可的那几项，其余一律置空。
+///
+/// 字段是按**子分类名**绑定的，换分类之后控件里上一类残留的值必须丢掉 ——
+/// 否则界面上看不见的「出发地」会跟着写进一笔买书。录入面板的「保存」和
+/// 「切换分类」共用这一个规则，避免两处各写一遍、日后只改了一处。
+///
+/// 同一组字段的场景（公共交通 ⇄ 打车，都是出发地/目的地）不会被清掉，
+/// 用户切错再切回来不用重填。
+Map<TxnField, String> pruneDetails(
+  String? subName,
+  Map<TxnField, String> values,
+) {
+  final active = fieldsOfSub(subName);
+  return {
+    for (final f in TxnField.values)
+      f: active.contains(f) ? (values[f] ?? '').trim() : '',
+  };
+}
+
 /// 这些子分类的详情**默认折叠**在「＋ 详情」里。
 ///
 /// 分界线是信息量：地点两端多数人懒得填，常驻两行只是白占屏幕高度；

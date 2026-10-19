@@ -227,7 +227,25 @@ class _RecordSheetState extends State<RecordSheet> {
       selectedCategoryId: _categoryId,
     );
     if (pick == null || !mounted) return;
-    setState(() => _categoryId = pick.txnCategoryId);
+    setState(() {
+      _categoryId = pick.txnCategoryId;
+      _pruneDetails();
+    });
+  }
+
+  /// 分类一换，详情字段的语义就变了 —— 把新分类用不到的字段就地清空。
+  ///
+  /// 规则收在 [pruneDetails]（纯函数，保存时也走它），这里只负责把结果写回控件。
+  void _pruneDetails() {
+    final kept = pruneDetails(
+      Store.i.categoryOf(_categoryId)?.name,
+      {for (final f in TxnField.values) f: _detailCtl[f]!.text},
+    );
+    for (final e in kept.entries) {
+      if (e.value.isEmpty) _detailCtl[e.key]!.clear();
+    }
+    // 新分类的详情区默认收起；留着展开状态会突然多出一片空输入框
+    _detailsOpen = false;
   }
 
   /// 按键只是对表达式字符串做一次变换，规则都收在 Calc.press 里
@@ -334,9 +352,14 @@ class _RecordSheetState extends State<RecordSheet> {
     // 用了模板就记在账目上；没用但内容跟某个模板一模一样，也算它一次
     final tplId = _applied?.id ?? _matchingTemplate()?.id;
 
-    // 四个详情字段**全部带上**，哪怕当前分类用不上：用户在「公共交通」里
-    // 填了出发地又改成「打车」，两个分类都要这两个字段，中间不该丢一次。
-    String d(TxnField f) => _detailCtl[f]!.text.trim();
+    // 只写**当前分类用得到**的字段（规则见 [pruneDetails]）。同一组字段的场景
+    // （公共交通 ⇄ 打车）照旧带上，中间不该丢一次；但换成「书籍」时，控件里
+    // 残留的出发地必须丢掉 —— 否则界面上看不见的值会跟着写进库里。
+    final detailValues = pruneDetails(
+      Store.i.categoryOf(_categoryId)?.name,
+      {for (final f in TxnField.values) f: _detailCtl[f]!.text},
+    );
+    String d(TxnField f) => detailValues[f]!;
 
     try {
       if (_isEdit) {
@@ -500,6 +523,8 @@ class _RecordSheetState extends State<RecordSheet> {
                   // 切换收支后原分类不再适用，重置到第一个；模板也随之失效
                   _categoryId = _firstCategoryId();
                   _applied = null;
+                  // 支出侧的详情字段（出发地/对象）不该带到收入侧
+                  _pruneDetails();
                 });
               },
             ),

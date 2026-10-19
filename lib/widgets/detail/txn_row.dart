@@ -97,9 +97,12 @@ class TxnRow extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('删除这笔记录？', style: T.section),
+        // 与列表同一口径：标题是分类名，备注只作补充。
+        // 旧版拿备注当标题，出现的是「删除这笔记录？午饭」，看不出删的是哪一类。
         content: Text(
-          '${txn.note.isNotEmpty ? txn.note : (Store.i.categoryOf(txn.categoryId)?.name ?? '未分类')}'
-          ' · ${Fmt.money(txn.signedCents, sign: true)}',
+          '${Store.i.categoryOf(txn.categoryId)?.name ?? '未分类'}'
+          ' · ${Fmt.money(txn.signedCents, sign: true)}'
+          '${txn.note.isEmpty ? '' : '\n${txn.note}'}',
           style: T.body2,
         ),
         actions: [
