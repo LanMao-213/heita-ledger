@@ -34,6 +34,26 @@ class _StatsPageState extends State<StatsPage> {
     await s.applyFilter(TxnFilter(dateFrom: date, dateTo: date));
   }
 
+  /// 点排行里的某个分类 → 明细页只留这个分类。
+  ///
+  /// 两个细节：
+  /// - 排行榜按**根分类**聚合（`COALESCE(parent_id, id)`），所以这里筛的是根，
+  ///   筛选侧用 `_catScope` 连带子分类一起命中 —— 点「餐饮」能看到正餐/外卖/聚餐。
+  /// - 带上统计页当前的区间。统计页可以是「按月」也可以是「按本期」，
+  ///   不带上就会出现「图表显示 3,874，点进去明细却是另一个数」。
+  Future<void> _openCategory(CatStat stat) async {
+    final s = Store.i;
+    s.switchTab(0);
+    await s.applyFilter(
+      TxnFilter(
+        type: _type,
+        categoryId: stat.categoryId,
+        dateFrom: s.statFrom.isEmpty ? null : s.statFrom,
+        dateTo: s.statTo.isEmpty ? null : s.statTo,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
@@ -183,6 +203,9 @@ class _StatsPageState extends State<StatsPage> {
                         stat: stats[i],
                         ratio: stats[i].totalCents / maxV,
                         color: monoSlot(i),
+                        // 点排行 → 明细页只留这个分类（点得动就行，不加箭头，
+                        // 和上面「点某天」保持同一种手感）
+                        onTap: () => _openCategory(stats[i]),
                       ),
                   ],
                 ),
