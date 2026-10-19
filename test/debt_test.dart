@@ -15,6 +15,7 @@ import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/store.dart';
 import 'package:ledger/widgets/calc_keypad.dart';
+import 'package:ledger/widgets/detail/txn_row.dart';
 import 'package:ledger/widgets/record_sheet.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -407,5 +408,35 @@ void main() {
     expect(debts.first.direction, DebtDirection.lent);
     expect(debts.first.amountCents, 500000);
     expect(debts.first.remainingCents, 500000);
+  });
+
+  testWidgets('明细行把借贷显示成「借出 · 张三」，并带应还日', (tester) async {
+    await tester.runAsync(() => _freshDb());
+    await tester.runAsync(() => Store.i.boot());
+
+    final c = (await tester.runAsync(() => _ctx()))!;
+    final debtId = (await tester.runAsync(
+      () => Repo.createDebt(
+        _debt(ledgerId: c.ledgerId, accountId: c.account.id),
+        _principal(ledgerId: c.ledgerId, accountId: c.account.id),
+      ),
+    ))!;
+    await tester.runAsync(() => Store.i.afterTxnChange());
+
+    final txns = (await tester.runAsync(
+      () => Repo.listTxns(
+        ledgerId: c.ledgerId,
+        month: Fmt.month(DateTime.now()),
+      ),
+    ))!;
+    final t = txns.firstWhere((e) => e.debtId == debtId);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: TxnRow(txn: t))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('借出 · 张三'), findsOneWidget);
+    expect(find.textContaining('应还'), findsOneWidget);
   });
 }

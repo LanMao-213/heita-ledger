@@ -80,6 +80,16 @@ class Store extends ChangeNotifier {
   int txnCount = 0;
   List<Txn> txns = [];
 
+  /// 借贷往来（带派生的已还金额）。
+  ///
+  /// 明细行据此把流水显示成「借出 · 张三」而不是红色支出，往来卡片也读它 ——
+  /// 共用一个缓存，避免两处各查一次、口径还不一致。
+  List<Debt> debts = [];
+  Map<int, Debt> _debtById = {};
+
+  /// 按 id 取往来；普通流水返回 null（明细行据此决定用哪种渲染）
+  Debt? debtOf(int? id) => id == null ? null : _debtById[id];
+
   /// 抬期池分类 id（工资/奖金/提成）：记一笔面板用它给开关一个默认值
   Set<int> liftableCatIds = {};
 
@@ -179,6 +189,7 @@ class Store extends ChangeNotifier {
     accounts = await Repo.listAccounts();
     netWorthCents = await Repo.totalBalanceCents();
     await _loadCategories();
+    await _loadDebts();
     goals = await Repo.listGoals();
     liftableCatIds = await Repo.liftableCategoryIds(ledgerId);
     await loadTemplates();
@@ -336,6 +347,8 @@ class Store extends ChangeNotifier {
   Future<void> afterTxnChange() async {
     accounts = await Repo.listAccounts();
     netWorthCents = await Repo.totalBalanceCents();
+    // 借贷的「已还多少」是按流水算的，动过流水就得重算
+    await _loadDebts();
     await loadCycle();
     await loadStats();
     // 筛选态下必须重跑，否则删掉的记录还会挂在结果里
@@ -362,6 +375,12 @@ class Store extends ChangeNotifier {
     allIncomeCats = await Repo.listCategories(ledgerId, type: TxnType.income);
     expenseCats = _topOnly(allExpenseCats);
     incomeCats = _topOnly(allIncomeCats);
+  }
+
+  /// 借贷列表与索引一起重建，保证 `debts` 与 `debtOf` 永远一致
+  Future<void> _loadDebts() async {
+    debts = await Repo.listDebts(ledgerId: ledgerId);
+    _debtById = {for (final d in debts) d.id: d};
   }
 
   static List<Category> _topOnly(List<Category> all) => [
