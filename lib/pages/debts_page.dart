@@ -544,9 +544,17 @@ class _RepaySheetState extends State<_RepaySheet> {
   late final TextEditingController _amount = TextEditingController(
     text: _yuan(widget.debt.remainingCents),
   );
-  late int? _accountId = Store.i.accounts.isEmpty
-      ? null
-      : Store.i.accounts.first.id;
+  // 默认账户优先取这笔借贷当时用的账户（钱从哪儿出去就回哪儿），
+  // 没有才退到列表第一个。不然从微信借出去的钱，还款默认记到现金上，
+  // 两个账户的余额就都不对了 —— 而且看不出来，因为总额是对的。
+  late int? _accountId = _defaultAccountId();
+
+  int? _defaultAccountId() {
+    final accounts = Store.i.accounts;
+    if (accounts.isEmpty) return null;
+    final same = accounts.where((a) => a.id == widget.debt.accountId);
+    return same.isNotEmpty ? same.first.id : accounts.first.id;
+  }
   late String _date = Fmt.today();
   bool _saving = false;
   String? _error;
