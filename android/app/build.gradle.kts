@@ -29,7 +29,12 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.heita.ledger"
+        //
+        // 后缀用于打出**并排安装的测试包**：`-PappIdSuffix=.dev` 会得到
+        // com.heita.ledger.dev。真机走查时手机上通常已经装了旧版，而旧版是
+        // debug 签名、装不上正式签名的包（签名不同必须卸载）。加个后缀就能
+        // 两个包共存，旧版账目一条不动。不传这个参数时和原来完全一致。
+        applicationId = "com.heita.ledger" + ((project.findProperty("appIdSuffix") as String?) ?: "")
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

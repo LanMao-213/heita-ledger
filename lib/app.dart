@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'design/icons.dart';
 import 'design/tokens.dart';
+import 'dev/seed.dart';
 import 'pages/home_shell.dart';
 import 'store.dart';
 
@@ -68,7 +69,12 @@ class _BootGateState extends State<_BootGate> {
     super.initState();
     // 已经开过库就不再开一次：重复 boot 会再跑一遍补记与全量查询，
     // 在测试环境里（真实事件循环被假时钟挡住）还会直接卡在启动页。
-    _boot = Store.i.ready ? Future<void>.value() : Store.i.boot();
+    //
+    // seedDemoDataIfNeeded 只在带 `--dart-define=HEITA_SEED=1` 的构建里做事，
+    // 正式包是空操作（见 lib/dev/seed.dart）。
+    _boot = Store.i.ready
+        ? Future<void>.value()
+        : Store.i.boot().then((_) => seedDemoDataIfNeeded());
   }
 
   @override
