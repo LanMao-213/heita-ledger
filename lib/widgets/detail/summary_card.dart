@@ -87,13 +87,17 @@ class SummaryCard extends StatelessWidget {
     final dim = C.ink2;
     final faint = C.ink3;
     final budget = s.totalBudgetCents;
+    // 进度与「还剩几天能花多少」都按**可用额度**算（预算 + 本期计入预算的借入），
+    // 否则借入打开后这一行会和计划页对不上
+    final cap = s.budgetAvailableCents;
+    final borrowed = s.borrowedInBudgetCents;
 
     // 预算节奏只在「按本期看」时算：跨期筛选的合计和一期预算不是一回事
     final pacing = !filtering && budget != null
         ? Pacing.ofRange(
             from: s.cycleFrom,
             to: s.cycleTo,
-            totalCents: budget,
+            totalCents: cap,
             usedCents: s.expenseCents,
           )
         : null;
@@ -180,6 +184,14 @@ class SummaryCard extends StatelessWidget {
                 ),
               ],
             ),
+            // 借入计入预算时单列一行：挤在同一行里，右侧「剩多少」会被顶出屏幕
+            if (borrowed > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                '含借入 ${Fmt.money(borrowed)} · 可用 ${Fmt.money(cap)}',
+                style: TextStyle(fontSize: 11.5, color: faint),
+              ),
+            ],
             const SizedBox(height: S.sm),
             ClipRRect(
               borderRadius: BorderRadius.circular(99),

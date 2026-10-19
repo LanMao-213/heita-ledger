@@ -485,7 +485,11 @@ class Repo {
     final liftable = await _liftableCategoryIds(db, debt.ledgerId);
     late int debtId;
     await db.transaction((txn) async {
-      debtId = await txn.insert('debt', debt.toMap());
+      // 借出恒不计入预算：钱出去了，不是可花的钱。入口只给「借入」显示这个开关，
+      // 但口径由数据层兜住，不指望每个调用方都记得传 false。
+      final map = debt.toMap();
+      if (debt.direction.isReceivable) map['count_in_budget'] = 0;
+      debtId = await txn.insert('debt', map);
       final row = principal.copyWith(
         debtId: debtId,
         type: debt.direction.isMoneyOut ? TxnType.expense : TxnType.income,

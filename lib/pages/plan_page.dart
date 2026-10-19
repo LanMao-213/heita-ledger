@@ -169,12 +169,16 @@ class _TotalBudgetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Store.i;
     final budget = s.totalBudgetCents;
+    final borrowed = s.borrowedInBudgetCents;
+    // 进度按**可用额度**算：借入计入预算时它比额度大，不按它算就会出现
+    // 「条子才到 84%，剩余却有 5,951」这种自相矛盾的组合
+    final cap = s.budgetAvailableCents;
     final over = s.overBudget;
-    final used = budget == null || budget <= 0 ? 0.0 : s.expenseCents / budget;
+    final used = budget == null || cap <= 0 ? 0.0 : s.expenseCents / cap;
     final pacing = Pacing.ofRange(
       from: s.cycleFrom,
       to: s.cycleTo,
-      totalCents: budget,
+      totalCents: cap,
       usedCents: s.expenseCents,
     );
 
@@ -223,6 +227,15 @@ class _TotalBudgetCard extends StatelessWidget {
                 ),
               ],
             ),
+            // 借入计入预算时，额度那一栏仍是用户自己设的数，借来的钱单列一行 ——
+            // 否则「我设了 6000，怎么剩得比 1000 多」会一直解释不清
+            if (borrowed > 0) ...[
+              const SizedBox(height: S.xs),
+              Text(
+                '含借入 ${Fmt.money(borrowed)} · 可用 ${Fmt.money(cap)}',
+                style: T.caption.copyWith(color: C.ink3),
+              ),
+            ],
             const SizedBox(height: S.md),
             Bar(ratio: used, over: over, height: 7),
             const SizedBox(height: S.sm),

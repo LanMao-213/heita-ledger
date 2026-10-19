@@ -160,13 +160,41 @@ class Store extends ChangeNotifier {
     return ledgers.isEmpty ? null : ledgers.first;
   }
 
+  /// 本期「计入预算」的借入本金合计。
+  ///
+  /// 借贷流水一律不进收支统计，但用户勾了「计入预算」的那笔借入是**真能花**的钱。
+  /// 不把它加进可用额度，就会出现「账户里明明多了 3000，预算卡却说你快超支了」。
+  /// 借出恒不计入 —— 钱出去了，不是可花的钱。
+  int get borrowedInBudgetCents {
+    var sum = 0;
+    for (final d in debts) {
+      if (d.direction.isReceivable) continue;
+      if (!d.countInBudget) continue;
+      if (cycleFrom.isEmpty || cycleTo.isEmpty) continue;
+      // 只算本期借入的；上期借的钱不该抬这一期的额度
+      if (d.date.compareTo(cycleFrom) < 0 || d.date.compareTo(cycleTo) > 0) {
+        continue;
+      }
+      sum += d.amountCents;
+    }
+    return sum;
+  }
+
+  /// 本期可用额度 = 预算额度 + 计入预算的借入本金。
+  ///
+  /// **预算额度本身不动**（那是用户自己设的数，不该被借款改写），
+  /// 借入只是把「能花多少」抬上去，并在卡片上单列一行说明。
+  int get budgetAvailableCents =>
+      (totalBudgetCents ?? 0) + borrowedInBudgetCents;
+
   int get budgetLeftCents =>
-      totalBudgetCents == null ? 0 : totalBudgetCents! - expenseCents;
+      totalBudgetCents == null ? 0 : budgetAvailableCents - expenseCents;
 
   bool get overBudget =>
-      totalBudgetCents != null && expenseCents > totalBudgetCents!;
+      totalBudgetCents != null && expenseCents > budgetAvailableCents;
 
-  int get overBudgetCents => overBudget ? expenseCents - totalBudgetCents! : 0;
+  int get overBudgetCents =>
+      overBudget ? expenseCents - budgetAvailableCents : 0;
 
   /// 首屏启动：建表/开库 → 补归属期 → 补记周期账单 → 载入全部数据
   Future<void> boot() async {
