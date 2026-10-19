@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/data/db.dart';
+import 'package:ledger/data/debt_grouping.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/pages/debts_page.dart';
@@ -511,10 +512,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('应收（别人欠我）'), findsOneWidget);
-    expect(find.text('张三 · 借出'), findsOneWidget);
+    // 未结清按人列：标题是姓名，方向在副行
+    expect(find.text('张三'), findsOneWidget);
+    expect(find.textContaining('借出'), findsWidgets);
 
-    // 进详情：能记还款
-    await tester.tap(find.text('张三 · 借出'));
+    // 进详情：能记还款（只有一笔时点人名直接进那笔的详情）
+    await tester.tap(find.text('张三'));
     await tester.pumpAndSettle();
     expect(find.text('记一笔还款'), findsOneWidget);
 
@@ -535,5 +538,110 @@ void main() {
     ))!.first;
     expect(d.repaidCents, 200000);
     expect(d.remainingCents, 300000);
+  });
+
+  // ---------------------------------------------------------------- 按人汇总
+  //
+  // 往来页的主语是「人」不是「笔」。这几条钉住合并规则：同一个人的几笔要加成
+  // 一个净额，已结清的不能算进来，该催的（逾期）要排最上面。
+  group('按人汇总', () {
+    Debt d({
+      String name = '张三',
+      DebtDirection direction = DebtDirection.lent,
+      int amount = 100000,
+      String? due = '2026-11-30',
+      int repaid = 0,
+      String? closedAt,
+    }) => Debt(
+      id: 0,
+      ledgerId: 1,
+      direction: direction,
+      counterparty: name,
+      amountCents: amount,
+      date: '2026-10-01',
+      dueDate: due,
+      closedAt: closedAt,
+      repaidCents: repaid,
+    );
+
+    test('同一个人的几笔合并成一行，金额相加', () {
+      final g = groupDebtsByCounterparty([
+        d(amount: 300000),
+        d(amount: 200000, due: '2026-12-31'),
+      ]);
+      expect(g.length, 1);
+      expect(g.first.name, '张三');
+      expect(g.first.count, 2);
+      expect(g.first.receivableCents, 500000);
+      expect(g.first.nearestDue, '2026-11-30', reason: '取最近的那个应还日');
+      expect(g.first.single, isNull, reason: '多笔时不能直接进某一笔的详情');
+    });
+
+    test('既借出又借入时按净额算，但两边金额都保留', () {
+      final g = groupDebtsByCounterparty([
+        d(amount: 500000),
+        d(direction: DebtDirection.borrowed, amount: 200000),
+      ]).single;
+      expect(g.isMixed, isTrue);
+      expect(g.receivableCents, 500000);
+      expect(g.payableCents, 200000);
+      expect(g.netCents, 300000, reason: '净额是对方还欠我 3000');
+    });
+
+    test('已结清的不进汇总，也不影响净额', () {
+      final g = groupDebtsByCounterparty([
+        d(amount: 300000),
+        d(amount: 900000, closedAt: '2026-10-10'),
+      ]).single;
+      expect(g.count, 1);
+      expect(g.netCents, 300000);
+    });
+
+    test('逾期的排在前面，没约定日期的垫底', () {
+      final g = groupDebtsByCounterparty([
+        d(name: '无期限', due: null),
+        d(name: '年底', due: '2026-12-31'),
+        d(name: '逾期', due: '2026-09-01'),
+      ]);
+      expect(g.map((e) => e.name).toList(), ['逾期', '年底', '无期限']);
+      expect(g.first.isOverdue, isTrue);
+    });
+
+    test('名字为空归到「未填对方」，不丢数据', () {
+      final g = groupDebtsByCounterparty([d(name: '  ')]).single;
+      expect(g.name, '未填对方');
+      expect(g.count, 1);
+    });
+  });
+
+  testWidgets('往来页：同一个人的两笔合并成一行，点开看明细', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.runAsync(() => _freshDb());
+    await tester.runAsync(() => Store.i.boot());
+    final c = (await tester.runAsync(() => _ctx()))!;
+    for (final amount in [300000, 200000]) {
+      await tester.runAsync(
+        () => Repo.createDebt(
+          _debt(ledgerId: c.ledgerId, accountId: c.account.id, amount: amount),
+          _principal(ledgerId: c.ledgerId, accountId: c.account.id),
+        ),
+      );
+    }
+    await tester.runAsync(() => Store.i.afterTxnChange());
+
+    await tester.pumpWidget(const MaterialApp(home: DebtsPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('张三'), findsOneWidget, reason: '两笔要合成一行');
+    expect(find.textContaining('2 笔'), findsOneWidget);
+    expect(find.text('5,000.00'), findsWidgets, reason: '净额是两笔之和');
+
+    // 点开这个人的明细：两笔都在，各自能进详情
+    await tester.tap(find.text('张三'));
+    await tester.pumpAndSettle();
+    expect(find.text('张三 · 借出'), findsNWidgets(2));
   });
 }

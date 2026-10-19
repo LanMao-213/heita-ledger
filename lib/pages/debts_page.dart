@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/debt_grouping.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
 import '../design/icons.dart';
@@ -37,6 +38,8 @@ class DebtsPage extends StatelessWidget {
         builder: (context, _) {
           final open = s.debts.where((d) => !d.isClosed).toList();
           final closed = s.debts.where((d) => d.isClosed).toList();
+          // 未结清按**人**汇总：主业是「谁欠我多少」，单笔只是背后的来龙去脉
+          final groups = groupDebtsByCounterparty(open);
           final receivable = open
               .where((d) => d.direction.isReceivable)
               .fold<int>(0, (a, d) => a + d.remainingCents);
@@ -62,11 +65,12 @@ class DebtsPage extends StatelessWidget {
                   ),
                 ),
               if (open.isNotEmpty) ...[
-                const SectionTitle('未结清'),
-                for (final d in open) _DebtRow(debt: d),
+                const SectionTitle('未结清（按人）'),
+                for (final g in groups) _PersonRow(group: g),
               ],
               if (closed.isNotEmpty) ...[
                 const SectionTitle('已结清'),
+                // 已结清的钱不再构成「欠」，一笔一行就够，不按人合并
                 for (final d in closed) _DebtRow(debt: d, dimmed: true),
               ],
               const SizedBox(height: S.lg),
@@ -130,6 +134,192 @@ class _Figure extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 一个人的未结清往来：姓名 + 净额。
+///
+/// 只有一笔时点进去就是那笔的详情；多笔时先看这个人的明细 ——
+/// 「他到底欠我几笔、哪笔快到期」是多笔场景下真正要回答的问题。
+class _PersonRow extends StatelessWidget {
+  const _PersonRow({required this.group});
+
+  final PersonDebts group;
+
+  @override
+  Widget build(BuildContext context) {
+    final net = group.netCents;
+    final overdue = group.overdueDays;
+    final due = group.nearestDue;
+
+    final sub = <String>[
+      if (group.count > 1)
+        '${group.count} 笔'
+      else
+        group.debts.first.direction.label,
+      // 同一个人既借又还时，净额怎么来的要说清楚，否则「他欠我 3000」
+      // 会和记忆里的「5000 和 2000」对不上
+      if (group.isMixed)
+        '借出 ${Fmt.money(group.receivableCents)} / 借入 ${Fmt.money(group.payableCents)}',
+      if (overdue != null)
+        '逾期 $overdue 天'
+      else if (due != null)
+        '应还 ${Fmt.md(due)}'
+      else
+        '未约定还款日',
+    ].join(' · ');
+
+    final (String amount, String label) = switch (net) {
+      > 0 => (Fmt.money(net), '净应收'),
+      < 0 => (Fmt.money(-net), '净应付'),
+      _ => ('两清', group.count > 1 ? '借还相抵' : '已无欠款'),
+    };
+
+    final icon = group.isMixed
+        ? 'coin'
+        : (group.debts.first.direction.isMoneyOut ? 'upload' : 'download');
+
+    return GestureDetector(
+      onTap: () {
+        final one = group.single;
+        if (one != null) {
+          showDebtDetail(context, one);
+        } else {
+          showPersonDebtsSheet(context, group);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
+        padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: S.md),
+        decoration: BoxDecoration(
+          color: C.bg,
+          borderRadius: BorderRadius.circular(R.card),
+          border: Border.all(color: C.line),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: C.bg2,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: LineIcon(icon, size: 19, color: C.ink),
+              ),
+            ),
+            const SizedBox(width: S.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    group.name,
+                    style: T.body.copyWith(
+                      color: C.ink,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    sub,
+                    style: T.caption.copyWith(
+                      color: overdue != null ? C.over : C.ink3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: S.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  amount,
+                  style: T.amount.copyWith(fontSize: 16, color: C.ink),
+                ),
+                const SizedBox(height: 2),
+                Text(label, style: T.caption.copyWith(color: C.ink4)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 某个人的全部未结清往来。点其中一笔进那笔的详情（在那儿记还款）。
+Future<void> showPersonDebtsSheet(BuildContext context, PersonDebts group) {
+  final s = Store.i;
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: C.bg,
+    isScrollControlled: true,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
+    ),
+    builder: (ctx) => AnimatedBuilder(
+      animation: s,
+      builder: (ctx, _) {
+        // 面板开着时可能刚还完一笔，重新算一遍，避免显示已结清的旧数据
+        final fresh = [
+          for (final d in s.debts)
+            if (!d.isClosed &&
+                (d.counterparty.trim().isEmpty
+                    ? '未填对方'
+                    : d.counterparty.trim()) ==
+                group.name)
+              d,
+        ];
+        if (fresh.isEmpty) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(S.xl),
+              child: Text(
+                '${group.name}的往来都结清了',
+                style: T.body.copyWith(color: C.ink2),
+              ),
+            ),
+          );
+        }
+        final g = PersonDebts(group.name, fresh);
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
+                child: Row(
+                  children: [
+                    Text(group.name, style: T.section),
+                    const Spacer(),
+                    Text(
+                      g.isMixed
+                          ? '借出 ${Fmt.money(g.receivableCents)} · 借入 ${Fmt.money(g.payableCents)}'
+                          : '${g.netCents > 0 ? '应收' : '应付'} ${Fmt.money(g.netCents.abs())}',
+                      style: T.caption.copyWith(color: C.ink3),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(top: S.xs, bottom: S.md),
+                  children: [for (final d in g.debts) _DebtRow(debt: d)],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class _DebtRow extends StatelessWidget {
