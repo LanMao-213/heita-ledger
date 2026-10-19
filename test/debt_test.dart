@@ -8,10 +8,14 @@
 // 4) 删掉一笔借贷，账户余额要回到借出之前。
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/store.dart';
+import 'package:ledger/widgets/calc_keypad.dart';
+import 'package:ledger/widgets/record_sheet.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -340,5 +344,68 @@ void main() {
     final after = await Repo.monthTotals(c.ledgerId, month);
     expect(after.$1, before.$1);
     expect(after.$2, before.$2, reason: '收回来的钱不是这个月的收入');
+  });
+
+  testWidgets('记一笔：切到借出，填对方与金额后落成一条往来', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    // 开库/建种子是真实 I/O，必须包在 runAsync 里 —— 假时钟里直接 await
+    // 会永久挂住，连超时都不触发（交接说明第 4 节第 2 条）
+    await tester.runAsync(() => _freshDb());
+    await tester.runAsync(() => Store.i.boot());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => Center(
+              child: ElevatedButton(
+                onPressed: () => showRecordSheet(ctx),
+                child: const Text('记一笔'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('记一笔'));
+    await tester.pumpAndSettle();
+
+    // 切到「借出」：出现对方输入框，分类行不再出现
+    await tester.tap(find.text('借出'));
+    await tester.pumpAndSettle();
+    expect(find.text('借给谁（必填）'), findsOneWidget);
+
+    // 没填对方时确认键不可用：先填对方
+    await tester.enterText(find.byType(TextField).first, '张三');
+    await tester.pump();
+
+    for (final k in ['5', '0', '0', '0']) {
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CalcKeypad),
+          matching: find.text(k),
+        ),
+      );
+      await tester.pump();
+    }
+    await tester.tap(find.text('确认'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => Future.delayed(const Duration(milliseconds: 200)),
+    );
+
+    final debts = await tester.runAsync(
+      () => Repo.listDebts(ledgerId: Store.i.ledgerId),
+    );
+    expect(debts, isNotNull);
+    expect(debts!.length, 1);
+    expect(debts.first.counterparty, '张三');
+    expect(debts.first.direction, DebtDirection.lent);
+    expect(debts.first.amountCents, 500000);
+    expect(debts.first.remainingCents, 500000);
   });
 }

@@ -38,7 +38,12 @@ class RecordSheet extends StatefulWidget {
 }
 
 class _RecordSheetState extends State<RecordSheet> {
-  late TxnType _type;
+  /// 面板顶部的四段：支出 / 收入 / 借出 / 借入。
+  ///
+  /// 借出/借入**不扩 `TxnType`**：扩了要改统计、筛选、Excel、明细分组里
+  /// 所有按类型分支的地方。这里只多两个录入模式，保存时走 `Repo.createDebt`，
+  /// 流水类型按借贷方向定（借出=支出、借入=收入）。
+  late _RecordMode _mode;
   late int? _categoryId;
   late int? _accountId;
   late String _date;
@@ -76,6 +81,26 @@ class _RecordSheetState extends State<RecordSheet> {
   /// 从模板填进来的那一笔。保存时会把 template_id 记到账目上并累加使用次数。
   TxnTemplate? _applied;
 
+  // ---- 借贷模式专用 ----
+
+  /// 对方（谁借给我 / 我借给谁），借出借入必填
+  final _counterparty = TextEditingController();
+  final _counterpartyFocus = FocusNode();
+
+  /// 约定还款日，可空
+  String? _dueDate;
+
+  /// 借入时是否算进本期可用。借出恒为 false（用户口径：借出不算预算）
+  bool _countInBudget = false;
+
+  bool get _isLending => _mode.isLending;
+
+  /// 借出/借入对应的流水类型：借出是钱出去（支出），借入是钱进来（收入）
+  TxnType get _type =>
+      (_mode == _RecordMode.income || _mode == _RecordMode.lendIn)
+      ? TxnType.income
+      : TxnType.expense;
+
   /// 「这笔算下一期」的手动开关。null = 跟着分类白名单走默认值。
   /// 白名单只给初值，最终值必须能听用户的（设计 §5.2）。
   bool? _liftOverride;
@@ -84,7 +109,7 @@ class _RecordSheetState extends State<RecordSheet> {
 
   /// 只有收入、且这笔真的落在「同月账单日之前」时，抬期开关才有意义
   bool get _showLift =>
-      _type.isIncome && liftable(_date, Store.i.cycleStartDay);
+      !_isLending && _type.isIncome && liftable(_date, Store.i.cycleStartDay);
 
   /// 当前开关状态：手动拨过就听手动的，否则按分类白名单
   bool get _liftOn =>
@@ -96,10 +121,15 @@ class _RecordSheetState extends State<RecordSheet> {
     super.initState();
     // 备注框拿到/失去焦点时要重画：焦点在备注里时数字键盘要让位给系统输入法
     _noteFocus.addListener(_onTextFocusChanged);
+    _counterpartyFocus.addListener(_onTextFocusChanged);
+    // 对方是必填项：输入时要重建面板，确认键才会从灰变实
+    _counterparty.addListener(_onCounterpartyChanged);
     _scroll.addListener(_syncScrollHint);
     final s = Store.i;
     final e = widget.editing;
-    _type = e?.type ?? TxnType.expense;
+    _mode = (e?.type == TxnType.income)
+        ? _RecordMode.income
+        : _RecordMode.expense;
     _categoryId = e?.categoryId;
     _accountId =
         e?.accountId ?? (s.accounts.isEmpty ? null : s.accounts.first.id);
@@ -144,13 +174,28 @@ class _RecordSheetState extends State<RecordSheet> {
   /// 记一笔支出 −20，而不是拆成一笔支出加一笔收入）。
   int? get _amountCents => Calc.cents(_amountInput);
 
-  bool get _canSave => _amountCents != null;
+  /// 借贷必须填对方、金额大于 0 —— 「谁欠我 0 元」这种记录没有意义。
+  /// 其余情况沿用原规则：只要算式能算出数就能存。
+  bool get _canSave {
+    final cents = _amountCents;
+    if (cents == null) return false;
+    if (_isLending) {
+      return cents > 0 && _counterparty.text.trim().isNotEmpty;
+    }
+    return true;
+  }
 
   @override
   void dispose() {
     _noteFocus.removeListener(_onTextFocusChanged);
     _note.dispose();
     _noteFocus.dispose();
+    _counterpartyFocus
+      ..removeListener(_onTextFocusChanged)
+      ..dispose();
+    _counterparty
+      ..removeListener(_onCounterpartyChanged)
+      ..dispose();
     _scroll
       ..removeListener(_syncScrollHint)
       ..dispose();
@@ -188,7 +233,9 @@ class _RecordSheetState extends State<RecordSheet> {
   /// 任意一个文本输入框有焦点。有焦点才让数字键盘让位 ——
   /// 只判备注框的话，点「出发地」时数字键盘还赖在下面占掉半屏。
   bool get _hasTextFocus =>
-      _noteFocus.hasFocus || _detailFocus.values.any((f) => f.hasFocus);
+      _noteFocus.hasFocus ||
+      _counterpartyFocus.hasFocus ||
+      _detailFocus.values.any((f) => f.hasFocus);
 
   /// 当前有焦点的输入框位置，没焦点返回 null
   GlobalKey? get _focusedKey {
@@ -216,6 +263,11 @@ class _RecordSheetState extends State<RecordSheet> {
         alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
       );
     });
+  }
+
+  /// 对方输入变化：只用来刷新「确认键是否可用」，不做别的
+  void _onCounterpartyChanged() {
+    if (mounted) setState(() {});
   }
 
   /// 双轮盘：左选一级、右选子分类。右轮首项「不细分」= 只记到一级。
@@ -259,7 +311,9 @@ class _RecordSheetState extends State<RecordSheet> {
     setState(() {
       _applied = t;
       if (t.type != TxnType.transfer) {
-        _type = t.type;
+        _mode = t.type == TxnType.income
+            ? _RecordMode.income
+            : _RecordMode.expense;
         _categoryId = t.categoryId ?? _firstCategoryId();
       }
       if (t.accountId != null) _accountId = t.accountId;
@@ -362,6 +416,37 @@ class _RecordSheetState extends State<RecordSheet> {
     String d(TxnField f) => detailValues[f]!;
 
     try {
+      // 借出 / 借入：建一条往来 + 一笔本金流水（同一事务），不走普通记账路径。
+      // 编辑已有借贷流水时不走这里 —— 对方与应还日属于「往来」，改它要去往来详情。
+      if (!_isEdit && _isLending) {
+        await Repo.createDebt(
+          Debt(
+            id: 0,
+            ledgerId: store.ledgerId,
+            direction: _mode.direction,
+            counterparty: _counterparty.text.trim(),
+            amountCents: cents.abs(),
+            date: _date,
+            accountId: _accountId,
+            dueDate: _dueDate,
+            // 借出恒不计预算；借入按开关
+            countInBudget: _mode == _RecordMode.lendIn && _countInBudget,
+            note: note,
+          ),
+          Txn(
+            id: 0,
+            ledgerId: store.ledgerId,
+            type: _type,
+            amountCents: cents.abs(),
+            date: _date,
+            accountId: _accountId,
+          ),
+        );
+        await store.afterTxnChange();
+        if (!mounted) return;
+        Navigator.pop(context, true);
+        return;
+      }
       if (_isEdit) {
         final old = widget.editing!;
         final now = Txn(
@@ -426,6 +511,23 @@ class _RecordSheetState extends State<RecordSheet> {
       locale: const Locale('zh', 'CN'),
     );
     if (picked != null) setState(() => _date = Fmt.date(picked));
+  }
+
+  /// 借出/借入的约定还款日。可以不选 —— 不选就是「没约好什么时候还」，
+  /// 往来卡片会把它排在最后，不会当成逾期。
+  Future<void> _pickDueDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate != null
+          ? (DateTime.tryParse(_dueDate!) ?? now)
+          : now,
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 10, 12, 31),
+      locale: const Locale('zh', 'CN'),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _dueDate = Fmt.date(picked));
   }
 
   void _pickAccount() {
@@ -515,16 +617,21 @@ class _RecordSheetState extends State<RecordSheet> {
                 appliedId: _applied?.id,
                 onTap: _applyTemplate,
               ),
-            _TypeSwitch(
-              value: _type,
-              onChanged: (t) {
+            _ModeTabs(
+              value: _mode,
+              onChanged: (m) {
                 setState(() {
-                  _type = t;
-                  // 切换收支后原分类不再适用，重置到第一个；模板也随之失效
+                  _mode = m;
+                  // 切换模式后原分类不再适用，重置到第一个；模板也随之失效
                   _categoryId = _firstCategoryId();
                   _applied = null;
                   // 支出侧的详情字段（出发地/对象）不该带到收入侧
                   _pruneDetails();
+                  // 借贷不带分类与详情；「计入预算」只在借入时有意义
+                  if (m.isLending) {
+                    _detailsOpen = false;
+                    _countInBudget = false;
+                  }
                 });
               },
             ),
@@ -540,21 +647,42 @@ class _RecordSheetState extends State<RecordSheet> {
                     padding: const EdgeInsets.only(bottom: S.sm),
                     child: Column(
                       children: [
-                        _CategoryNoteRow(
-                          category: Store.i.categoryOf(_categoryId),
-                          parent: Store.i.parentOf(
-                            Store.i.categoryOf(_categoryId),
+                        if (_isLending) ...[
+                          _DebtFields(
+                            direction: _mode.direction,
+                            counterparty: _counterparty,
+                            counterpartyFocus: _counterpartyFocus,
+                            dueDate: _dueDate,
+                            onPickDue: _pickDueDate,
+                            countInBudget: _countInBudget,
+                            onCountChanged: (v) =>
+                                setState(() => _countInBudget = v),
                           ),
-                          note: _note,
-                          onTap: _pickCategory,
-                        ),
-                        const Divider(height: 1, color: C.line),
+                          const Divider(height: 1, color: C.line),
+                          _NoteField(
+                            key: _noteKey,
+                            controller: _note,
+                            focusNode: _noteFocus,
+                            onSubmitted: (_) => _noteFocus.unfocus(),
+                          ),
+                          const Divider(height: 1, color: C.line),
+                        ] else ...[
+                          _CategoryNoteRow(
+                            category: Store.i.categoryOf(_categoryId),
+                            parent: Store.i.parentOf(
+                              Store.i.categoryOf(_categoryId),
+                            ),
+                            note: _note,
+                            onTap: _pickCategory,
+                          ),
+                          const Divider(height: 1, color: C.line),
+                        ],
                         // 有详情字段时，备注框**提到详情前面**。
                         // 详情区一出现就把信息区撑高，备注留在最后会被整块顶出
                         // 可视区 —— 它不是必填项，藏起来用户就当它不存在了。
                         // 顺序仍是「先补充说明、再日期账户」：详情本来就是
                         // 分类的延伸，和备注挨着比隔着日期更顺。
-                        if (_fields.isNotEmpty) ...[
+                        if (!_isLending && _fields.isNotEmpty) ...[
                           _NoteField(
                             key: _noteKey,
                             controller: _note,
@@ -595,7 +723,9 @@ class _RecordSheetState extends State<RecordSheet> {
                             ),
                             onChanged: (v) => setState(() => _liftOverride = v),
                           ),
-                        if (_fields.isEmpty)
+                        // 借贷模式已经在上面单独放了备注框，这里不能再放一个 ——
+                        // 两处都用同一个 GlobalKey，会在切换模式时报重复 key
+                        if (!_isLending && _fields.isEmpty)
                           _NoteField(
                             key: _noteKey,
                             controller: _note,
@@ -741,17 +871,170 @@ class _TemplateStrip extends StatelessWidget {
   }
 }
 
-class _TypeSwitch extends StatelessWidget {
-  const _TypeSwitch({required this.value, required this.onChanged});
+/// 录入模式：支出 / 收入 / 借出 / 借入。
+///
+/// 只存在于录入面板，**不污染 `TxnType`**：借出借入落库时仍是支出/收入流水，
+/// 只是多挂一个 `debt_id`。扩枚举要改统计、筛选、Excel、明细分组里所有
+/// 按类型分支的地方，而这里只需要多两个模式。
+enum _RecordMode {
+  expense('支出'),
+  income('收入'),
+  lendOut('借出'),
+  lendIn('借入');
 
-  final TxnType value;
-  final ValueChanged<TxnType> onChanged;
+  const _RecordMode(this.label);
+
+  final String label;
+
+  bool get isLending =>
+      this == _RecordMode.lendOut || this == _RecordMode.lendIn;
+
+  DebtDirection get direction =>
+      this == _RecordMode.lendOut ? DebtDirection.lent : DebtDirection.borrowed;
+}
+
+/// 四段切换。视觉沿用 [SegTabs]（选中黑底白字），只是段数从 2 变 4。
+class _ModeTabs extends StatelessWidget {
+  const _ModeTabs({required this.value, required this.onChanged});
+
+  final _RecordMode value;
+  final ValueChanged<_RecordMode> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: S.lg),
-      child: SegTabs(value: value, onChanged: onChanged),
+      child: Container(
+        height: 32,
+        decoration: BoxDecoration(
+          color: C.bg2,
+          borderRadius: BorderRadius.circular(R.sm),
+        ),
+        child: Row(
+          children: [
+            for (final m in _RecordMode.values)
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onChanged(m),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    margin: const EdgeInsets.all(2),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: value == m ? C.ink : Colors.transparent,
+                      borderRadius: BorderRadius.circular(R.sm),
+                    ),
+                    child: Text(
+                      m.label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: value == m ? C.bg : C.ink2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 借贷模式的三个输入：对方（必填）、应还日（选填）、计入预算（仅借入）。
+class _DebtFields extends StatelessWidget {
+  const _DebtFields({
+    required this.direction,
+    required this.counterparty,
+    required this.counterpartyFocus,
+    required this.dueDate,
+    required this.onPickDue,
+    required this.countInBudget,
+    required this.onCountChanged,
+  });
+
+  final DebtDirection direction;
+  final TextEditingController counterparty;
+  final FocusNode counterpartyFocus;
+  final String? dueDate;
+  final VoidCallback onPickDue;
+  final bool countInBudget;
+  final ValueChanged<bool> onCountChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBorrow = direction == DebtDirection.borrowed;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: counterparty,
+            focusNode: counterpartyFocus,
+            style: T.body,
+            maxLength: 20,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => counterpartyFocus.unfocus(),
+            inputFormatters: [LengthLimitingTextInputFormatter(20)],
+            decoration: InputDecoration(
+              counterText: '',
+              hintText: isBorrow ? '向谁借的（必填）' : '借给谁（必填）',
+              hintStyle: T.body2.copyWith(color: C.ink4),
+              filled: true,
+              fillColor: C.bg2,
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(R.md),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: S.md,
+                vertical: S.md,
+              ),
+            ),
+          ),
+          const SizedBox(height: S.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _Chip(
+                  icon: 'rec',
+                  label: dueDate == null
+                      ? '应还日（可不选）'
+                      : Fmt.friendly(dueDate!),
+                  onTap: onPickDue,
+                ),
+              ),
+              if (isBorrow) ...[
+                const SizedBox(width: S.md),
+                GestureDetector(
+                  onTap: () => onCountChanged(!countInBudget),
+                  child: Container(
+                    height: 42,
+                    padding: const EdgeInsets.symmetric(horizontal: S.md),
+                    decoration: BoxDecoration(
+                      color: countInBudget ? C.ink : C.bg2,
+                      borderRadius: BorderRadius.circular(R.md),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '计入预算',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: countInBudget ? C.bg : C.ink2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
