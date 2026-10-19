@@ -4,6 +4,7 @@ import '../../data/models.dart';
 import '../../design/haptics.dart';
 import '../../design/icons.dart';
 import '../../design/tokens.dart';
+import '../../pages/debts_page.dart';
 import '../../store.dart';
 import '../common.dart';
 import '../record_sheet.dart';
@@ -44,10 +45,10 @@ class TxnRow extends StatelessWidget {
     ];
 
     return InkWell(
-      // 借贷流水不能当普通支出编辑：对方、应还日、还款都在「往来」里，
-      // 在这里改金额会和债务记录对不上。先给一句明确指引。
+      // 借贷流水不能当普通支出编辑：改金额会和债务记录对不上。
+      // 点它直接看往来详情，记还款也在那一页。
       onTap: debt != null
-          ? () => showToast(context, '借贷记录请在「计划 → 往来」里修改')
+          ? () => showDebtDetail(context, debt)
           : () => showRecordSheet(context, editing: txn),
       onLongPress: () => _confirmDelete(context),
       child: Padding(

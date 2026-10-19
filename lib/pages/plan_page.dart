@@ -8,6 +8,7 @@ import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/calendar_picker.dart';
 import '../widgets/common.dart';
+import 'debts_page.dart';
 
 /// 计划页 = 预算 + 储蓄目标。
 /// 这个位置原来是「分类」，按用户要求把分类移进了「我的」，这里放计划。
@@ -34,6 +35,7 @@ class PlanPage extends StatelessWidget {
           ),
           // ⚠️ 不要加 const：这些组件读 Store，const 实例在重建时会被
           // 判定为「同一个 widget」而跳过 build，界面上就是「改了没反应」
+          _DebtsCard(),
           _TotalBudgetCard(),
           const SectionTitle('分类预算'),
           _CategoryBudgets(),
@@ -42,6 +44,118 @@ class PlanPage extends StatelessWidget {
           const SizedBox(height: S.lg),
         ],
       ),
+    );
+  }
+}
+
+// ----------------------------------------------------------------------- 往来
+
+/// 往来摘要：应收 / 应付 / 本期到期笔数，点进去是完整台账。
+///
+/// 放在计划页而不是「我的」，是因为借贷直接改变这一期还能花多少，
+/// 和预算同屏才容易被看见。没有借贷时退化成一行引导，不占一整张卡。
+class _DebtsCard extends StatelessWidget {
+  const _DebtsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    final open = s.debts.where((d) => !d.isClosed).toList();
+    final receivable = open
+        .where((d) => d.direction.isReceivable)
+        .fold<int>(0, (a, d) => a + d.remainingCents);
+    final payable = open
+        .where((d) => !d.direction.isReceivable)
+        .fold<int>(0, (a, d) => a + d.remainingCents);
+    final dueSoon = open.where((d) {
+      final due = d.dueDate;
+      return due != null &&
+          due.compareTo(s.cycleFrom) >= 0 &&
+          due.compareTo(s.cycleTo) <= 0;
+    }).length;
+
+    void openPage() => Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const DebtsPage()));
+
+    if (open.isEmpty) {
+      return SectionCard(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: openPage,
+          child: Row(
+            children: [
+              const LineIcon('coin', size: 18, color: C.ink2),
+              const SizedBox(width: S.sm),
+              Expanded(
+                child: Text('往来：记借出/借入后，在这里看谁欠谁多少', style: T.body2),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: C.ink4,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SectionCard(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: openPage,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const LineIcon('coin', size: 18, color: C.ink2),
+                const SizedBox(width: S.sm),
+                Text('往来', style: T.section),
+                const Spacer(),
+                if (dueSoon > 0)
+                  Text(
+                    '本期到期 $dueSoon 笔',
+                    style: T.caption.copyWith(color: C.ink2),
+                  ),
+                const SizedBox(width: S.xs),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: C.ink4,
+                ),
+              ],
+            ),
+            const SizedBox(height: S.sm),
+            Row(
+              children: [
+                Expanded(child: _MiniFigure(label: '应收', cents: receivable)),
+                Expanded(child: _MiniFigure(label: '应付', cents: payable)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniFigure extends StatelessWidget {
+  const _MiniFigure({required this.label, required this.cents});
+
+  final String label;
+  final int cents;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: T.caption),
+        const SizedBox(height: 2),
+        Text(Fmt.money(cents), style: T.amount.copyWith(fontSize: 18)),
+      ],
     );
   }
 }

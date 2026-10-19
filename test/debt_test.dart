@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/pages/debts_page.dart';
 import 'package:ledger/store.dart';
 import 'package:ledger/widgets/calc_keypad.dart';
 import 'package:ledger/widgets/detail/txn_row.dart';
@@ -438,5 +439,51 @@ void main() {
 
     expect(find.text('借出 · 张三'), findsOneWidget);
     expect(find.textContaining('应还'), findsOneWidget);
+  });
+
+  testWidgets('往来页：列表显示应收，点进去能记一笔还款', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.runAsync(() => _freshDb());
+    await tester.runAsync(() => Store.i.boot());
+    final c = (await tester.runAsync(() => _ctx()))!;
+    await tester.runAsync(
+      () => Repo.createDebt(
+        _debt(ledgerId: c.ledgerId, accountId: c.account.id),
+        _principal(ledgerId: c.ledgerId, accountId: c.account.id),
+      ),
+    );
+    await tester.runAsync(() => Store.i.afterTxnChange());
+
+    await tester.pumpWidget(const MaterialApp(home: DebtsPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('应收（别人欠我）'), findsOneWidget);
+    expect(find.text('张三 · 借出'), findsOneWidget);
+
+    // 进详情：能记还款
+    await tester.tap(find.text('张三 · 借出'));
+    await tester.pumpAndSettle();
+    expect(find.text('记一笔还款'), findsOneWidget);
+
+    await tester.tap(find.text('记一笔还款'));
+    await tester.pumpAndSettle();
+
+    // 金额默认是剩余（5000），改成 2000 再确认
+    await tester.enterText(find.byType(TextField).last, '2000');
+    await tester.pump();
+    await tester.tap(find.text('确认'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => Future.delayed(const Duration(milliseconds: 300)),
+    );
+
+    final d = (await tester.runAsync(
+      () => Repo.listDebts(ledgerId: c.ledgerId),
+    ))!.first;
+    expect(d.repaidCents, 200000);
+    expect(d.remainingCents, 300000);
   });
 }
