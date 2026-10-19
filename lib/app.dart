@@ -14,7 +14,7 @@ const String kAppName = '黑塔消费日记';
 
 /// 版本号。**必须与 pubspec.yaml 的 version 前两段保持一致**
 /// （pubspec 里的 `+N` 是构建号，不显示给用户）。
-const String kAppVersion = '1.1.4';
+const String kAppVersion = '1.3.0';
 
 class HeitaApp extends StatelessWidget {
   const HeitaApp({super.key});
