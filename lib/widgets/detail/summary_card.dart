@@ -168,7 +168,7 @@ class SummaryCard extends StatelessWidget {
               children: [
                 Text(
                   '本期预算 ${Fmt.money(s.expenseCents)} / '
-                  '${Fmt.money(budget!)}',
+                  '${Fmt.money(cap)}',
                   style: TextStyle(fontSize: 12, color: dim),
                 ),
                 const Spacer(),
@@ -188,7 +188,7 @@ class SummaryCard extends StatelessWidget {
             if (borrowed > 0) ...[
               const SizedBox(height: 4),
               Text(
-                '含借入 ${Fmt.money(borrowed)} · 可用 ${Fmt.money(cap)}',
+                '含借入 ${Fmt.money(borrowed)}（额度 ${Fmt.money(budget!)}）',
                 style: TextStyle(fontSize: 11.5, color: faint),
               ),
             ],

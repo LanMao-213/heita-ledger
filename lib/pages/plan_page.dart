@@ -222,17 +222,18 @@ class _TotalBudgetCard extends StatelessWidget {
                   style: T.hero.copyWith(fontSize: 30),
                 ),
                 Text(
-                  '  /  ${Fmt.money(budget)}',
+                  '  /  ${Fmt.money(cap)}',
                   style: T.body2.copyWith(fontSize: 14),
                 ),
               ],
             ),
-            // 借入计入预算时，额度那一栏仍是用户自己设的数，借来的钱单列一行 ——
-            // 否则「我设了 6000，怎么剩得比 1000 多」会一直解释不清
+            // 借入计入预算时，卡片上的额度直接显示成「额度 + 借入」（9000），
+            // 下面小字说明这多出来的 3000 是借的 —— 借来的钱确实能花，
+            // 大数字若还停在 6000，用户会以为预算没变。存的额度不动，下期自动还原。
             if (borrowed > 0) ...[
               const SizedBox(height: S.xs),
               Text(
-                '含借入 ${Fmt.money(borrowed)} · 可用 ${Fmt.money(cap)}',
+                '含借入 ${Fmt.money(borrowed)}（额度 ${Fmt.money(budget)}）',
                 style: T.caption.copyWith(color: C.ink3),
               ),
             ],
