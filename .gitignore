@@ -44,5 +44,10 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# 签名文件：泄露等于别人能给这个 App 出升级包
+*.jks
+*.keystore
+**/key.properties
+
 # Widget Preview related
 .widget_preview/
