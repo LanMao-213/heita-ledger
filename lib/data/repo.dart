@@ -190,6 +190,20 @@ class Repo {
 
   static Future<int> insertCategory(Category c) async {
     final db = await Db.open();
+    // 两级上限：父级自己必须是一级分类，否则就会长出第三层。
+    // 数据层拦一道，比在界面上藏入口可靠 —— 导入 Excel、恢复备份都会走这里。
+    if (c.parentId != null) {
+      final parent = await db.query(
+        'category',
+        columns: ['parent_id'],
+        where: 'id = ?',
+        whereArgs: [c.parentId],
+        limit: 1,
+      );
+      if (parent.isEmpty || parent.first['parent_id'] != null) {
+        throw ArgumentError('子分类的父级必须是一级分类');
+      }
+    }
     return db.insert('category', c.toMap());
   }
 
@@ -198,17 +212,34 @@ class Repo {
     await db.update('category', c.toMap(), where: 'id = ?', whereArgs: [c.id]);
   }
 
-  /// 分类被删时，历史交易的 category_id 置空（不连带删交易）
+  /// 分类被删时，历史交易的 `category_id` 置空（不连带删交易）。
+  ///
+  /// 删一级分类会**连同它的子分类一起删**：子分类失去父级之后既不会出现在
+  /// 轮盘里，也没法在界面上找到，留着只会变成孤儿行。
   static Future<void> deleteCategory(int id) async {
     final db = await Db.open();
     await db.transaction((txn) async {
+      final subs = await txn.query(
+        'category',
+        columns: ['id'],
+        where: 'parent_id = ?',
+        whereArgs: [id],
+      );
+      final ids = [id, ...subs.map((r) => r['id'] as int)];
+      final marks = List.filled(ids.length, '?').join(',');
       await txn.update(
         'txn',
         {'category_id': null},
-        where: 'category_id = ?',
-        whereArgs: [id],
+        where: 'category_id IN ($marks)',
+        whereArgs: ids,
       );
-      await txn.delete('category', where: 'id = ?', whereArgs: [id]);
+      // 指向这些分类的预算也要一起清掉，否则会留下查不到分类的预算行
+      await txn.delete(
+        'budget',
+        where: 'category_id IN ($marks)',
+        whereArgs: ids,
+      );
+      await txn.delete('category', where: 'id IN ($marks)', whereArgs: ids);
     });
   }
 
@@ -480,12 +511,17 @@ class Repo {
       args.add(type.code);
     }
     if (categoryId != null) {
-      where.write(' AND category_id = ?');
-      args.add(categoryId);
+      where.write(' AND $_catScope');
+      args
+        ..add(categoryId)
+        ..add(categoryId);
     }
     if (keyword != null && keyword.trim().isNotEmpty) {
-      where.write(' AND note LIKE ?');
-      args.add('%${keyword.trim()}%');
+      where.write(' AND $_keywordWhere');
+      final k = '%${keyword.trim()}%';
+      for (var i = 0; i < _keywordCols.length; i++) {
+        args.add(k);
+      }
     }
     final rows = await db.query(
       'txn',
@@ -524,6 +560,29 @@ class Repo {
       "  WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
       '  ELSE 0 END), 0)';
 
+  /// 关键词要搜的列。备注之外还要带上 v6 的详情字段 ——
+  /// 记了「红包 · 对象=张三」却搜不到「张三」，那这个字段等于白填。
+  static const _keywordCols = [
+    'note',
+    'person',
+    'subject',
+    'place_from',
+    'place_to',
+  ];
+
+  static final _keywordWhere =
+      '(${_keywordCols.map((c) => '$c LIKE ?').join(' OR ')})';
+
+  /// 「按某个分类筛」的条件：**把它的子分类一起带上**。
+  ///
+  /// 两级分类之后绝大多数记录挂在子分类上（餐饮 / 正餐）。只写
+  /// `category_id = ?` 的话，选「餐饮」会筛出 0 条 —— 而那正是最常被点的格子。
+  /// 子分类用子查询找，不把 id 列表拼进 `IN`：拼列表在分类多时会撞 SQLite 的
+  /// 参数上限，而这里只需多一个参数。
+  static const _catScope =
+      '(category_id = ? OR category_id IN '
+      '(SELECT id FROM category WHERE parent_id = ?))';
+
   /// 明细查询的公共 WHERE。
   ///
   /// 列表（[searchTxns]）与合计（[sumFiltered]）必须共用同一份条件，
@@ -538,16 +597,20 @@ class Repo {
 
     final k = keyword?.trim() ?? '';
     if (k.isNotEmpty) {
-      where.add('note LIKE ?');
-      args.add('%$k%');
+      where.add(_keywordWhere);
+      for (var i = 0; i < _keywordCols.length; i++) {
+        args.add('%$k%');
+      }
     }
     if (filter?.type != null) {
       where.add('type = ?');
       args.add(filter!.type!.code);
     }
     if (filter?.categoryId != null) {
-      where.add('category_id = ?');
-      args.add(filter!.categoryId);
+      where.add(_catScope);
+      args
+        ..add(filter!.categoryId)
+        ..add(filter.categoryId);
     }
     final accountId = filter?.accountId;
     if (accountId != null) {
@@ -842,17 +905,24 @@ class Repo {
     final rows = await db.rawQuery(
       // 本侧的正数 + 对侧的负数（金额取绝对值）—— 与 rangeTotals 的口径保持一致，
       // 否则饼图分项之和会跟合计对不上
-      'SELECT t.category_id AS cid, '
-      "  COALESCE(c.name, '未分类') AS name, "
-      "  COALESCE(c.icon, 'more')  AS icon, "
+      //
+      // **按根分类聚合**：两级分类之后，交易可能挂在子分类（正餐）上，
+      // 也可能直接挂一级（餐饮）。饼图与排行只按一级呈现，所以用
+      // `COALESCE(p.id, c.id)` 把子分类折回它的一级；未分类时三者都空，
+      // 落在同一组里显示为「未分类」。
+      'SELECT COALESCE(p.id, c.id) AS cid, '
+      "  COALESCE(p.name, c.name, '未分类') AS name, "
+      "  COALESCE(p.icon, c.icon, 'more')  AS icon, "
       '  SUM(CASE WHEN t.amount_cents < 0 THEN -t.amount_cents'
       '          ELSE t.amount_cents END) AS total, '
       '  COUNT(*) AS cnt '
-      'FROM txn t LEFT JOIN category c ON c.id = t.category_id '
+      'FROM txn t '
+      '  LEFT JOIN category c ON c.id = t.category_id '
+      '  LEFT JOIN category p ON p.id = c.parent_id '
       'WHERE t.ledger_id = ? AND t.${_col(basis)} BETWEEN ? AND ? '
       '  AND ((t.type = ? AND t.amount_cents >= 0)'
       '    OR (t.type = ? AND t.amount_cents < 0)) '
-      'GROUP BY t.category_id '
+      'GROUP BY COALESCE(p.id, c.id) '
       'ORDER BY total DESC',
       [ledgerId, from, to, type.code, other.code],
     );
@@ -1030,15 +1100,20 @@ class Repo {
   }) async {
     final db = await Db.open();
     final rows = await db.rawQuery(
+      // 只列一级分类（`parent_id IS NULL`）：预算设在「餐饮」上，
+      // 不该出现「正餐」。已用金额则要**含该一级下的所有子分类**，
+      // 否则把交易记到子分类之后，餐饮的预算进度条永远不动。
       'SELECT c.id AS cid, c.name AS name, c.icon AS icon, '
       '  b.amount_cents AS budget, '
       '  COALESCE((SELECT SUM(t.amount_cents) FROM txn t '
-      "     WHERE t.category_id = c.id AND t.type = 'expense' "
+      '     JOIN category tc ON tc.id = t.category_id '
+      "     WHERE COALESCE(tc.parent_id, tc.id) = c.id AND t.type = 'expense' "
       '       AND t.period_start BETWEEN ? AND ?), 0) AS spent '
       'FROM category c '
       'LEFT JOIN budget b ON b.category_id = c.id '
       '  AND b.ledger_id = c.ledger_id AND b.period_start = ? '
       "WHERE c.ledger_id = ? AND c.type = 'expense' AND c.archived = 0 "
+      '  AND c.parent_id IS NULL '
       '  AND (b.amount_cents IS NOT NULL OR spent > 0) '
       'ORDER BY (b.amount_cents IS NULL), b.amount_cents DESC',
       [from, to, periodStart, ledgerId],

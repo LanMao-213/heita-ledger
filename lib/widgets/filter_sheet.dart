@@ -352,6 +352,9 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   Widget _categoryBlock(Store s) {
     final locked = _type == TxnType.income;
+    // 选中的可能是子分类（二级筛选），网格的高亮要落回它的一级
+    final sel = s.categoryOf(_categoryId);
+    final topId = sel == null ? null : (sel.parentId ?? sel.id);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -367,13 +370,48 @@ class _FilterSheetState extends State<_FilterSheet> {
             opacity: locked ? 0.35 : 1,
             child: CategoryGrid(
               cats: s.expenseCats,
-              selected: _categoryId,
+              selected: topId,
               onSelect: (id) =>
                   _edit(() => _categoryId = _categoryId == id ? null : id),
             ),
           ),
         ),
+        if (!locked) _subRow(s, sel),
       ],
+    );
+  }
+
+  /// 选中一级之后，在下面再给一排子分类。
+  ///
+  /// 两级分类的意义就在这一排：「餐饮」看整体，「餐饮 / 正餐」看细分。
+  /// 只给一级的话，用户为了查午饭只能把整月餐饮都翻一遍。
+  Widget _subRow(Store s, Category? sel) {
+    if (sel == null) return const SizedBox.shrink();
+    final top = sel.parentId == null ? sel : s.categoryOf(sel.parentId);
+    if (top == null) return const SizedBox.shrink();
+    final subs = s.childrenOf(top.id);
+    if (subs.isEmpty) return const SizedBox.shrink();
+    final activeSub = sel.parentId == null ? null : sel.id;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(S.xl, S.sm, S.lg, 0),
+      child: Wrap(
+        spacing: S.sm,
+        runSpacing: S.sm,
+        children: [
+          _ToggleChip(
+            label: '全部',
+            selected: activeSub == null,
+            onTap: () => _edit(() => _categoryId = top.id),
+          ),
+          for (final c in subs)
+            _ToggleChip(
+              label: c.name,
+              selected: activeSub == c.id,
+              onTap: () => _edit(() => _categoryId = c.id),
+            ),
+        ],
+      ),
     );
   }
 

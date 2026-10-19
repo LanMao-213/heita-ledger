@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../design/tokens.dart';
+import 'category_seed.dart';
+
+/// 空白字符串一律落库为 NULL。
+///
+/// 不清成 NULL 的话，「填过又删掉」和「从来没过」在库里长成两种样子
+/// （空串 / NULL），后面按字段筛选「有对象的记录」就会漏掉一半。
+String? _nz(String? v) {
+  final t = (v ?? '').trim();
+  return t.isEmpty ? null : t;
+}
 
 /// 金额与日期的统一格式约定。
 ///
@@ -328,6 +338,10 @@ class Txn {
     this.accountId,
     this.toAccountId,
     this.note = '',
+    this.placeFrom,
+    this.placeTo,
+    this.person,
+    this.subject,
     this.templateId,
     this.recurringId,
     this.createdAt = '',
@@ -347,6 +361,23 @@ class Txn {
   final int? recurringId;
   final String createdAt;
 
+  // ---- 分类详情字段（v6）。四个都可空，只有分类声明了才在录入面板出现 ----
+  //
+  // 为什么做成四列而不是一个 JSON：这四类信息要能 `GROUP BY`（「给张三花了多少」
+  // 「这条线路每月花多少」）。JSON 只能全表解析、也没法建索引。
+
+  /// 出发地（出行类）
+  final String? placeFrom;
+
+  /// 目的地（出行类）
+  final String? placeTo;
+
+  /// 对象（人情类）
+  final String? person;
+
+  /// 名称（课程 / 书籍 / 订阅等）
+  final String? subject;
+
   /// 归属期（`YYYY-MM-DD`，该期第一天）。
   ///
   /// **只读派生字段**：由 `Repo` 在写入时按 `date + 账单日 + 抬期规则` 算出来落库，
@@ -356,6 +387,35 @@ class Txn {
 
   /// 支出记为负、收入记为正 —— 用于求和
   int get signedCents => type.isIncome ? amountCents : -amountCents;
+
+  /// 按字段取值，没有就返回空串。
+  /// 返回空串而不是 null：UI 里到处 `?? ''` 会把真正的「忘了填」和「不适用」混在一起。
+  String detail(TxnField f) => switch (f) {
+    TxnField.from => placeFrom ?? '',
+    TxnField.to => placeTo ?? '',
+    TxnField.person => person ?? '',
+    TxnField.subject => subject ?? '',
+  };
+
+  /// 有值的详情字段，按枚举声明顺序。明细行、Excel 导出共用一个口径。
+  List<(TxnField, String)> get filledDetails => [
+    for (final f in TxnField.values)
+      if (detail(f).isNotEmpty) (f, detail(f)),
+  ];
+
+  /// 一行摘要：地点两端合成 `家 → 公司`，其余原样拼在后面。
+  /// 空串表示这条记录没有任何详情 —— 调用方据此决定要不要多画一行。
+  String get detailSummary {
+    final from = detail(TxnField.from);
+    final to = detail(TxnField.to);
+    final parts = <String>[
+      if (from.isNotEmpty || to.isNotEmpty)
+        '${from.isEmpty ? '—' : from} → ${to.isEmpty ? '—' : to}',
+      if (person != null && person!.isNotEmpty) person!,
+      if (subject != null && subject!.isNotEmpty) subject!,
+    ];
+    return parts.join(' · ');
+  }
 
   factory Txn.fromMap(Map<String, Object?> m) => Txn(
     id: m['id'] as int,
@@ -367,6 +427,10 @@ class Txn {
     accountId: m['account_id'] as int?,
     toAccountId: m['to_account_id'] as int?,
     note: (m['note'] as String?) ?? '',
+    placeFrom: _nz(m['place_from'] as String?),
+    placeTo: _nz(m['place_to'] as String?),
+    person: _nz(m['person'] as String?),
+    subject: _nz(m['subject'] as String?),
     templateId: m['template_id'] as int?,
     recurringId: m['recurring_id'] as int?,
     createdAt: (m['created_at'] as String?) ?? '',
@@ -383,6 +447,10 @@ class Txn {
     'account_id': accountId,
     'to_account_id': toAccountId,
     'note': note,
+    'place_from': _nz(placeFrom),
+    'place_to': _nz(placeTo),
+    'person': _nz(person),
+    'subject': _nz(subject),
     'template_id': templateId,
     'recurring_id': recurringId,
     'created_at': createdAt.isEmpty
@@ -398,6 +466,10 @@ class Txn {
     int? accountId,
     int? toAccountId,
     String? note,
+    String? placeFrom,
+    String? placeTo,
+    String? person,
+    String? subject,
     bool clearCategory = false,
     bool clearAccount = false,
   }) => Txn(
@@ -410,6 +482,10 @@ class Txn {
     accountId: clearAccount ? null : (accountId ?? this.accountId),
     toAccountId: toAccountId ?? this.toAccountId,
     note: note ?? this.note,
+    placeFrom: placeFrom ?? this.placeFrom,
+    placeTo: placeTo ?? this.placeTo,
+    person: person ?? this.person,
+    subject: subject ?? this.subject,
     templateId: templateId,
     recurringId: recurringId,
     createdAt: createdAt,

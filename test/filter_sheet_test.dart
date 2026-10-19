@@ -133,7 +133,11 @@ void main() {
         Store.i.ledgerId,
         type: TxnType.expense,
       );
-      final other = cats.firstWhere((c) => c.id != foodId).id;
+      // 必须挑一个**一级**分类：两级之后 `category_id != foodId` 可能命中
+      // 「餐饮」自己的子分类，而按一级筛选本来就会带上整棵子树。
+      final other = cats
+          .firstWhere((c) => c.parentId == null && c.id != foodId)
+          .id;
       await Repo.insertTxn(
         Txn(
           id: 0,

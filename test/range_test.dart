@@ -42,7 +42,7 @@ void main() {
     final expenses = await Repo.listCategories(ledgerId, type: TxnType.expense);
     final incomes = await Repo.listCategories(ledgerId, type: TxnType.income);
     catFood = expenses.firstWhere((c) => c.name == '餐饮').id;
-    catTraffic = expenses.firstWhere((c) => c.name == '交通').id;
+    catTraffic = expenses.firstWhere((c) => c.name == '出行').id;
     catSalary = incomes.firstWhere((c) => c.name == '工资').id;
     catParttime = incomes.firstWhere((c) => c.name == '兼职').id;
   });

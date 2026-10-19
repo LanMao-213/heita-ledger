@@ -139,7 +139,17 @@ abstract final class BackupService {
         if (!_restoredSettingKeys.contains(e.key)) e.key: e.value,
     };
 
-    return Repo.replaceTables(tables, keepSettings: keep);
+    final counts = await Repo.replaceTables(tables, keepSettings: keep);
+
+    // 旧备份里的分类是扁平的一套（交通 / 通讯 / 医疗…）。灌进新库之后，
+    // 走一遍升级迁移把它们并进两级体系 —— 否则恢复出来的账本在分类管理页里
+    // 是「9 个一级、0 个子分类」，而且再也不会被自动修正。
+    final sv = payload['schemaVersion'];
+    if (sv is int && sv < Db.schemaVersion) {
+      await Db.upgradeRestoredData();
+    }
+
+    return counts;
   }
 
   /// 恢复前的摘要，给确认弹窗用。

@@ -44,7 +44,7 @@ class MinePage extends StatelessWidget {
                   icon: 'tag',
                   title: '分类管理',
                   subtitle:
-                      '支出 ${s.expenseCats.length} · 收入 ${s.incomeCats.length}',
+                      '支出 ${s.expenseCats.length} 类 · 收入 ${s.incomeCats.length} 类',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const CatsPage()),

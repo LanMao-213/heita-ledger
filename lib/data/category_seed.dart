@@ -31,6 +31,15 @@ enum TxnField {
     TxnField.person => 'person',
     TxnField.subject => 'subject',
   };
+
+  /// 输入框里的示例文字。空着的时候给一句「该填什么」，
+  /// 比只写「可不填」有用得多 —— 否则用户不知道「对象」是写人名还是写关系。
+  String get hint => switch (this) {
+    TxnField.from => '从哪出发',
+    TxnField.to => '到哪去',
+    TxnField.person => '给谁 / 谁给的',
+    TxnField.subject => '课程名 / 书名',
+  };
 }
 
 /// 一个子分类：名称 + 图标 + 需要额外记录的字段（可空）
@@ -46,14 +55,41 @@ class SeedSub {
 
 /// 一个一级分类
 class SeedCat {
-  const SeedCat(this.name, this.icon, this.subs);
+  const SeedCat(this.name, this.icon, this.subs, {this.legacyNames = const []});
 
   final String name;
   final String icon;
   final List<SeedSub> subs;
+
+  /// 历史名字。迁移时新名找不到、旧名找到了，就**原地改名**（不动交易的
+  /// `category_id`），这样老账目自动跟着新名字走。
+  /// 不写在这里的名字等于「没有历史包袱」。
+  final List<String> legacyNames;
 }
 
-/// 支出：9 个一级 / 48 个子分类
+/// 老的一级分类降级成子分类的映射。
+///
+/// 和改名不同，这类分类在旧库里是一级、在新表里是别人的子级 —— 必须原地
+/// 改 `parent_id`，否则历史交易会挂在一个「已经不该存在的层级」上。
+class DemotedCat {
+  const DemotedCat(this.type, this.oldName, this.parentName, this.newName);
+
+  final String type;
+  final String oldName;
+  final String parentName;
+  final String newName;
+}
+
+const kDemotedCats = <DemotedCat>[
+  // 话费宽带是每月固定支出，但用户定稿的「居家」里没有它的位置，
+  // 于是降级成居家的第 7 个子分类 —— 历史话费记录一条都不用改
+  DemotedCat('expense', '通讯', '居家', '话费网费'),
+  // 收入侧：v3 补进来的「提成」和「奖金」本质相同，收进奖金当子分类，
+  // 顺带解决两者图标撞车（都曾是 bonus）
+  DemotedCat('income', '提成', '奖金', '提成'),
+];
+
+/// 支出：9 个一级 / 49 个子分类
 ///
 /// 两条已经过用户确认的取舍：
 /// - 「借款」「代付」不在这里：借出去的钱不是消费，记成支出会让当月支出虚高、
@@ -61,30 +97,43 @@ class SeedCat {
 /// - 「通讯」不在这里：话费和宽带并进「居家 / 水电燃气」之外的日用语义，
 ///   由迁移脚本把老「通讯」分类降级为「居家」的子分类。
 const kExpenseSeed = <SeedCat>[
-  SeedCat('餐饮', 'food', [
-    SeedSub('正餐', 'food'),
+  SeedCat('餐饮', 'utensils', [
+    SeedSub('正餐', 'spoon'),
     SeedSub('食材', 'basket'),
     SeedSub('饮品', 'cup'),
     SeedSub('零食', 'snack'),
     SeedSub('烟酒', 'wine'),
     SeedSub('聚餐', 'group'),
   ]),
-  SeedCat('出行', 'transport', [
-    SeedSub('公共交通', 'transport', fields: [TxnField.from, TxnField.to]),
-    SeedSub('打车', 'taxi', fields: [TxnField.from, TxnField.to]),
-    SeedSub('加油充电', 'fuel'),
-    SeedSub('停车过路', 'parking'),
-    SeedSub('共享单车', 'bike'),
-    SeedSub('车辆养护', 'car'),
-  ]),
-  SeedCat('居家', 'home', [
-    SeedSub('房租房贷', 'key'),
-    SeedSub('水电燃气', 'drop'),
-    SeedSub('物业', 'building'),
-    SeedSub('日用百货', 'shopping'),
-    SeedSub('家居家电', 'sofa'),
-    SeedSub('维修保洁', 'wrench'),
-  ]),
+  SeedCat(
+    '出行',
+    'transport',
+    [
+      SeedSub('公共交通', 'transport', fields: [TxnField.from, TxnField.to]),
+      SeedSub('打车', 'taxi', fields: [TxnField.from, TxnField.to]),
+      SeedSub('加油充电', 'fuel'),
+      SeedSub('停车过路', 'parking'),
+      SeedSub('共享单车', 'bike'),
+      SeedSub('车辆养护', 'car'),
+    ],
+    legacyNames: ['交通'],
+  ),
+  SeedCat(
+    '居家',
+    'home',
+    [
+      SeedSub('房租房贷', 'key'),
+      SeedSub('水电燃气', 'drop'),
+      SeedSub('物业', 'building'),
+      SeedSub('日用百货', 'shopping'),
+      SeedSub('家居家电', 'sofa'),
+      SeedSub('维修保洁', 'wrench'),
+      // 第 7 项：老「通讯」分类的落脚点。用户定稿时只列了 6 个，但话费宽带
+      // 是每月固定支出，删掉会让历史记录无处可去（只能落到父级变成未细分）
+      SeedSub('话费网费', 'comm'),
+    ],
+    legacyNames: ['居住'],
+  ),
   SeedCat('购物', 'shopping', [
     SeedSub('服饰鞋包', 'shirt'),
     SeedSub('美妆个护', 'cosmetic'),
@@ -92,14 +141,19 @@ const kExpenseSeed = <SeedCat>[
     SeedSub('母婴用品', 'baby'),
     SeedSub('宠物用品', 'paw'),
   ]),
-  SeedCat('健康', 'medical', [
-    SeedSub('医疗挂号', 'medical'),
-    SeedSub('药品', 'pill'),
-    SeedSub('体检', 'pulse'),
-    SeedSub('口腔眼科', 'eye'),
-    SeedSub('健身运动', 'dumbbell'),
-    SeedSub('心理咨询', 'chat'),
-  ]),
+  SeedCat(
+    '健康',
+    'medical',
+    [
+      SeedSub('医疗挂号', 'medical'),
+      SeedSub('药品', 'pill'),
+      SeedSub('体检', 'pulse'),
+      SeedSub('口腔眼科', 'eye'),
+      SeedSub('健身运动', 'dumbbell'),
+      SeedSub('心理咨询', 'chat'),
+    ],
+    legacyNames: ['医疗'],
+  ),
   SeedCat('娱乐', 'fun', [
     SeedSub('电影演出', 'film'),
     SeedSub('旅行度假', 'plane'),
@@ -114,13 +168,18 @@ const kExpenseSeed = <SeedCat>[
     SeedSub('孝敬长辈', 'elder', fields: [TxnField.person]),
     SeedSub('公益捐赠', 'heart', fields: [TxnField.person]),
   ]),
-  SeedCat('成长', 'study', [
-    SeedSub('课程培训', 'certificate', fields: [TxnField.subject]),
-    SeedSub('书籍', 'book', fields: [TxnField.subject]),
-    SeedSub('考试报名', 'doc'),
-    SeedSub('知识付费', 'bulb'),
-    SeedSub('工具软件', 'gear'),
-  ]),
+  SeedCat(
+    '成长',
+    'study',
+    [
+      SeedSub('课程培训', 'certificate', fields: [TxnField.subject]),
+      SeedSub('书籍', 'book', fields: [TxnField.subject]),
+      SeedSub('考试报名', 'doc'),
+      SeedSub('知识付费', 'bulb'),
+      SeedSub('工具软件', 'gear'),
+    ],
+    legacyNames: ['学习'],
+  ),
   SeedCat('其他', 'more', [
     SeedSub('保险', 'shield'),
     SeedSub('手续费', 'percent'),
@@ -129,7 +188,7 @@ const kExpenseSeed = <SeedCat>[
   ]),
 ];
 
-/// 收入：6 个一级 / 23 个子分类
+/// 收入：6 个一级 / 24 个子分类
 const kIncomeSeed = <SeedCat>[
   SeedCat('工资', 'salary', [
     SeedSub('月薪', 'salary'),
@@ -168,3 +227,26 @@ const kIncomeSeed = <SeedCat>[
     SeedSub('中奖', 'star'),
   ]),
 ];
+
+/// 子分类名 → 需要额外记录的字段。
+///
+/// 键用**名字**而不是 id：种子每次建库都会重新分配 id，名字才是稳定标识，
+/// 也才能被「用户能自己改名」的分类管理页共用。代价是用户把「公共交通」
+/// 改成别的名字之后就不再有出发地/目的地 —— 他自己起的名字，我们猜不出
+/// 要填什么。用户新建的分类不在表里 = 不要详情字段，这是刻意的默认。
+final Map<String, List<TxnField>> kSubFieldSpecs = {
+  for (final c in [...kExpenseSeed, ...kIncomeSeed])
+    for (final s in c.subs)
+      if (s.hasFields) s.name: s.fields,
+};
+
+/// 某个分类名需要填哪些详情字段（自建 / 已改名的分类返回空）
+List<TxnField> fieldsOfSub(String? name) =>
+    (name == null ? null : kSubFieldSpecs[name]) ?? const [];
+
+/// 这些子分类的详情**默认折叠**在「＋ 详情」里。
+///
+/// 分界线是信息量：地点两端多数人懒得填，常驻两行只是白占屏幕高度；
+/// 而人情/成长的「对象、名称」正是这几类支出的核心信息 —— 记了红包份子
+/// 却不知道给谁，这条记录基本没有价值，所以必须平铺、一眼可见。
+const kFoldedSubs = {'公共交通', '打车'};

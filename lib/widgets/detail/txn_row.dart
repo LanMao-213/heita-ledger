@@ -19,11 +19,19 @@ class TxnRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Store.i;
     final cat = s.categoryOf(txn.categoryId);
+    // 子分类要带上一级，否则明细里只看到「正餐」，不知道它属于餐饮
+    final parent = s.parentOf(cat);
     final acc = s.accountOf(txn.accountId);
 
-    final title = txn.note.isNotEmpty ? txn.note : (cat?.name ?? '未分类');
+    // 标题**永远**是分类名：两级分类之后，分类才是结构信息，备注只是补充。
+    // 旧版本把备注当标题（因为名目就存在备注里），那笔账的「是什么」和
+    // 「补充说明」被混成了一栏，统计上也就查不到「午饭一共花了多少」。
+    final title = cat?.name ?? '未分类';
     final subParts = <String>[
-      if (cat != null && txn.note.isNotEmpty) cat.name,
+      if (parent != null) parent.name,
+      // 出发地/目的地、对象、名称 —— 记了就得看得见，否则录完就再也找不到
+      if (txn.detailSummary.isNotEmpty) txn.detailSummary,
+      if (txn.note.isNotEmpty) txn.note,
       if (showDate) Fmt.md(txn.date),
       if (acc != null) acc.name,
     ];

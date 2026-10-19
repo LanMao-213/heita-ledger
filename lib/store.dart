@@ -42,6 +42,12 @@ class Store extends ChangeNotifier {
   int netWorthCents = 0;
 
   // 分类
+  //
+  // 两级分类（v6 起）：[allExpenseCats] 含全部节点，用于按 id 反查；
+  // [expenseCats] 只留一级 —— 筛选面板、预算、分类管理、录入左轮要的都是
+  // 一级，混着子分类列出来会出现「餐饮」和「正餐」并排的怪状。
+  List<Category> allExpenseCats = [];
+  List<Category> allIncomeCats = [];
   List<Category> expenseCats = [];
   List<Category> incomeCats = [];
 
@@ -115,6 +121,11 @@ class Store extends ChangeNotifier {
   /// 启动时补记的周期账单条数（>0 时界面给一次提示）
   int recurringJustAdded = 0;
 
+  /// 是否要提示「分类升级成两级了」。只在真的从老库升上来、且没提示过时为真。
+  bool catsUpgradeJustDone = false;
+
+  static const _kCatsNotice = 'ui.cats_two_level_notice';
+
   Ledger? get currentLedger {
     for (final l in ledgers) {
       if (l.id == ledgerId) return l;
@@ -142,6 +153,15 @@ class Store extends ChangeNotifier {
     cycleStartDay = await Repo.cycleStartDay();
     resetCycleToToday();
     recurringJustAdded = await Repo.runDueRecurring(ledgerId);
+
+    // 分类从「一级 + 名目」改成「分类 + 子分类」之后，老用户打开会看到一堆
+    // 眼熟的分类换了名字（交通→出行、学习→成长），还多出一层子分类。
+    // 不说一句，他会以为数据被改乱了。提示只出一次，落一个 setting 作标记。
+    if (Db.upgradedToTwoLevel && await Repo.getSetting(_kCatsNotice) == null) {
+      catsUpgradeJustDone = true;
+      await Repo.setSetting(_kCatsNotice, '1');
+    }
+
     await loadAll();
     ready = true;
     notifyListeners();
@@ -158,8 +178,7 @@ class Store extends ChangeNotifier {
     ledgers = await Repo.listLedgers();
     accounts = await Repo.listAccounts();
     netWorthCents = await Repo.totalBalanceCents();
-    expenseCats = await Repo.listCategories(ledgerId, type: TxnType.expense);
-    incomeCats = await Repo.listCategories(ledgerId, type: TxnType.income);
+    await _loadCategories();
     goals = await Repo.listGoals();
     liftableCatIds = await Repo.liftableCategoryIds(ledgerId);
     await loadTemplates();
@@ -330,11 +349,25 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> afterCategoryChange() async {
-    expenseCats = await Repo.listCategories(ledgerId, type: TxnType.expense);
-    incomeCats = await Repo.listCategories(ledgerId, type: TxnType.income);
+    await _loadCategories();
     await loadCycle();
     await loadStats();
   }
+
+  /// 分类是两级结构，但只有一个数据源：一次查全，再切出一级。
+  /// 分开查两次（`WHERE parent_id IS NULL` + 全量）会让两个列表的
+  /// 加载时机不一致，改分类时界面会闪一下。
+  Future<void> _loadCategories() async {
+    allExpenseCats = await Repo.listCategories(ledgerId, type: TxnType.expense);
+    allIncomeCats = await Repo.listCategories(ledgerId, type: TxnType.income);
+    expenseCats = _topOnly(allExpenseCats);
+    incomeCats = _topOnly(allIncomeCats);
+  }
+
+  static List<Category> _topOnly(List<Category> all) => [
+    for (final c in all)
+      if (c.parentId == null) c,
+  ];
 
   Future<void> afterAccountChange() async {
     accounts = await Repo.listAccounts();
@@ -365,14 +398,30 @@ class Store extends ChangeNotifier {
 
   Category? categoryOf(int? id) {
     if (id == null) return null;
-    for (final c in expenseCats) {
+    for (final c in allExpenseCats) {
       if (c.id == id) return c;
     }
-    for (final c in incomeCats) {
+    for (final c in allIncomeCats) {
       if (c.id == id) return c;
     }
     return null;
   }
+
+  /// 某个一级分类的全部子分类，已按 `sort_order` 排好（查询时就是这个顺序）。
+  List<Category> childrenOf(int? parentId) {
+    if (parentId == null) return const [];
+    return [
+      for (final c in allExpenseCats)
+        if (c.parentId == parentId) c,
+      for (final c in allIncomeCats)
+        if (c.parentId == parentId) c,
+    ];
+  }
+
+  /// 子分类的父级；一级分类本身返回 null。
+  /// 明细行要显示「正餐 · 餐饮」这种层级说明时用得上。
+  Category? parentOf(Category? c) =>
+      c?.parentId == null ? null : categoryOf(c!.parentId);
 
   Account? accountOf(int? id) {
     if (id == null) return null;

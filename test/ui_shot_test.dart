@@ -7,6 +7,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +18,7 @@ import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/store.dart';
+import 'package:ledger/widgets/pickers.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -156,6 +158,23 @@ void main() {
     await _shot(tester, 'build/visual/shot_4_mine.png');
     expect(tester.takeException(), isNull, reason: '我的页有布局溢出');
 
+    // ---- 分类管理（一级列表）----
+    await tester.tap(find.text('分类管理'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_16_cats.png');
+    expect(tester.takeException(), isNull, reason: '分类管理页有布局溢出');
+
+    // ---- 子分类列表（以餐饮为例）----
+    await tester.tap(find.text('餐饮').first);
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_17_subcats.png');
+    expect(tester.takeException(), isNull, reason: '子分类页有布局溢出');
+    // 这两页用的是自绘返回按钮，tester.pageBack() 找不到系统返回键
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
+    await tester.pumpAndSettle();
+
     // ---- 模板管理 ----
     await tester.tap(find.text('记账模板'));
     await tester.pumpAndSettle();
@@ -189,12 +208,54 @@ void main() {
     await _shot(tester, 'build/visual/shot_15_record_filled.png');
     expect(tester.takeException(), isNull, reason: '记一笔（有金额）有布局溢出');
 
-    // ---- 分类 + 名目双轮盘 ----
-    await tester.tap(find.text('选名目，或自己写备注'));
+    // ---- 分类 + 子分类双轮盘 ----
+    await tester.tap(find.textContaining('未细分'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_11_note_wheel.png');
     expect(tester.takeException(), isNull, reason: '双轮盘有布局溢出');
-    await tester.tap(find.text('取消'));
+
+    // ---- 详情字段（出行）：默认折叠 ----
+    // 左轮滚一格（餐饮 → 出行），右轮滚一格（不细分 → 公共交通）后确定
+    await tester.drag(find.byType(CupertinoPicker).at(0), const Offset(0, -52));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CupertinoPicker).at(1), const Offset(0, -52));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_18_detail_folded.png');
+    expect(tester.takeException(), isNull, reason: '详情折叠态有布局溢出');
+
+    // ---- 详情字段（出行）：展开 ----
+    await tester.tap(find.text('＋ 添加详情'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_19_detail_open.png');
+    expect(tester.takeException(), isNull, reason: '详情展开态有布局溢出');
+
+    // ---- 详情字段（人情）：对象直接平铺 ----
+    await tester.tap(find.textContaining('出行').first);
+    await tester.pumpAndSettle();
+    // 左轮从出行滚到人情（出行 → 居家 → 购物 → 健康 → 娱乐 → 人情，共 5 格）
+    await tester.drag(
+      find.byType(CupertinoPicker).at(0),
+      const Offset(0, -52.0 * 5),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CupertinoPicker).at(1), const Offset(0, -52));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_20_detail_inline.png');
+    expect(tester.takeException(), isNull, reason: '人情对象平铺有布局溢出');
+
+    // 复位到「餐饮 / 不细分」：详情区会把面板撑高，后面的日期/账户截图要求它够短
+    await tester.tap(find.textContaining('人情').first);
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(CupertinoPicker).at(0),
+      const Offset(0, 52.0 * 5),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确定'));
     await tester.pumpAndSettle();
 
     // ---- 日期选择 ----
@@ -221,6 +282,18 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     await _shot(tester, 'build/visual/shot_8_filter_sheet.png');
     expect(tester.takeException(), isNull, reason: '筛选面板有布局溢出');
+
+    // ---- 筛选中二级分类：点「餐饮」后下面多出一排子分类 ----
+    await tester.tap(
+      find.descendant(of: find.byType(CategoryGrid), matching: find.text('餐饮')),
+    );
+    await tester.pump(const Duration(milliseconds: 300)); // 走完去抖
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 150)),
+    );
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_21_filter_subcats.png');
+    expect(tester.takeException(), isNull, reason: '子分类筛选排有布局溢出');
 
     // ---- 筛选生效后的明细页 ----
     // 面板里的实时计数会走真实数据库（假时钟里 await 不到），这里直接从
@@ -266,9 +339,9 @@ Future<void> _seedDemoData() async {
   }
 
   final food = await cat('餐饮', TxnType.expense);
-  final transport = await cat('交通', TxnType.expense);
+  final transport = await cat('出行', TxnType.expense);
   final shopping = await cat('购物', TxnType.expense);
-  final home = await cat('居住', TxnType.expense);
+  final home = await cat('居家', TxnType.expense);
   final fun = await cat('娱乐', TxnType.expense);
   final salary = await cat('工资', TxnType.income);
 

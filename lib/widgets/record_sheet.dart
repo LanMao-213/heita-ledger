@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/calc.dart';
+import '../data/category_seed.dart';
 import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
@@ -54,6 +55,20 @@ class _RecordSheetState extends State<RecordSheet> {
   /// 和面板收缩叠在一起，看起来就像「关掉一页又开了一页」。
   final _noteKey = GlobalKey();
 
+  /// 四个详情字段的输入控制器。**四个都建**，不管当前分类用不用得上：
+  /// 用户选错分类再选回来时，已经敲进去的内容不能因为重建而消失。
+  final _detailCtl = <TxnField, TextEditingController>{};
+  final _detailFocus = <TxnField, FocusNode>{};
+  final _detailKey = <TxnField, GlobalKey>{};
+
+  /// 折叠区的展开状态（只看出行类）。编辑一条已经填过地点的记录时默认展开，
+  /// 否则用户会以为数据丢了。
+  bool _detailsOpen = false;
+
+  /// 信息区下面还压着东西（详情区一展开，日期/备注就会被顶出可视区）。
+  /// 用来在底部画一条渐变，否则被裁掉的那一行看起来像「界面坏了」。
+  bool _moreBelow = false;
+
   /// 正在输入的金额，直接存字符串便于按键操作（避免浮点误差累积）
   String _amountInput = '';
   bool _saving = false;
@@ -80,7 +95,8 @@ class _RecordSheetState extends State<RecordSheet> {
   void initState() {
     super.initState();
     // 备注框拿到/失去焦点时要重画：焦点在备注里时数字键盘要让位给系统输入法
-    _noteFocus.addListener(_onNoteFocusChanged);
+    _noteFocus.addListener(_onTextFocusChanged);
+    _scroll.addListener(_syncScrollHint);
     final s = Store.i;
     final e = widget.editing;
     _type = e?.type ?? TxnType.expense;
@@ -94,6 +110,13 @@ class _RecordSheetState extends State<RecordSheet> {
     }
     // 编辑时若原记录没分类，落到该类型的第一个分类
     _categoryId ??= _firstCategoryId();
+
+    for (final f in TxnField.values) {
+      _detailCtl[f] = TextEditingController(text: e?.detail(f) ?? '');
+      _detailFocus[f] = FocusNode()..addListener(_onTextFocusChanged);
+      _detailKey[f] = GlobalKey();
+    }
+    _detailsOpen = e != null && e.filledDetails.isNotEmpty;
 
     // 反推「计入下期」开关：归属期跟真实日期所在期不一致，就是当时拨开了
     if (e != null && e.periodStart != null) {
@@ -125,47 +148,86 @@ class _RecordSheetState extends State<RecordSheet> {
 
   @override
   void dispose() {
-    _noteFocus.removeListener(_onNoteFocusChanged);
+    _noteFocus.removeListener(_onTextFocusChanged);
     _note.dispose();
     _noteFocus.dispose();
-    _scroll.dispose();
+    _scroll
+      ..removeListener(_syncScrollHint)
+      ..dispose();
+    for (final c in _detailCtl.values) {
+      c.dispose();
+    }
+    for (final f in _detailFocus.values) {
+      f
+        ..removeListener(_onTextFocusChanged)
+        ..dispose();
+    }
     super.dispose();
   }
 
-  void _onNoteFocusChanged() {
-    if (!mounted) return;
-    setState(() {});
-    // 输入法把信息区压扁之后，备注框可能落到可视区下面。只保证它可见，
-    // 不做整块滚动 —— 滚动幅度越小，越不会被看成「换了一个界面」。
-    if (_noteFocus.hasFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final ctx = _noteKey.currentContext;
-        if (!mounted || ctx == null) return;
-        Scrollable.ensureVisible(
-          ctx,
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-        );
-      });
-    }
+  /// 同步「下面还有内容」的状态。只在真的变化时 setState，
+  /// 否则会变成「重建 → 布局 → 又重建」的死循环。
+  void _syncScrollHint() {
+    if (!mounted || !_scroll.hasClients) return;
+    final p = _scroll.position;
+    final more = p.maxScrollExtent - p.pixels > 2;
+    if (more != _moreBelow) setState(() => _moreBelow = more);
   }
 
-  /// 双轮盘：左选分类、右选名目。选「自定义…」就把焦点交回备注框。
-  Future<void> _pickCategoryNote() async {
-    final pick = await showCategoryNoteWheel(
+  /// 当前分类要填哪些详情字段。空表示不需要（绝大多数分类）。
+  ///
+  /// 口径来自 [fieldsOfSub]：种子登记过的子分类才有，用户自建的分类不要 ——
+  /// 猜不出的字段宁可不显示，也别给每个分类都塞四个框。
+  List<TxnField> get _fields =>
+      fieldsOfSub(Store.i.categoryOf(_categoryId)?.name);
+
+  /// 这个分类的详情要不要默认折叠（只看出行：地点两端）
+  bool get _folded =>
+      kFoldedSubs.contains(Store.i.categoryOf(_categoryId)?.name);
+
+  /// 任意一个文本输入框有焦点。有焦点才让数字键盘让位 ——
+  /// 只判备注框的话，点「出发地」时数字键盘还赖在下面占掉半屏。
+  bool get _hasTextFocus =>
+      _noteFocus.hasFocus || _detailFocus.values.any((f) => f.hasFocus);
+
+  /// 当前有焦点的输入框位置，没焦点返回 null
+  GlobalKey? get _focusedKey {
+    if (_noteFocus.hasFocus) return _noteKey;
+    for (final e in _detailFocus.entries) {
+      if (e.value.hasFocus) return _detailKey[e.key];
+    }
+    return null;
+  }
+
+  void _onTextFocusChanged() {
+    if (!mounted) return;
+    setState(() {});
+    // 输入法把信息区压扁之后，正在输入的框可能落到可视区下面。只保证**它**
+    // 可见，不做整块滚动 —— 滚动幅度越小，越不会被看成「换了一个界面」。
+    final key = _focusedKey;
+    if (key == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = key.currentContext;
+      if (!mounted || ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    });
+  }
+
+  /// 双轮盘：左选一级、右选子分类。右轮首项「不细分」= 只记到一级。
+  Future<void> _pickCategory() async {
+    final pick = await showCategoryWheel(
       context,
       cats: _cats,
-      categoryId: _categoryId,
-      type: _type,
-      note: _note.text,
+      childrenOf: Store.i.childrenOf,
+      selectedCategoryId: _categoryId,
     );
     if (pick == null || !mounted) return;
-    setState(() {
-      _categoryId = pick.categoryId;
-      if (pick.note != null) _note.text = pick.note!;
-    });
-    if (pick.note == null) _noteFocus.requestFocus();
+    setState(() => _categoryId = pick.txnCategoryId);
   }
 
   /// 按键只是对表达式字符串做一次变换，规则都收在 Calc.press 里
@@ -272,6 +334,10 @@ class _RecordSheetState extends State<RecordSheet> {
     // 用了模板就记在账目上；没用但内容跟某个模板一模一样，也算它一次
     final tplId = _applied?.id ?? _matchingTemplate()?.id;
 
+    // 四个详情字段**全部带上**，哪怕当前分类用不上：用户在「公共交通」里
+    // 填了出发地又改成「打车」，两个分类都要这两个字段，中间不该丢一次。
+    String d(TxnField f) => _detailCtl[f]!.text.trim();
+
     try {
       if (_isEdit) {
         final old = widget.editing!;
@@ -284,6 +350,10 @@ class _RecordSheetState extends State<RecordSheet> {
           categoryId: _categoryId,
           accountId: _accountId,
           note: note,
+          placeFrom: d(TxnField.from),
+          placeTo: d(TxnField.to),
+          person: d(TxnField.person),
+          subject: d(TxnField.subject),
           templateId: old.templateId,
           recurringId: old.recurringId,
           createdAt: old.createdAt,
@@ -300,6 +370,10 @@ class _RecordSheetState extends State<RecordSheet> {
             categoryId: _categoryId,
             accountId: _accountId,
             note: note,
+            placeFrom: d(TxnField.from),
+            placeTo: d(TxnField.to),
+            person: d(TxnField.person),
+            subject: d(TxnField.subject),
             templateId: tplId,
           ),
           liftToNext: _liftOverride,
@@ -376,7 +450,7 @@ class _RecordSheetState extends State<RecordSheet> {
     // 焦点在备注里、且输入法真的弹出时，才把数字键盘收起来。
     // 只看焦点不看键盘高度的话，用户用输入法自带的「完成」收起键盘后，
     // 数字键盘不会回来，连确认键一起消失。
-    final typingNote = keyboard > 0 && _noteFocus.hasFocus;
+    final typingNote = keyboard > 0 && _hasTextFocus;
     // 0.90：顶部多了「最近模板」那排之后，0.88 会把备注框切掉一条。
     final maxH = (media.size.height - bottomInset) * 0.90;
 
@@ -385,7 +459,14 @@ class _RecordSheetState extends State<RecordSheet> {
         // 键高跟着可用高度走：先给头部 / 金额 / 信息区留 380，剩下 5 排均分。
         // 56 是设计值（46 → 52 → 56，键偏矮不好按），只有矮屏才往下收 ——
         // 宁可键矮一点，也不要裁掉「确认」。
-        final keyH = ((box.maxHeight - 380) / 5).clamp(38.0, 56.0);
+        //
+        // 有分类详情时上限压到 52：详情区要多吃 40~90 的高度，而信息区里
+        // 的「日期 / 账户」不能因为多填两个框就被挤出可视区。4dp 的键高差
+        // 手感上几乎看不出，信息被裁掉却一眼就能看出。
+        final keyH = ((box.maxHeight - 380) / 5).clamp(
+          38.0,
+          _fields.isEmpty ? 56.0 : 52.0,
+        );
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -427,47 +508,100 @@ class _RecordSheetState extends State<RecordSheet> {
             // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
             // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
             Flexible(
-              child: SingleChildScrollView(
-                controller: _scroll,
-                padding: const EdgeInsets.only(bottom: S.sm),
-                child: Column(
-                  children: [
-                    _CategoryNoteRow(
-                      category: Store.i.categoryOf(_categoryId),
-                      note: _note,
-                      onTap: _pickCategoryNote,
+              child: Stack(
+                children: [
+                  SingleChildScrollView(
+                    controller: _scroll,
+                    padding: const EdgeInsets.only(bottom: S.sm),
+                    child: Column(
+                      children: [
+                        _CategoryNoteRow(
+                          category: Store.i.categoryOf(_categoryId),
+                          parent: Store.i.parentOf(
+                            Store.i.categoryOf(_categoryId),
+                          ),
+                          note: _note,
+                          onTap: _pickCategory,
+                        ),
+                        const Divider(height: 1, color: C.line),
+                        // 有详情字段时，备注框**提到详情前面**。
+                        // 详情区一出现就把信息区撑高，备注留在最后会被整块顶出
+                        // 可视区 —— 它不是必填项，藏起来用户就当它不存在了。
+                        // 顺序仍是「先补充说明、再日期账户」：详情本来就是
+                        // 分类的延伸，和备注挨着比隔着日期更顺。
+                        if (_fields.isNotEmpty) ...[
+                          _NoteField(
+                            key: _noteKey,
+                            controller: _note,
+                            focusNode: _noteFocus,
+                            onSubmitted: (_) => _noteFocus.unfocus(),
+                          ),
+                          const Divider(height: 1, color: C.line),
+                          _DetailBlock(
+                            fields: _fields,
+                            folded: _folded,
+                            open: _detailsOpen,
+                            controllers: _detailCtl,
+                            focusNodes: _detailFocus,
+                            keys: _detailKey,
+                            onToggle: () =>
+                                setState(() => _detailsOpen = !_detailsOpen),
+                          ),
+                          const Divider(height: 1, color: C.line),
+                        ],
+                        _MetaRow(
+                          date: _date,
+                          onPickDate: _pickDate,
+                          accountName:
+                              Store.i.accountOf(_accountId)?.name ?? '未选账户',
+                          accountIcon:
+                              Store.i.accountOf(_accountId)?.icon ?? 'wallet',
+                          onPickAccount: _pickAccount,
+                        ),
+                        if (_showLift)
+                          _LiftRow(
+                            on: _liftOn,
+                            periodLabel: shortYmd(
+                              periodStartOf(
+                                _date,
+                                Store.i.cycleStartDay,
+                                liftToNext: _liftOn,
+                              ),
+                            ),
+                            onChanged: (v) => setState(() => _liftOverride = v),
+                          ),
+                        if (_fields.isEmpty)
+                          _NoteField(
+                            key: _noteKey,
+                            controller: _note,
+                            focusNode: _noteFocus,
+                            // 输入法的「完成」= 备注写完：收起键盘，数字键盘和确认键回来
+                            onSubmitted: (_) => _noteFocus.unfocus(),
+                          ),
+                      ],
                     ),
-                    const Divider(height: 1, color: C.line),
-                    _MetaRow(
-                      date: _date,
-                      onPickDate: _pickDate,
-                      accountName:
-                          Store.i.accountOf(_accountId)?.name ?? '未选账户',
-                      accountIcon:
-                          Store.i.accountOf(_accountId)?.icon ?? 'wallet',
-                      onPickAccount: _pickAccount,
-                    ),
-                    if (_showLift)
-                      _LiftRow(
-                        on: _liftOn,
-                        periodLabel: shortYmd(
-                          periodStartOf(
-                            _date,
-                            Store.i.cycleStartDay,
-                            liftToNext: _liftOn,
+                  ),
+                  // 还能往下滚时，底部压一层渐隐 —— 不铺这层的话，被裁掉的
+                  // 「日期 / 备注」看起来像界面画坏了一道横线。
+                  if (_moreBelow)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: IgnorePointer(
+                        child: Container(
+                          height: 22,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [C.bg.withValues(alpha: 0), C.bg],
+                            ),
                           ),
                         ),
-                        onChanged: (v) => setState(() => _liftOverride = v),
                       ),
-                    _NoteField(
-                      key: _noteKey,
-                      controller: _note,
-                      focusNode: _noteFocus,
-                      // 输入法的「完成」= 备注写完：收起键盘，数字键盘和确认键回来
-                      onSubmitted: (_) => _noteFocus.unfocus(),
                     ),
-                  ],
-                ),
+                ],
               ),
             ),
             // 写备注时数字键盘让位：它 270dp 高，和系统键盘叠在一起会把可滚动区
@@ -497,6 +631,10 @@ class _RecordSheetState extends State<RecordSheet> {
     // 直接跟随 viewInsets 反而最顺：键盘推多少，面板就让多少，两者同帧同步。
     // 代价是「切换收支导致模板条出现/消失」时高度是突变的，但那一下本来也
     // 不该有慢动作。
+    // 布局完成之后才知道有没有溢出，所以滚动提示只能在下一帧同步。
+    // [_syncScrollHint] 自带「值没变就不 setState」，不会打转。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollHint());
+
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: ConstrainedBox(
@@ -504,9 +642,7 @@ class _RecordSheetState extends State<RecordSheet> {
         child: ClipRRect(
           // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
           // 留白不会跟着变白
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(R.lg),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.lg)),
           child: Container(color: C.bg, child: body),
         ),
       ),
@@ -663,8 +799,8 @@ class _MetaRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      // 上面紧挨着分隔线，留 12 的呼吸位；下面接备注框，收 8 免得两处叠成一大块
-      padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
+      // 上面紧挨着分隔线，留 8 的呼吸位；下面接备注框，收 8 免得两处叠成一大块
+      padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.sm),
       child: Row(
         children: [
           Expanded(
@@ -739,11 +875,15 @@ class _Chip extends StatelessWidget {
 class _CategoryNoteRow extends StatelessWidget {
   const _CategoryNoteRow({
     required this.category,
+    required this.parent,
     required this.note,
     required this.onTap,
   });
 
   final Category? category;
+
+  /// 选中的是子分类时，这里是它的一级
+  final Category? parent;
   final TextEditingController note;
   final VoidCallback onTap;
 
@@ -757,6 +897,11 @@ class _CategoryNoteRow extends StatelessWidget {
         animation: note,
         builder: (context, _) {
           final text = note.text.trim();
+          // 副标题说清楚「这笔落在哪一层」：选了子分类就带上一级名，
+          // 只选到一级就明说未细分 —— 否则用户不知道自己记到了哪一层
+          final hint = parent != null
+              ? '${parent!.name} · 备注可不填'
+              : '未细分 · 备注可不填';
           return Padding(
             padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.md, S.md),
             child: Row(
@@ -787,7 +932,7 @@ class _CategoryNoteRow extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        text.isEmpty ? '选名目，或自己写备注' : text,
+                        text.isEmpty ? hint : text,
                         style: T.caption,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -810,6 +955,157 @@ class _CategoryNoteRow extends StatelessWidget {
   }
 }
 
+/// 分类详情区。
+///
+/// 两套呈现方式，分界线是「这条信息有多重要」：
+/// - **折叠**（出行）：多数人懒得填出发地/目的地，常驻两行是白占高度，
+///   收进「＋ 添加详情」，填过的会在标题后面显示 `家 → 公司` 摘要。
+/// - **平铺**（人情 / 成长）：记了红包份子却不知道给谁，这条记录就没有价值，
+///   所以对象和名称必须一眼可见、直接能填。
+class _DetailBlock extends StatelessWidget {
+  const _DetailBlock({
+    required this.fields,
+    required this.folded,
+    required this.open,
+    required this.controllers,
+    required this.focusNodes,
+    required this.keys,
+    required this.onToggle,
+  });
+
+  final List<TxnField> fields;
+  final bool folded;
+  final bool open;
+  final Map<TxnField, TextEditingController> controllers;
+  final Map<TxnField, FocusNode> focusNodes;
+  final Map<TxnField, GlobalKey> keys;
+  final VoidCallback onToggle;
+
+  /// 折叠时标题右边那串 `家 → 公司`，没填就空着
+  String get _summary {
+    final from = controllers[TxnField.from]!.text.trim();
+    final to = controllers[TxnField.to]!.text.trim();
+    if (from.isEmpty && to.isEmpty) return '';
+    return '${from.isEmpty ? '—' : from} → ${to.isEmpty ? '—' : to}';
+  }
+
+  List<Widget> get _rows => [
+    for (final f in fields)
+      Padding(
+        padding: const EdgeInsets.only(bottom: S.sm),
+        child: _DetailInput(
+          key: keys[f],
+          field: f,
+          controller: controllers[f]!,
+          focusNode: focusNodes[f]!,
+        ),
+      ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (!folded) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, 2),
+        child: Column(children: _rows),
+      );
+    }
+    return Column(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onToggle,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.sm),
+            child: Row(
+              children: [
+                Text(
+                  open ? '收起详情' : '＋ 添加详情',
+                  style: T.caption.copyWith(color: C.ink2),
+                ),
+                const SizedBox(width: S.sm),
+                Expanded(
+                  child: Text(
+                    open ? '' : _summary,
+                    style: T.caption.copyWith(color: C.ink3),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(
+                  open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  size: 18,
+                  color: C.ink4,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (open)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.xs),
+            child: Column(children: _rows),
+          ),
+      ],
+    );
+  }
+}
+
+/// 一行「标签 + 输入框」。标签宽度固定，几个框的输入起点才会对齐。
+class _DetailInput extends StatelessWidget {
+  const _DetailInput({
+    super.key,
+    required this.field,
+    required this.controller,
+    required this.focusNode,
+  });
+
+  final TxnField field;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 46,
+          child: Text(field.label, style: T.caption.copyWith(color: C.ink2)),
+        ),
+        const SizedBox(width: S.sm),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            focusNode: focusNode,
+            style: T.body2.copyWith(color: C.ink),
+            maxLength: 30,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => focusNode.unfocus(),
+            onTapOutside: (_) => focusNode.unfocus(),
+            inputFormatters: [LengthLimitingTextInputFormatter(30)],
+            decoration: InputDecoration(
+              counterText: '',
+              hintText: field.hint,
+              hintStyle: T.caption.copyWith(color: C.ink4),
+              filled: true,
+              fillColor: C.bg2,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: S.md,
+                vertical: 9,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(R.md),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _NoteField extends StatelessWidget {
   const _NoteField({
     super.key,
@@ -827,7 +1123,7 @@ class _NoteField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
+      padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.md),
       child: TextField(
         controller: controller,
         focusNode: focusNode,

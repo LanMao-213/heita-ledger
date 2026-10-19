@@ -1,6 +1,8 @@
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import 'category_seed.dart';
+
 /// 本地 SQLite 存储。
 ///
 /// ★ 单机应用的前提：**不发任何 HTTP 请求、不接任何统计/崩溃上报/广告 SDK**。
@@ -23,10 +25,19 @@ class Db {
   /// 3：收入分类补「提成」
   /// 4：`txn` 增加 `period_start`（归属期，F5 阶段 2 —— 加列但**不改查询**）
   /// 5：`budget` 由「自然月」改为「归属期」存储（D13 改口径，预算也按周期）
-  static const _version = 5;
+  /// 6：分类改两级（复用 `parent_id`）+ `txn` 加 4 个详情列。
+  ///    **不动任何一笔交易**：老分类靠改名/降级落位，没有对应子分类的记录
+  ///    留在父级，明细里显示为一级分类名。
+  static const _version = 6;
 
   /// 当前 schema 版本。备份文件里会记下来，恢复时用来判断兼容性。
   static int get schemaVersion => _version;
+
+  /// 这次启动是否真的把老库升成了两级分类（全新安装为 false）。
+  ///
+  /// 只用来决定「要不要给用户一句提示」：分类被改名、多出一层子分类之后，
+  /// 老用户打开会以为数据被改乱了。提示只出一次，见 [Store.boot]。
+  static bool upgradedToTwoLevel = false;
 
   static Future<Database> open() async {
     if (_db != null) return _db!;
@@ -61,6 +72,10 @@ class Db {
         if (oldVersion < 5) {
           await _moveBudgetToPeriod(db);
         }
+        if (oldVersion < 6) {
+          await _migrateTwoLevelCategories(db);
+          upgradedToTwoLevel = true;
+        }
       },
     );
     return _db!;
@@ -69,6 +84,19 @@ class Db {
   static Future<void> close() async {
     await _db?.close();
     _db = null;
+  }
+
+  /// 从**旧版本备份**恢复之后调用，把恢复回来的扁平分类升成两级。
+  ///
+  /// 为什么需要：`onUpgrade` 只在「手机上的老库被新版应用打开」时触发；
+  /// 备份恢复是直接往已经建好的新库表里灌行，那条路径根本不会走进 onUpgrade。
+  /// 少了这一步，从 v5 备份恢复的账本会一直是「交通 / 通讯」那套平铺分类，
+  /// 而界面上按两级渲染的分类管理页会显示成「一级分类 + 0 个子分类」。
+  ///
+  /// 迁移本身幂等（见 [_migrateTwoLevelCategories]），重复调用只会补缺。
+  static Future<void> upgradeRestoredData() async {
+    final db = await open();
+    await _migrateTwoLevelCategories(db);
   }
 
   /// 危险操作：清空全部业务数据（保留设置）
@@ -135,6 +163,11 @@ class Db {
         date          TEXT    NOT NULL,
         period_start  TEXT,
         note          TEXT    NOT NULL DEFAULT '',
+        -- 详情字段（v6）：挂到子分类上，全部可空，不填也能存
+        place_from    TEXT,
+        place_to      TEXT,
+        person        TEXT,
+        subject       TEXT,
         template_id   INTEGER,
         recurring_id  INTEGER,
         created_at    TEXT    NOT NULL DEFAULT '',
@@ -250,51 +283,45 @@ class Db {
     await db.insert('setting', {'k': 'schema_ready', 'v': '1'});
   }
 
-  /// 默认分类 —— 图标键与原型 `CATS` 一一对应
+  /// 默认分类 —— 全部来自 `category_seed.dart`，这里不写死任何一个分类名。
+  ///
+  /// 两级结构：先插一级（`parent_id` 为空），再挂子分类。
+  /// `sort_order` 在每一层内部各自从 0 开始 —— 查询时按父级分组取，
+  /// 一级与子级的编号互不干扰。
   static Future<void> _seedCategories(Database db, int ledgerId) async {
-    const expense = [
-      ('餐饮', 'food'),
-      ('交通', 'transport'),
-      ('购物', 'shopping'),
-      ('居住', 'home'),
-      ('娱乐', 'fun'),
-      ('医疗', 'medical'),
-      ('学习', 'study'),
-      ('通讯', 'comm'),
-      ('人情', 'gift'),
-      ('其他', 'more'),
-    ];
-    const income = [
-      ('工资', 'salary'),
-      ('奖金', 'bonus'),
-      ('提成', 'bonus'),
-      ('兼职', 'parttime'),
-      ('理财', 'invest'),
-      ('红包', 'redpacket'),
-      ('其他', 'more'),
-    ];
+    await _seedGroup(db, ledgerId, 'expense', kExpenseSeed);
+    await _seedGroup(db, ledgerId, 'income', kIncomeSeed);
+  }
 
-    var order = 0;
-    for (final (name, icon) in expense) {
-      await db.insert('category', {
+  static Future<void> _seedGroup(
+    Database db,
+    int ledgerId,
+    String type,
+    List<SeedCat> cats,
+  ) async {
+    for (var i = 0; i < cats.length; i++) {
+      final cat = cats[i];
+      final parentId = await db.insert('category', {
         'ledger_id': ledgerId,
-        'type': 'expense',
-        'name': name,
-        'icon': icon,
-        'sort_order': order++,
+        'type': type,
+        'name': cat.name,
+        'icon': cat.icon,
+        'parent_id': null,
+        'sort_order': i,
         'archived': 0,
       });
-    }
-    order = 0;
-    for (final (name, icon) in income) {
-      await db.insert('category', {
-        'ledger_id': ledgerId,
-        'type': 'income',
-        'name': name,
-        'icon': icon,
-        'sort_order': order++,
-        'archived': 0,
-      });
+      for (var j = 0; j < cat.subs.length; j++) {
+        final sub = cat.subs[j];
+        await db.insert('category', {
+          'ledger_id': ledgerId,
+          'type': type,
+          'name': sub.name,
+          'icon': sub.icon,
+          'parent_id': parentId,
+          'sort_order': j,
+          'archived': 0,
+        });
+      }
     }
   }
 
@@ -435,5 +462,236 @@ class Db {
     ''');
     await db.execute('DROP TABLE budget');
     await db.execute('ALTER TABLE budget_v5 RENAME TO budget');
+  }
+
+  // ------------------------------------------------------------ v5 → v6
+
+  /// 分类从「一层平铺」改为「一级 + 子分类」两级。
+  ///
+  /// 三条纪律：
+  /// 1. **不动 `txn` 任何一行**，只加 4 个空列。老交易靠 `category_id` 被动
+  ///    跟随分类改名；找不到对应子分类的记录留在父级，明细里显示为「未细分」。
+  /// 2. **不猜**。不根据备注推断子分类、不合并重名分类。猜错比不猜更难发现。
+  /// 3. **幂等**。全部按「账本 + 类型 + 父级 + 名字」查重，重复执行只会补充、
+  ///    不会生成第二套分类。
+  static Future<void> _migrateTwoLevelCategories(Database db) async {
+    final hasTxn = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'txn'",
+    );
+    if (hasTxn.isNotEmpty) {
+      final cols = await db.rawQuery('PRAGMA table_info(txn)');
+      for (final f in TxnField.values) {
+        if (cols.any((c) => c['name'] == f.column)) continue;
+        await db.execute('ALTER TABLE txn ADD COLUMN ${f.column} TEXT');
+      }
+    }
+
+    final hasCat = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'category'",
+    );
+    if (hasCat.isEmpty) return;
+
+    // 老库（v1 起）本来就有 parent_id；万一遇到被裁剪过的库，补上再继续
+    final catCols = await db.rawQuery('PRAGMA table_info(category)');
+    if (!catCols.any((c) => c['name'] == 'parent_id')) {
+      await db.execute('ALTER TABLE category ADD COLUMN parent_id INTEGER');
+    }
+
+    final ledgers = await db.query('ledger', columns: ['id']);
+    for (final row in ledgers) {
+      final ledgerId = row['id'] as int;
+
+      // 先降级再补齐。反过来的话，_syncGroup 会先建一个同名子分类，
+      // 老的那个一级分类就留在外面成了孤儿（同一件事两个分类）
+      for (final d in kDemotedCats) {
+        await _demoteCategory(db, ledgerId, d);
+      }
+      await _syncGroup(db, ledgerId, 'expense', kExpenseSeed);
+      await _syncGroup(db, ledgerId, 'income', kIncomeSeed);
+    }
+  }
+
+  /// 按「账本 + 类型 + 名字 + 父级」找一个分类，返回 id。
+  /// [topOnly] 为 true 时只在一级里找（`parent_id IS NULL`——
+  /// SQLite 里 `parent_id = NULL` 永远不成立，必须单独写）。
+  static Future<int?> _findCategory(
+    Database db,
+    int ledgerId,
+    String type,
+    String name, {
+    int? parentId,
+    bool topOnly = false,
+  }) async {
+    final rows = await db.query(
+      'category',
+      columns: ['id'],
+      where: topOnly
+          ? 'ledger_id = ? AND type = ? AND name = ? AND parent_id IS NULL'
+          : 'ledger_id = ? AND type = ? AND name = ? AND parent_id = ?',
+      whereArgs: topOnly
+          ? [ledgerId, type, name]
+          : [ledgerId, type, name, parentId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['id'] as int;
+  }
+
+  /// 保证一级分类存在并返回 id：新名优先 → 历史名原地改名 → 都没有才新建。
+  ///
+  /// 「原地改名」是这次迁移能做到「不动交易」的关键：改的是 `category.name`，
+  /// 交易的 `category_id` 指向没变，历史账目自动跟着新名字走。
+  static Future<int> _ensureTopCategory(
+    Database db,
+    int ledgerId,
+    String type,
+    SeedCat cat,
+  ) async {
+    final hit = await _findCategory(
+      db,
+      ledgerId,
+      type,
+      cat.name,
+      topOnly: true,
+    );
+    if (hit != null) {
+      await db.update(
+        'category',
+        {'icon': cat.icon},
+        where: 'id = ?',
+        whereArgs: [hit],
+      );
+      return hit;
+    }
+    for (final legacy in cat.legacyNames) {
+      final old = await _findCategory(
+        db,
+        ledgerId,
+        type,
+        legacy,
+        topOnly: true,
+      );
+      if (old == null) continue;
+      await db.update(
+        'category',
+        {'name': cat.name, 'icon': cat.icon},
+        where: 'id = ?',
+        whereArgs: [old],
+      );
+      return old;
+    }
+    return db.insert('category', {
+      'ledger_id': ledgerId,
+      'type': type,
+      'name': cat.name,
+      'icon': cat.icon,
+      'parent_id': null,
+      'sort_order': 0, // 稍后由 _normalizeTopOrder 统一重排
+      'archived': 0,
+    });
+  }
+
+  /// 老的一级分类原地降级成某个一级的子分类（改 `parent_id` + 改名）。
+  static Future<void> _demoteCategory(
+    Database db,
+    int ledgerId,
+    DemotedCat d,
+  ) async {
+    final seed = d.type == 'expense' ? kExpenseSeed : kIncomeSeed;
+    final parent = seed.where((c) => c.name == d.parentName).firstOrNull;
+    if (parent == null) return;
+
+    // 老名已经不在一级了 = 之前跑过（或用户本来就没有），直接跳过。
+    // 注意这里查的是**旧名**：幂等的关键，重跑时旧名已经变成子分类了。
+    final old = await _findCategory(
+      db,
+      ledgerId,
+      d.type,
+      d.oldName,
+      topOnly: true,
+    );
+    if (old == null) return;
+
+    final parentId = await _ensureTopCategory(db, ledgerId, d.type, parent);
+    await db.update(
+      'category',
+      {'name': d.newName, 'parent_id': parentId},
+      where: 'id = ?',
+      whereArgs: [old],
+    );
+  }
+
+  /// 把种子里的两级结构同步进某个账本：缺什么补什么，已有的只刷新图标。
+  static Future<void> _syncGroup(
+    Database db,
+    int ledgerId,
+    String type,
+    List<SeedCat> cats,
+  ) async {
+    for (final cat in cats) {
+      final parentId = await _ensureTopCategory(db, ledgerId, type, cat);
+      for (var i = 0; i < cat.subs.length; i++) {
+        final sub = cat.subs[i];
+        final hit = await _findCategory(
+          db,
+          ledgerId,
+          type,
+          sub.name,
+          parentId: parentId,
+        );
+        if (hit == null) {
+          await db.insert('category', {
+            'ledger_id': ledgerId,
+            'type': type,
+            'name': sub.name,
+            'icon': sub.icon,
+            'parent_id': parentId,
+            'sort_order': i,
+            'archived': 0,
+          });
+        } else {
+          // 已存在：只对齐图标和排序，**不碰 archived**
+          // （用户主动归档过的子分类，迁移不该给他恢复出来）
+          await db.update(
+            'category',
+            {'icon': sub.icon, 'sort_order': i},
+            where: 'id = ?',
+            whereArgs: [hit],
+          );
+        }
+      }
+    }
+    await _normalizeTopOrder(db, ledgerId, type, cats);
+  }
+
+  /// 按种子顺序给一级分类重排 `sort_order`，用户自建的一级排到最后
+  /// （彼此保持原来的相对顺序）。不这么做的话，改名保留下来的老分类
+  /// 会带着旧编号，跟新补的分类编号撞在一起，顺序随 id 漂移。
+  static Future<void> _normalizeTopOrder(
+    Database db,
+    int ledgerId,
+    String type,
+    List<SeedCat> cats,
+  ) async {
+    final rows = await db.query(
+      'category',
+      columns: ['id', 'name'],
+      where: 'ledger_id = ? AND type = ? AND parent_id IS NULL',
+      whereArgs: [ledgerId, type],
+      orderBy: 'sort_order, id',
+    );
+    final index = <String, int>{
+      for (var i = 0; i < cats.length; i++) cats[i].name: i,
+    };
+    var next = cats.length;
+    for (final r in rows) {
+      final name = r['name'] as String;
+      final order = index[name] ?? next++;
+      await db.update(
+        'category',
+        {'sort_order': order},
+        where: 'id = ?',
+        whereArgs: [r['id'] as int],
+      );
+    }
   }
 }

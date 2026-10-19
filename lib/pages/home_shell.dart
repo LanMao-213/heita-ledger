@@ -23,7 +23,8 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  bool _recurringNotified = false;
+  /// 启动提示只出一次（页面重建、热重载都不该再弹）
+  bool _startupNotified = false;
 
   /// 页码的唯一真源是 `store.tabIndex`，这个 controller 只是它的投影：
   /// 点 tab、手指横滑、以及统计页的「看明细」调 `switchTab`，都从 [_syncPage] 汇进来
@@ -42,7 +43,7 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     Store.i.addListener(_syncPage);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _notifyRecurring());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _notifyStartup());
   }
 
   @override
@@ -80,13 +81,20 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   /// 周期账单补记只提示一次，不打扰
-  void _notifyRecurring() {
-    if (_recurringNotified) return;
-    final n = Store.i.recurringJustAdded;
-    if (n > 0 && mounted) {
-      _recurringNotified = true;
-      showToast(context, '已补记 $n 笔周期账单');
-    }
+  /// 启动后的一次性提示：分类升级 / 补记的周期账单。
+  ///
+  /// 两条合并成一句：`showToast` 会先清掉上一条，连弹两次等于只有后一条
+  /// 被看见 —— 而「分类改名了」恰恰是最不能说丢的那一条。
+  void _notifyStartup() {
+    if (_startupNotified) return;
+    _startupNotified = true;
+    final parts = <String>[
+      if (Store.i.catsUpgradeJustDone) '分类已升级为「分类 + 子分类」两级，可在「我的 → 分类管理」里调整',
+      if (Store.i.recurringJustAdded > 0)
+        '已补记 ${Store.i.recurringJustAdded} 笔周期账单',
+    ];
+    if (parts.isEmpty || !mounted) return;
+    showToast(context, parts.join('；'));
   }
 
   Future<void> _openRecord() async {

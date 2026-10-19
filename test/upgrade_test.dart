@@ -1,9 +1,11 @@
 // 分类种子与升级迁移的自检。
 //
-// 这里钉的是两件「装到老手机上才会出事、本机怎么点都正常」的事：
-// 1) 老库升级要能补上后加的「提成」分类，否则老用户永远没有这一类；
-// 2) 补的时候不能重复插 —— 用户可能早就自建过一个叫「提成」的分类，
-//    插重了会在筛选和统计里各算一半，而且界面上两个同名项很难看出问题。
+// 这里钉的是「装到老手机上才会出事、本机怎么点都正常」的事：
+// 1) v3 补进来的「提成」在 v6 要降级成「奖金」的子分类 —— 老用户的一级
+//    列表里不该再多出一个和奖金同质的位置；
+// 2) 降级不能重复：用户可能早就自建过一个叫「提成」的分类，
+//    重复会在筛选和统计里各算一半，界面上两个同名项很难看出问题；
+// 3) 老账本原本没有支出分类时，升级要能补齐整套支出两级结构。
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -79,13 +81,27 @@ Future<void> _makeV2Db({List<(String, String, int)> extra = const []}) async {
   await db.close();
 }
 
-Future<List<String>> _incomeNames() async {
+/// 一级收入分类名（不含子分类）
+Future<List<String>> _topIncomeNames() async {
   final db = await Db.open();
   final rows = await db.query(
     'category',
     columns: ['name'],
-    where: "type = 'income'",
+    where: "type = 'income' AND parent_id IS NULL",
     orderBy: 'sort_order, id',
+  );
+  return rows.map((r) => r['name'] as String).toList();
+}
+
+/// 某个一级分类下的子分类名
+Future<List<String>> _subNames(String parent, {String type = 'income'}) async {
+  final db = await Db.open();
+  final rows = await db.rawQuery(
+    'SELECT c.name AS name FROM category c '
+    'JOIN category p ON p.id = c.parent_id '
+    'WHERE c.type = ? AND p.name = ? AND p.parent_id IS NULL '
+    'ORDER BY c.sort_order, c.id',
+    [type, parent],
   );
   return rows.map((r) => r['name'] as String).toList();
 }
@@ -110,31 +126,55 @@ void main() {
     if (file.existsSync()) file.deleteSync();
   });
 
-  test('全新安装：收入 7 类，提成紧跟在奖金后面', () async {
-    final names = await _incomeNames();
-    expect(names, ['工资', '奖金', '提成', '兼职', '理财', '红包', '其他']);
+  test('全新安装：收入 6 个一级，提成收进奖金', () async {
+    final tops = await _topIncomeNames();
+    expect(tops, ['工资', '奖金', '兼职', '理财', '红包', '其他']);
+    expect(await _subNames('奖金'), contains('提成'));
+    expect(tops, isNot(contains('提成')), reason: '提成不该再占一个一级位置');
   });
 
-  test('老库升级：补上提成，且「其他」仍在最后', () async {
+  test('老库升级：老的一级「提成」降级成奖金子分类', () async {
     await _makeV2Db();
-    final names = await _incomeNames();
-    expect(names, ['工资', '奖金', '提成', '兼职', '理财', '红包', '其他']);
+    final tops = await _topIncomeNames();
+    expect(tops, ['工资', '奖金', '兼职', '理财', '红包', '其他']);
+    expect(await _subNames('奖金'), contains('提成'));
   });
 
-  test('老库已有自建的「提成」：不重复插入', () async {
+  test('老库已有自建的「提成」：降级后只有一个', () async {
     // 用户早就在最后自己加过一个「提成」
     await _makeV2Db(extra: [('提成', 'bonus', 6)]);
-    final names = await _incomeNames();
+    final tops = await _topIncomeNames();
+    final bonusSubs = await _subNames('奖金');
 
-    expect(names.where((n) => n == '提成').length, 1, reason: '出现了两个「提成」');
-    expect(names, [
-      '工资',
-      '奖金',
-      '兼职',
-      '理财',
-      '红包',
-      '其他',
-      '提成',
-    ], reason: '用户自建的那条应保持原位，不能被新种子顶掉');
+    expect(bonusSubs.where((n) => n == '提成').length, 1, reason: '出现了两个「提成」');
+    expect(tops, isNot(contains('提成')));
+  });
+
+  test('老账本没有支出分类：升级后补齐 9 个一级与子分类', () async {
+    await _makeV2Db();
+    final db = await Db.open();
+    final rows = await db.query(
+      'category',
+      columns: ['name'],
+      where: "type = 'expense' AND parent_id IS NULL",
+      orderBy: 'sort_order, id',
+    );
+    final tops = rows.map((r) => r['name'] as String).toList();
+    expect(tops, ['餐饮', '出行', '居家', '购物', '健康', '娱乐', '人情', '成长', '其他']);
+    expect(await _subNames('居家', type: 'expense'), contains('话费网费'));
+  });
+
+  test('从老库升上来会置位「该提示一次」，全新安装不会', () async {
+    // 全新库：onCreate 不走迁移分支
+    Db.upgradedToTwoLevel = false;
+    await Db.open();
+    expect(Db.upgradedToTwoLevel, isFalse);
+
+    // 老库：onUpgrade 里 oldVersion < 6 才会置位
+    await Db.close();
+    await _makeV2Db();
+    Db.upgradedToTwoLevel = false;
+    await Db.open();
+    expect(Db.upgradedToTwoLevel, isTrue);
   });
 }
