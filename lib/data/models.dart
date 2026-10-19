@@ -514,6 +514,9 @@ int sumBySide(Iterable<Txn> txns, TxnType side) {
   var sum = 0;
   for (final t in txns) {
     if (t.type == TxnType.transfer) continue;
+    // 借贷流水不是收支：借出去的钱不是消费，收回来的也不是收入。
+    // 放在这里而不是各页面自己过滤 —— 漏一处就有一个「今日支出」是错的。
+    if (t.debtId != null) continue;
     final sameSide = t.type == side;
     if (sameSide ? t.amountCents >= 0 : t.amountCents < 0) {
       sum += t.amountCents.abs();

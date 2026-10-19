@@ -701,13 +701,19 @@ class Repo {
   ///
   /// 负数按交叉口径：支出里的负数算进收入，收入里的负数算进支出。
   /// [monthTotals] 与 [sumFiltered] 共用这两段，避免两处口径漂移。
+  ///
+  /// **借贷流水一律算 0**：借出去的钱不是消费，收回来的也不是收入。
+  /// 排除条件写在这两个表达式里而不是各查询的 WHERE —— 只写 WHERE 的话，
+  /// 哪天有人新加一个只用表达式、不复用 WHERE 的查询，就会漏掉。
   static const _expSumSql =
       'COALESCE(SUM(CASE '
+      '  WHEN debt_id IS NOT NULL THEN 0 '
       "  WHEN type = 'expense' AND amount_cents >= 0 THEN amount_cents "
       "  WHEN type = 'income'  AND amount_cents <  0 THEN -amount_cents "
       '  ELSE 0 END), 0)';
   static const _incSumSql =
       'COALESCE(SUM(CASE '
+      '  WHEN debt_id IS NOT NULL THEN 0 '
       "  WHEN type = 'income'  AND amount_cents >= 0 THEN amount_cents "
       "  WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
       '  ELSE 0 END), 0)';
@@ -1072,6 +1078,7 @@ class Repo {
       '  LEFT JOIN category c ON c.id = t.category_id '
       '  LEFT JOIN category p ON p.id = c.parent_id '
       'WHERE t.ledger_id = ? AND t.${_col(basis)} BETWEEN ? AND ? '
+      '  AND t.debt_id IS NULL '
       '  AND ((t.type = ? AND t.amount_cents >= 0)'
       '    OR (t.type = ? AND t.amount_cents < 0)) '
       'GROUP BY COALESCE(p.id, c.id) '
@@ -1120,6 +1127,7 @@ class Repo {
       "    WHEN type = 'expense' AND amount_cents <  0 THEN -amount_cents "
       '    ELSE 0 END), 0) AS inc '
       'FROM txn WHERE ledger_id = ? AND ${_col(basis)} BETWEEN ? AND ? '
+      '  AND debt_id IS NULL '
       'GROUP BY date ORDER BY date',
       [ledgerId, from, to],
     );
@@ -1260,6 +1268,7 @@ class Repo {
       '  COALESCE((SELECT SUM(t.amount_cents) FROM txn t '
       '     JOIN category tc ON tc.id = t.category_id '
       "     WHERE COALESCE(tc.parent_id, tc.id) = c.id AND t.type = 'expense' "
+      '       AND t.debt_id IS NULL '
       '       AND t.period_start BETWEEN ? AND ?), 0) AS spent '
       'FROM category c '
       'LEFT JOIN budget b ON b.category_id = c.id '

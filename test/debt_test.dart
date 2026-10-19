@@ -114,10 +114,10 @@ void main() {
     );
     expect(after.balanceCents, before - 500000);
 
-    final txns = (await Repo.listTxns(
+    final txns = await Repo.listTxns(
       ledgerId: c.ledgerId,
       month: Fmt.month(DateTime.now()),
-    ))!;
+    );
     final principal = txns.firstWhere((t) => t.debtId == debtId);
     expect(principal.type, TxnType.expense, reason: '借出必须是钱出去');
     expect(principal.amountCents, 500000);
@@ -154,10 +154,10 @@ void main() {
     );
     expect(after.balanceCents, before + 300000);
 
-    final txns = (await Repo.listTxns(
+    final txns = await Repo.listTxns(
       ledgerId: c.ledgerId,
       month: Fmt.month(DateTime.now()),
-    ))!;
+    );
     expect(txns.firstWhere((t) => t.debtId == debtId).type, TxnType.income);
   });
 
@@ -287,10 +287,58 @@ void main() {
       (a) => a.id == c.account.id,
     );
     expect(after.balanceCents, before);
-    final txns = (await Repo.listTxns(
+    final txns = await Repo.listTxns(
       ledgerId: c.ledgerId,
       month: Fmt.month(DateTime.now()),
-    ))!;
+    );
     expect(txns.where((t) => t.debtId == debtId), isEmpty);
+  });
+
+  test('借出不算支出：月度合计与分类统计都不变', () async {
+    await _freshDb();
+    final c = await _ctx();
+    final month = Fmt.month(DateTime.now());
+    final before = await Repo.monthTotals(c.ledgerId, month);
+
+    await Repo.createDebt(
+      _debt(ledgerId: c.ledgerId, accountId: c.account.id),
+      _principal(ledgerId: c.ledgerId, accountId: c.account.id),
+    );
+
+    final after = await Repo.monthTotals(c.ledgerId, month);
+    expect(after.$1, before.$1, reason: '借出不是消费，支出合计不该变');
+    expect(after.$2, before.$2, reason: '借出更不是收入');
+
+    final cats = await Repo.categoryStats(
+      ledgerId: c.ledgerId,
+      month: month,
+      type: TxnType.expense,
+    );
+    expect(cats, isEmpty, reason: '借贷流水不该出现在分类饼图里');
+  });
+
+  test('回收借款不算收入', () async {
+    await _freshDb();
+    final c = await _ctx();
+    final month = Fmt.month(DateTime.now());
+    final debtId = await Repo.createDebt(
+      _debt(ledgerId: c.ledgerId, accountId: c.account.id),
+      _principal(ledgerId: c.ledgerId, accountId: c.account.id),
+    );
+    final before = await Repo.monthTotals(c.ledgerId, month);
+    final d = (await Repo.listDebts(
+      ledgerId: c.ledgerId,
+    )).firstWhere((e) => e.id == debtId);
+
+    await Repo.repayDebt(
+      debt: d,
+      amountCents: 200000,
+      accountId: c.account.id,
+      date: Fmt.today(),
+    );
+
+    final after = await Repo.monthTotals(c.ledgerId, month);
+    expect(after.$1, before.$1);
+    expect(after.$2, before.$2, reason: '收回来的钱不是这个月的收入');
   });
 }
