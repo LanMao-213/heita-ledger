@@ -733,7 +733,19 @@ class _NetWorthCard extends StatelessWidget {
         children: [
           Text('净资产', style: T.caption),
           const SizedBox(height: 4),
-          Text(Fmt.yuan(s.netWorthCents), style: T.hero.copyWith(fontSize: 32)),
+          Text(
+            Fmt.yuan(s.netWorthWithDebtCents),
+            style: T.hero.copyWith(fontSize: 32),
+          ),
+          // 借出/借入：账户余额只反映现金，这里把应收应付补上，
+          // 否则借出 5000 会看起来像「钱少了 5000」
+          if (s.receivableCents > 0 || s.payableCents > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              '含应收 ${Fmt.yuan(s.receivableCents)} · 应付 ${Fmt.yuan(s.payableCents)}',
+              style: T.caption.copyWith(color: C.ink3),
+            ),
+          ],
           if (s.accounts.isNotEmpty) ...[
             const SizedBox(height: S.md),
             const Divider(height: 1, color: C.line),

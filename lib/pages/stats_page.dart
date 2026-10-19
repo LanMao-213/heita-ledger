@@ -423,9 +423,20 @@ class _AccountsCard extends StatelessWidget {
               children: [
                 Text('合计', style: T.caption),
                 const Spacer(),
-                Text(
-                  Fmt.money(s.netWorthCents),
-                  style: T.amountSm.copyWith(fontSize: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      Fmt.money(s.netWorthWithDebtCents),
+                      style: T.amountSm.copyWith(fontSize: 14),
+                    ),
+                    // 与「我的」页同一口径：账户余额 + 应收 − 应付
+                    if (s.receivableCents > 0 || s.payableCents > 0)
+                      Text(
+                        '含应收 ${Fmt.money(s.receivableCents)} · 应付 ${Fmt.money(s.payableCents)}',
+                        style: T.caption.copyWith(color: C.ink4),
+                      ),
+                  ],
                 ),
               ],
             ),

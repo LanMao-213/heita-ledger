@@ -90,6 +90,23 @@ class Store extends ChangeNotifier {
   /// 按 id 取往来；普通流水返回 null（明细行据此决定用哪种渲染）
   Debt? debtOf(int? id) => id == null ? null : _debtById[id];
 
+  /// 未结清的应收合计（别人欠我）
+  int get receivableCents => debts
+      .where((d) => !d.isClosed && d.direction.isReceivable)
+      .fold(0, (a, d) => a + d.remainingCents);
+
+  /// 未结清的应付合计（我欠别人）
+  int get payableCents => debts
+      .where((d) => !d.isClosed && !d.direction.isReceivable)
+      .fold(0, (a, d) => a + d.remainingCents);
+
+  /// 含往来的净资产：账户余额 + 应收 − 应付。
+  ///
+  /// 借出会让账户余额变少，但不该让「我有多少钱」跟着变少 —— 钱只是从
+  /// 现金换成了「别人欠我」。只减余额不加应收，用户会以为钱丢了。
+  int get netWorthWithDebtCents =>
+      netWorthCents + receivableCents - payableCents;
+
   /// 抬期池分类 id（工资/奖金/提成）：记一笔面板用它给开关一个默认值
   Set<int> liftableCatIds = {};
 

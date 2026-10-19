@@ -14,13 +14,14 @@ import 'repo.dart';
 /// Excel 账单导入 / 导出。
 ///
 /// 列顺序（也用于导入识别，第一行是表头）：
-///   日期 | 类型 | 分类 | 子分类 | 金额 | 账户 | 备注 | 出发地 | 目的地 | 对象 | 名称
+///   日期 | 类型 | 分类 | 子分类 | 金额 | 账户 | 备注 | 出发地 | 目的地 | 对象 | 名称 | 往来
 ///
 /// ★ 金额在表里用**元**（人类读写友好），进出数据库时立刻转成**分**。
 /// ★ 日期用 `YYYY-MM-DD` 文本，避免 Excel 按地区改成斜杠格式后解析失败。
 /// ★ 导入按**表头名**定位，不按列号：老版本导出的 6 列文件、用户自己加过列的
-///   文件、以及本版本 11 列的文件都能读。按列号读的话，多一列就整体错位，
+///   文件、以及带「往来」列的新文件都能读。按列号读的话，多一列就整体错位，
 ///   而且错得很安静 —— 金额被读成账户名这种事查起来非常费劲。
+/// ★ 「往来」列是只读的：导出时写「借出 · 张三」，导入时忽略（不建债务记录）。
 abstract final class ExcelService {
   static const headers = [
     '日期',
@@ -34,6 +35,7 @@ abstract final class ExcelService {
     '目的地',
     '对象',
     '名称',
+    '往来',
   ];
 
   /// 旧版（≤ v5）导出的表头，表头认不出来时按列号兜底用
@@ -67,6 +69,13 @@ abstract final class ExcelService {
       accs[a.id] = a.name;
     }
 
+    // 借贷往来：只标一列「借出 · 张三」，不单独出表 —— 完整台账在 App 里看，
+    // 导出的用途是「看得出这几笔不是消费」
+    final debts = <int, String>{};
+    for (final d in await Repo.listDebts(ledgerId: ledgerId)) {
+      debts[d.id] = '${d.direction.label} · ${d.counterparty}';
+    }
+
     final db = await Db.open();
     final rows = await db.query(
       'txn',
@@ -78,7 +87,7 @@ abstract final class ExcelService {
     var r = 1;
     for (final row in rows) {
       final t = Txn.fromMap(row);
-      final values = exportRow(t, byId, accs);
+      final values = exportRow(t, byId, accs, debtLabels: debts);
       for (var c = 0; c < values.length; c++) {
         final cell = sheet.cell(
           CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r),
@@ -111,8 +120,10 @@ abstract final class ExcelService {
   static List<String> exportRow(
     Txn t,
     Map<int, Category> byId,
-    Map<int, String> accountNames,
-  ) {
+    Map<int, String> accountNames, {
+    /// 借贷 id → 「借出 · 张三」。不传就留空（普通流水本来也没有）
+    Map<int, String> debtLabels = const {},
+  }) {
     // 一级 / 子分类拆成两列：拼成「餐饮 / 正餐」一列虽然好看，但导入时
     // 要按分隔符拆，而分类名本身就可能带斜杠。
     final cat = byId[t.categoryId];
@@ -131,6 +142,7 @@ abstract final class ExcelService {
       t.detail(TxnField.to),
       t.detail(TxnField.person),
       t.detail(TxnField.subject),
+      t.debtId == null ? '' : (debtLabels[t.debtId] ?? ''),
     ];
   }
 

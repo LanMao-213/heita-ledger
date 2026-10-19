@@ -348,6 +348,56 @@ void main() {
     expect(after.$2, before.$2, reason: '收回来的钱不是这个月的收入');
   });
 
+  test('净资产把应收算进去：借出前后总额不变', () async {
+    await _freshDb();
+    await Store.i.boot();
+    final c = await _ctx();
+    final before = Store.i.netWorthWithDebtCents;
+
+    await Repo.createDebt(
+      _debt(ledgerId: c.ledgerId, accountId: c.account.id),
+      _principal(ledgerId: c.ledgerId, accountId: c.account.id),
+    );
+    await Store.i.afterTxnChange();
+
+    expect(Store.i.netWorthCents, before - 500000, reason: '现金账户确实少了');
+    expect(Store.i.receivableCents, 500000);
+    expect(
+      Store.i.netWorthWithDebtCents,
+      before,
+      reason: '借出只是把钱换成别人欠我，总资产不该变',
+    );
+  });
+
+  test('备份包含 debt：导出一圈再恢复，往来与流水都还在', () async {
+    await _freshDb();
+    final c = await _ctx();
+    final debtId = await Repo.createDebt(
+      _debt(ledgerId: c.ledgerId, accountId: c.account.id),
+      _principal(ledgerId: c.ledgerId, accountId: c.account.id),
+    );
+
+    final dump = await Repo.dumpTables();
+    expect(dump['debt'], isNotNull, reason: '备份必须带上往来表');
+    expect(dump['debt']!.length, 1);
+    expect(dump['txn']!.length, 1);
+
+    // 覆盖式恢复：整库清掉再灌回去
+    await Repo.replaceTables(dump);
+
+    final debts = await Repo.listDebts(ledgerId: c.ledgerId);
+    expect(debts.length, 1);
+    expect(debts.first.id, debtId);
+    expect(debts.first.counterparty, '张三');
+    expect(debts.first.remainingCents, 500000);
+
+    final txns = await Repo.listTxns(
+      ledgerId: c.ledgerId,
+      month: Fmt.month(DateTime.now()),
+    );
+    expect(txns.where((t) => t.debtId == debtId).length, 1, reason: '流水上的 debt_id 要保住');
+  });
+
   testWidgets('记一笔：切到借出，填对方与金额后落成一条往来', (tester) async {
     tester.view.physicalSize = const Size(390 * 2, 844 * 2);
     tester.view.devicePixelRatio = 2.0;

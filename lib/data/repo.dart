@@ -914,6 +914,8 @@ class Repo {
     'ledger',
     'account',
     'category',
+    // debt 必须在 txn 之前：txn.debt_id 指向它。删除时反向遍历，txn 先走。
+    'debt',
     'txn',
     'budget',
     'saving_goal',
@@ -922,7 +924,10 @@ class Repo {
     'setting',
   ];
 
-  /// 把 9 张表整个读出来（备份用）。行是原始 map，交给上层序列化。
+  /// 把 10 张表整个读出来（备份用）。行是原始 map，交给上层序列化。
+  ///
+  /// 老备份（v6 及以前）里没有 `debt` 这一项，恢复时按空表处理 ——
+  /// 借贷是 v7 才有的，旧账本本来就没有往来。
   static Future<Map<String, List<Map<String, Object?>>>> dumpTables() async {
     final db = await Db.open();
     final out = <String, List<Map<String, Object?>>>{};
