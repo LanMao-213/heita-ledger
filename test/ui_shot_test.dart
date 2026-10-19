@@ -152,6 +152,39 @@ void main() {
     await _shot(tester, 'build/visual/shot_3_plan.png');
     expect(tester.takeException(), isNull, reason: '计划页有布局溢出');
 
+    // ---- 往来页（先造一条借出，否则只能截到空态）----
+    await tester.runAsync(() async {
+      final s = Store.i;
+      await Repo.createDebt(
+        Debt(
+          id: 0,
+          ledgerId: s.ledgerId,
+          direction: DebtDirection.lent,
+          counterparty: '张三',
+          amountCents: 500000,
+          date: Fmt.today(),
+          accountId: s.accounts.first.id,
+          dueDate: '2026-11-30',
+        ),
+        Txn(
+          id: 0,
+          ledgerId: s.ledgerId,
+          type: TxnType.expense,
+          amountCents: 500000,
+          date: Fmt.today(),
+          accountId: s.accounts.first.id,
+        ),
+      );
+      await s.afterTxnChange();
+    });
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('往来'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_22_debts.png');
+    expect(tester.takeException(), isNull, reason: '往来页有布局溢出');
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
+    await tester.pumpAndSettle();
+
     // ---- 我的 ----
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();

@@ -24,6 +24,11 @@ class DebtsPage extends StatelessWidget {
         backgroundColor: C.bg,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        // 和分类管理/模板页同一个返回箭头，不加这个系统会给一个平台默认的
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_rounded, size: 22),
+        ),
         title: const Text('往来', style: T.section),
         centerTitle: false,
       ),
