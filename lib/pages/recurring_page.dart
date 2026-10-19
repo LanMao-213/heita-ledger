@@ -6,6 +6,15 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
+import '../widgets/picker_wheels.dart';
+
+/// 分类显示名：子分类带上父级，「正餐」单看不知道属于餐饮
+String _catLabel(Store s, int? id) {
+  final c = s.categoryOf(id);
+  if (c == null) return '选择分类';
+  final p = s.parentOf(c);
+  return p == null ? c.name : '${p.name} / ${c.name}';
+}
 
 /// 周期账单管理。
 ///
@@ -139,14 +148,24 @@ class _RecurringPageState extends State<RecurringPage> {
                     decoration: const InputDecoration(hintText: '备注，如「房租」'),
                   ),
                   const SizedBox(height: S.md),
-                  DropdownButtonFormField<int>(
-                    initialValue: categoryId,
-                    decoration: const InputDecoration(labelText: '分类'),
-                    items: [
-                      for (final c in cats)
-                        DropdownMenuItem(value: c.id, child: Text(c.name)),
-                    ],
-                    onChanged: (v) => setLocal(() => categoryId = v),
+                  // 分类用和「记一笔」同一个双轮盘：周期账单也要能挂到
+                  // 「居家 / 房租房贷」这种子分类，否则每月自动补记的那笔
+                  // 永远停在父级，明细里看不出具体是什么
+                  InkWell(
+                    onTap: () async {
+                      final pick = await showCategoryWheel(
+                        context,
+                        cats: cats,
+                        childrenOf: s.childrenOf,
+                        selectedCategoryId: categoryId,
+                      );
+                      if (pick == null) return;
+                      setLocal(() => categoryId = pick.txnCategoryId);
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(labelText: '分类'),
+                      child: Text(_catLabel(s, categoryId), style: T.body),
+                    ),
                   ),
                   const SizedBox(height: S.md),
                   DropdownButtonFormField<String>(

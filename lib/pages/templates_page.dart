@@ -7,6 +7,7 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
+import '../widgets/picker_wheels.dart';
 
 /// 记账模板管理。
 ///
@@ -340,6 +341,21 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
     });
   }
 
+  /// 点一级分类后再弹双轮盘：可以直接确认（= 不细分），也能滚到子分类。
+  ///
+  /// 模板原先只能挂一级分类，「每月房租」选不到「居家 / 房租房贷」；
+  /// 这里复用记一笔的同一个轮盘，数据层不用动（category_id 本来就存得下子分类）。
+  Future<void> _pickCategory(int topId) async {
+    final pick = await showCategoryWheel(
+      context,
+      cats: _cats,
+      childrenOf: Store.i.childrenOf,
+      selectedCategoryId: topId,
+    );
+    if (pick == null || !mounted) return;
+    _selectCategory(pick.txnCategoryId);
+  }
+
   Future<void> _save() async {
     final s = Store.i;
     if (_categoryId == null) {
@@ -487,7 +503,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                   final c = _cats[i];
                   final on = c.id == _categoryId;
                   return GestureDetector(
-                    onTap: () => _selectCategory(c.id),
+                    onTap: () => _pickCategory(c.id),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
