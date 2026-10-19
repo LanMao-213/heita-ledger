@@ -85,8 +85,10 @@ class _StatsPageState extends State<StatsPage> {
                       to: s.statTo,
                       onPrev: () => s.shiftStat(-1),
                       onNext: () => s.shiftStat(1),
-                      // 点「10-15 → 11-14」也能弹日历：两条路都通
+                      // 点「10-15 至 11-14」也能弹日历：两条路都通
                       onTapLabel: () => showCalendarAndGo(context),
+                      // 双击回到今天所在的期
+                      onReset: s.backToCurrentStat,
                     )
                   : MonthBar(
                       month: s.month,
@@ -94,6 +96,8 @@ class _StatsPageState extends State<StatsPage> {
                       onNext: () => s.shiftStat(1),
                       onTapLabel: () =>
                           showCalendarAndGo(context, byMonth: true),
+                      // 双击回到本月
+                      onReset: s.backToCurrentStat,
                     ),
             ),
             Padding(

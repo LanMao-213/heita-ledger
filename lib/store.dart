@@ -229,6 +229,25 @@ class Store extends ChangeNotifier {
     cycleTo = to;
   }
 
+  /// 回到「今天所在的期」。翻了好几期之后一键回来（双击周期条触发）。
+  Future<void> backToCurrentCycle() async {
+    resetCycleToToday();
+    await loadCycle();
+  }
+
+  /// 统计页回到当前：按本期 → 今天所在的期；按月 → 本月。
+  ///
+  /// 两种口径各回各的「当前」，不互相干扰 —— 按月看的时候双击不该把
+  /// 周期口径的游标也一起挪了。
+  Future<void> backToCurrentStat() async {
+    if (statBasis == StatBasis.period) {
+      resetCycleToToday();
+    } else {
+      month = Fmt.month(DateTime.now());
+    }
+    await loadStats();
+  }
+
   Future<void> loadAll() async {
     ledgers = await Repo.listLedgers();
     accounts = await Repo.listAccounts();

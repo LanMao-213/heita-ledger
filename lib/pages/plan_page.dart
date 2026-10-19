@@ -31,6 +31,7 @@ class PlanPage extends StatelessWidget {
               onPrev: () => s.shiftCycle(-1),
               onNext: () => s.shiftCycle(1),
               onTapLabel: () => showCalendarAndGo(context),
+              onReset: s.backToCurrentCycle,
             ),
           ),
           // ⚠️ 不要加 const：这些组件读 Store，const 实例在重建时会被

@@ -80,17 +80,19 @@ bool isCurrentCycle(String from, String to, {DateTime? now}) {
   return today.compareTo(from) >= 0 && today.compareTo(to) <= 0;
 }
 
-/// 周期条上的文案：`10-15 → 11-14`
+/// 周期条上的文案：`10-15 至 11-14`
+///
+/// 起止之间用「至」而不是箭头：这两个日期是**一段区间**，不是「从 A 流向 B」，
+/// 箭头会让人以为有什么在往右边转移。
 String cycleLabel(String from, String to) =>
-    '${shortYmd(from)} → ${shortYmd(to)}';
+    '${shortYmd(from)} 至 ${shortYmd(to)}';
 
-/// 明细页概览卡上的文案：`10.01 – 10.31`
+/// 明细页概览卡上的文案：`10.01 至 10.31`
 ///
 /// 和 [cycleLabel] 的差别只有两处，但读起来轻很多：
 /// - 连字符换成 `·` 样式的点分（10.01），数字之间不再有两条横线打架
-/// - 箭头 `→` 换成 en dash `–`：箭头本来表达的是「流向」，而这里只是「起止」，
-///   方向感是多余的
-String periodLabel(String from, String to) => '${dotYmd(from)} – ${dotYmd(to)}';
+/// - 「至」照旧，和周期条保持同一个词
+String periodLabel(String from, String to) => '${dotYmd(from)} 至 ${dotYmd(to)}';
 
 /// `2026-10-15` → `10-15`。UI 里所有「期」的文案都用这个，别各处自己截。
 String shortYmd(String ymd) {

@@ -150,7 +150,7 @@ class SegTabs extends StatelessWidget {
 }
 
 /// 月份选择栏
-/// 周期条：「10-15 → 11-14」，左右箭头翻一期。
+/// 周期条：「10-15 至 11-14」，**左右轻扫**翻一期，**双击**回到今天所在的期。
 ///
 /// 与 [MonthBar] 并存，用途严格分开：
 /// - 明细页 / 计划页看**期**（周期归集后的唯一口径）
@@ -165,6 +165,7 @@ class CycleBar extends StatelessWidget {
     required this.onPrev,
     required this.onNext,
     this.onTapLabel,
+    this.onReset,
     this.onDark = false,
     this.trailing,
   });
@@ -175,6 +176,9 @@ class CycleBar extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback? onTapLabel;
 
+  /// 双击区间文案 → 回到今天所在的期
+  final VoidCallback? onReset;
+
   /// 放在深色卡里时用（首页 hero）
   final bool onDark;
 
@@ -184,17 +188,17 @@ class CycleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = onDark ? C.bg : C.ink;
-    final arrow = onDark ? C.bg.withValues(alpha: 0.72) : C.ink2;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _barArrow(Icons.chevron_left_rounded, onPrev, arrow),
-        // 标签比月份条长（「10-15 → 11-14」），窄屏或带右侧按钮时会被挤爆：
-        // 交给 Flexible + FittedBox 收字号，宁可小一点也不要黄黑条。
-        Flexible(
-          child: GestureDetector(
-            onTap: onTapLabel,
-            behavior: HitTestBehavior.opaque,
+    return _SwipeFlip(
+      onPrev: onPrev,
+      onNext: onNext,
+      onTap: onTapLabel,
+      onDoubleTap: onReset,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // 标签比月份条长（「10-15 至 11-14」），窄屏或带右侧按钮时会被挤爆：
+          // 交给 Flexible + FittedBox 收字号，宁可小一点也不要黄黑条。
+          Flexible(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               child: FittedBox(
@@ -212,21 +216,81 @@ class CycleBar extends StatelessWidget {
               ),
             ),
           ),
-        ),
-        _barArrow(Icons.chevron_right_rounded, onNext, arrow),
-        if (trailing != null) ...[const Spacer(), trailing!],
-      ],
+          if (trailing != null) ...[const Spacer(), trailing!],
+        ],
+      ),
     );
   }
 }
 
-Widget _barArrow(IconData icon, VoidCallback onTap, Color color) => IconButton(
-  onPressed: onTap,
-  icon: Icon(icon, size: 22, color: color),
-  splashRadius: 20,
-  constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-  padding: EdgeInsets.zero,
-);
+/// 左右轻扫换页（换期 / 换月）。
+///
+/// 箭头去掉之后翻页只剩手势，所以这块要处理好两件事：
+/// - **判定**：快速划一下按速度，慢慢拖按位移 —— 只看速度的话，手慢的人
+///   拖了半屏也翻不动；只看位移的话，轻轻一弹就跳两页。
+/// - **不误触**：阈值定在「明显想翻」的量级（速度 260 px/s 或位移 48 px），
+///   手指抖一下不会把页面翻走。
+///
+/// 点按仍走 [onTap]（日历入口），双击走 [onDoubleTap]（回到当前）。
+///
+/// ⚠️ 同时注册 tap 与 doubleTap 的代价：单击要等一个双击判定窗口
+/// （`kDoubleTapTimeout`，300ms）才会触发。日历确实会晚 0.3 秒弹出，
+/// 这是「一个地方挂两种点击」的固有成本，不是卡顿。
+class _SwipeFlip extends StatefulWidget {
+  const _SwipeFlip({
+    required this.onPrev,
+    required this.onNext,
+    required this.child,
+    this.onTap,
+    this.onDoubleTap,
+  });
+
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  final VoidCallback? onTap;
+
+  /// 双击回到「当前」：手上翻了好几期之后，不用一期一期点回去
+  final VoidCallback? onDoubleTap;
+
+  final Widget child;
+
+  @override
+  State<_SwipeFlip> createState() => _SwipeFlipState();
+}
+
+class _SwipeFlipState extends State<_SwipeFlip> {
+  static const _velocityThreshold = 260.0; // px/s
+  static const _distanceThreshold = 48.0; // px
+
+  double _dx = 0;
+
+  void _end(DragEndDetails d) {
+    final v = d.primaryVelocity ?? 0;
+    final turned = v.abs() >= _velocityThreshold
+        ? v
+        : (_dx.abs() >= _distanceThreshold ? _dx * 10 : 0);
+    _dx = 0;
+    if (turned > 0) {
+      widget.onPrev(); // 右滑 → 上一期
+    } else if (turned < 0) {
+      widget.onNext(); // 左滑 → 下一期
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onDoubleTap: widget.onDoubleTap,
+      onHorizontalDragStart: (_) => _dx = 0,
+      onHorizontalDragUpdate: (d) => _dx += d.delta.dx,
+      onHorizontalDragEnd: _end,
+      onHorizontalDragCancel: () => _dx = 0,
+      child: widget.child,
+    );
+  }
+}
 
 /// 「当前是哪一期」—— 明细页顶部只有这一个，不做左右翻期。
 ///
@@ -297,6 +361,7 @@ class MonthBar extends StatelessWidget {
     required this.onPrev,
     required this.onNext,
     this.onTapLabel,
+    this.onReset,
     this.onDark = false,
     this.trailing,
   });
@@ -305,6 +370,9 @@ class MonthBar extends StatelessWidget {
   final VoidCallback onPrev;
   final VoidCallback onNext;
   final VoidCallback? onTapLabel;
+
+  /// 双击月份文案 → 回到本月
+  final VoidCallback? onReset;
 
   /// 放在深色卡里时用（首页 hero）：文字与箭头的对比度要跟着换
   final bool onDark;
@@ -315,39 +383,36 @@ class MonthBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = onDark ? C.bg : C.ink;
-    final arrow = onDark ? C.bg.withValues(alpha: 0.72) : C.ink2;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _arrow(Icons.chevron_left_rounded, onPrev, arrow),
-        GestureDetector(
-          onTap: onTapLabel,
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            child: Text(
-              Fmt.monthLabel(month),
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: label,
+    return _SwipeFlip(
+      onPrev: onPrev,
+      onNext: onNext,
+      onTap: onTapLabel,
+      onDoubleTap: onReset,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  Fmt.monthLabel(month),
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: label,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        _arrow(Icons.chevron_right_rounded, onNext, arrow),
-        if (trailing != null) ...[const Spacer(), trailing!],
-      ],
+          if (trailing != null) ...[const Spacer(), trailing!],
+        ],
+      ),
     );
   }
-
-  Widget _arrow(IconData icon, VoidCallback onTap, Color color) => IconButton(
-    onPressed: onTap,
-    icon: Icon(icon, size: 22, color: color),
-    splashRadius: 20,
-    constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-    padding: EdgeInsets.zero,
-  );
 }
 
 /// 空状态
