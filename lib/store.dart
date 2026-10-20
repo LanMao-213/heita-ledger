@@ -27,6 +27,42 @@ class Store extends ChangeNotifier {
   /// 而不用给 HomeShell 开一个谁都能调的全局 key。
   int tabIndex = 0;
 
+  // ------------------------------------------------------- 通知合并（1.5.0）
+  //
+  // `loadCycle()` 和 `loadStats()` 各自 `notifyListeners()`，所以「记一笔」
+  // 会连着触发两次全树重建 —— 而用户真正需要的只是「最后那一次新状态」。
+  // 中间那次重建的内容永远会被立刻覆盖，纯属白干。
+  //
+  // 这里用一个深度计数把一次操作里的多次通知压成一次：[batchNotify] 结束前
+  // 不往外发，结束后只发一次。注意是**合并**不是节流 —— 不会延后到下一帧，
+  // 所以界面手感不变。
+
+  int _notifyDepth = 0;
+  bool _notifyPending = false;
+
+  @override
+  void notifyListeners() {
+    if (_notifyDepth > 0) {
+      _notifyPending = true;
+      return;
+    }
+    super.notifyListeners();
+  }
+
+  /// 把 [body] 里的多次通知合并成一次（在 body 结束后立即发出）。
+  Future<T> batchNotify<T>(Future<T> Function() body) async {
+    _notifyDepth++;
+    try {
+      return await body();
+    } finally {
+      _notifyDepth--;
+      if (_notifyDepth == 0 && _notifyPending) {
+        _notifyPending = false;
+        super.notifyListeners();
+      }
+    }
+  }
+
   void switchTab(int i) {
     if (tabIndex == i) return;
     tabIndex = i;
@@ -541,14 +577,19 @@ class Store extends ChangeNotifier {
 
   /// 记一笔 / 改一笔 / 删一笔之后统一调这个刷新
   Future<void> afterTxnChange() async {
-    accounts = await Repo.listAccounts();
-    netWorthCents = await Repo.totalBalanceCents();
-    // 借贷的「已还多少」是按流水算的，动过流水就得重算
-    await _loadDebts();
-    await loadCycle();
-    await loadStats();
-    // 筛选态下必须重跑，否则删掉的记录还会挂在结果里
-    if (filtering) await applyFilter(filter);
+    // 一次记账要动账户、往来、本期明细、统计四块，逐个刷新会各发一次通知
+    // （`loadCycle` / `loadStats` 内部都会 notify）。合并成一次重建，
+    // 界面看到的最终结果完全一样，中间那几次是白建的。
+    await batchNotify(() async {
+      accounts = await Repo.listAccounts();
+      netWorthCents = await Repo.totalBalanceCents();
+      // 借贷的「已还多少」是按流水算的，动过流水就得重算
+      await _loadDebts();
+      await loadCycle();
+      await loadStats();
+      // 筛选态下必须重跑，否则删掉的记录还会挂在结果里
+      if (filtering) await applyFilter(filter);
+    });
   }
 
   /// 新记一笔之后的收口：**保证这笔一定出现在明细里**。
