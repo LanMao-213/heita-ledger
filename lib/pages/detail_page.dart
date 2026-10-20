@@ -9,6 +9,7 @@ import '../widgets/common.dart';
 import '../widgets/detail/summary_card.dart';
 import '../widgets/detail/txn_row.dart';
 import '../widgets/filter_sheet.dart';
+import 'period_all_page.dart';
 
 /// 明细页（首页）：按周期看每一笔。
 class DetailPage extends StatelessWidget {
@@ -46,8 +47,13 @@ class DetailPage extends StatelessWidget {
                             text: '这一期还没有记账',
                             hint: '点下面的「＋」记第一笔',
                           )
-                  else
+                  else ...[
                     ..._dayGroups(context, s),
+                    // 被 500 条上限截断时说清楚，并给一条「看全部」的路。
+                    // 1.4.3 之前这里什么都不说：概览卡写 620 笔、列表只有 500 条，
+                    // 用户既不知道少了，也没地方看剩下的（见 period_all_page.dart）
+                    if (s.txnTruncated) const _MoreHint(),
+                  ],
                 ],
               ),
             ),
@@ -355,6 +361,60 @@ class _TypeChips extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// 明细被上限截断时，列表末尾的说明 + 「看全部」入口。
+///
+/// 做成整条可点，而不是只在文字里放个链接：这一行的唯一用途就是跳转，
+/// 手指点哪儿都该管用。
+class _MoreHint extends StatelessWidget {
+  const _MoreHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.card),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PeriodAllPage()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 14),
+          decoration: BoxDecoration(
+            color: C.bg2,
+            borderRadius: BorderRadius.circular(R.card),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '仅显示最近 ${Store.txnPageLimit} 条'
+                  '${s.txnCount > Store.txnPageLimit ? ' · 本期共 ${s.txnCount} 笔' : ''}',
+                  style: T.caption.copyWith(color: C.ink2),
+                ),
+              ),
+              Text(
+                '查看本期全部',
+                style: T.caption.copyWith(
+                  color: C.ink,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: C.ink2,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

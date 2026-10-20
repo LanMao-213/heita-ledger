@@ -83,6 +83,16 @@ class Store extends ChangeNotifier {
   int expenseCents = 0;
   int incomeCents = 0;
   int txnCount = 0;
+
+  /// 明细列表一次最多画多少条。
+  ///
+  /// 超出部分**不丢**，但要走「本期全览」才看得到（`pages/period_all_page.dart`）：
+  /// 明细页是按天分卡的非懒加载列表，一期几千笔一次全建会直接卡死，
+  /// 而「一个月记几百笔」属于极端情况，不该让常态为它付代价。
+  static const txnPageLimit = 500;
+
+  /// 本期明细是否被 [txnPageLimit] 截断了 —— 截断了列表末尾要说明白
+  bool txnTruncated = false;
   List<Txn> txns = [];
 
   /// 借贷往来（带派生的已还金额）。
@@ -395,11 +405,16 @@ class Store extends ChangeNotifier {
       from: cycleFrom,
       to: cycleTo,
     );
+    // 多取一条只为判断有没有被截断：只比较条数的话，
+    // 「正好 500 条」和「500 条之外还有」在调用方无法区分
     txns = await Repo.rangeListTxns(
       ledgerId: ledgerId,
       from: cycleFrom,
       to: cycleTo,
+      limit: txnPageLimit + 1,
     );
+    txnTruncated = txns.length > txnPageLimit;
+    if (txnTruncated) txns = txns.sublist(0, txnPageLimit);
     isCurrentPeriod = cyc.isCurrentCycle(cycleFrom, cycleTo);
     notifyListeners();
   }
