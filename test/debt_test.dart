@@ -75,6 +75,27 @@ Txn _principal({
   accountId: accountId,
 );
 
+
+/// 等 UI 里触发的那次写入真正落库。
+///
+/// 1.4.5 起写入走 `WriteGateway`，测试环境里它会在事务内跑一次不变量校验
+/// （多两次查询）。假时钟下这多出来的异步回合会让「固定 `Future.delayed`
+/// 然后断言」的写法变得不稳定 —— 不是功能回归，是等待方式太脆。
+/// 这里改成有界轮询：条件成立就立刻返回，最多等 40×50ms 真实时间。
+Future<void> _waitUntil(
+  WidgetTester tester,
+  Future<bool> Function() done, {
+  int rounds = 40,
+}) async {
+  for (var i = 0; i < rounds; i++) {
+    if ((await tester.runAsync(done)) ?? false) return;
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+  }
+}
+
 void main() {
   setUpAll(() async {
     sqfliteFfiInit();
@@ -447,9 +468,10 @@ void main() {
     }
     await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
-    await tester.runAsync(
-      () => Future.delayed(const Duration(milliseconds: 200)),
-    );
+    await _waitUntil(tester, () async {
+      final ds = await Repo.listDebts(ledgerId: Store.i.ledgerId);
+      return ds.isNotEmpty;
+    });
 
     final debts = await tester.runAsync(
       () => Repo.listDebts(ledgerId: Store.i.ledgerId),
@@ -529,9 +551,10 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
-    await tester.runAsync(
-      () => Future.delayed(const Duration(milliseconds: 300)),
-    );
+    await _waitUntil(tester, () async {
+      final ds = await Repo.listDebts(ledgerId: c.ledgerId);
+      return ds.isNotEmpty && ds.first.repaidCents > 0;
+    });
 
     final d = (await tester.runAsync(
       () => Repo.listDebts(ledgerId: c.ledgerId),

@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
+import 'command.dart';
 import 'cycle.dart';
 import 'db.dart';
 import 'models.dart';
@@ -457,72 +458,58 @@ class Repo {
   }
 
   // ------------------------------------------------------------------- 交易
+  //
+  // ★ 从这里往下到「借贷」小节的五条写路径（insertTxn / updateTxn / deleteTxn /
+  //   createDebt / repayDebt）全部走 `WriteGateway.run`：事务边界只有那一处，
+  //   业务层拿不到 `Database`，所以「忘记开事务」在结构上不成立。
+  //   其余写方法都是**单条 SQL**，本身就原子，不进网关。
 
   static Future<int> insertTxn(Txn t, {bool? liftToNext}) async {
-    final db = await Db.open();
     final startDay = await cycleStartDay();
-    final liftable = await _liftableCategoryIds(db, t.ledgerId);
-    final row = _txnRow(
-      t,
-      periodFor(t, startDay, liftable, liftToNext: liftToNext),
+    final liftable = await _liftableCategoryIds(await Db.open(), t.ledgerId);
+    return WriteGateway.run(
+      _InsertTxn(
+        t,
+        _txnRow(t, periodFor(t, startDay, liftable, liftToNext: liftToNext)),
+      ),
     );
-    // 写流水与改余额必须在**同一个事务**里。1.4.5 之前这里是裸的两条：
-    // 流水插进去了、`_applyBalanceDelta` 抛异常的话，就留下「有这笔账、
-    // 余额没扣」的库，而且没有任何界面会报警。updateTxn / deleteTxn 早就
-    // 是事务包住的，只有这条新增路径漏了 —— 与它们对齐。
-    late int id;
-    await db.transaction((txn) async {
-      id = await txn.insert('txn', row);
-      await _applyBalanceDelta(txn, t, reverse: false);
-    });
-    return id;
   }
 
   static Future<void> updateTxn(Txn old, Txn now, {bool? liftToNext}) async {
-    final db = await Db.open();
     final startDay = await cycleStartDay();
-    final liftable = await _liftableCategoryIds(db, now.ledgerId);
-    await db.transaction((txn) async {
-      await _applyBalanceDelta(txn, old, reverse: true);
-      await txn.update(
-        'txn',
-        _txnRow(
-          now,
-          periodFor(now, startDay, liftable, liftToNext: liftToNext),
-        ),
-        where: 'id = ?',
-        whereArgs: [now.id],
-      );
-      await _applyBalanceDelta(txn, now, reverse: false);
-    });
+    final liftable = await _liftableCategoryIds(await Db.open(), now.ledgerId);
+    return WriteGateway.run(
+      _UpdateTxn(
+        old,
+        now,
+        _txnRow(now, periodFor(now, startDay, liftable, liftToNext: liftToNext)),
+      ),
+    );
   }
 
-  static Future<void> deleteTxn(Txn t) async {
-    final db = await Db.open();
-    await db.transaction((txn) async {
-      await _applyBalanceDelta(txn, t, reverse: true);
-      await txn.delete('txn', where: 'id = ?', whereArgs: [t.id]);
-    });
-  }
+  static Future<void> deleteTxn(Txn t) => WriteGateway.run(_DeleteTxn(t));
 
   /// 账户余额随交易增减。
   /// [reverse] 为 true 时反向回滚（改单/删单前先回滚旧值）。
+  ///
+  /// 参数是 [WriteScope] 而不是 `DatabaseExecutor`：改了余额就必须和写流水
+  /// 在同一个事务里，接一个作用域比接一个连接更贴合这个约束。
   static Future<void> _applyBalanceDelta(
-    DatabaseExecutor db,
+    WriteScope w,
     Txn t, {
     required bool reverse,
-  }) async {
+    }) async {
     if (t.type == TxnType.transfer) {
       // 转账：转出账户减、转入账户加
       final sign = reverse ? -1 : 1;
       if (t.accountId != null) {
-        await db.rawUpdate(
+        await w.rawUpdate(
           'UPDATE account SET balance_cents = balance_cents + ? WHERE id = ?',
           [-t.amountCents * sign, t.accountId],
         );
       }
       if (t.toAccountId != null) {
-        await db.rawUpdate(
+        await w.rawUpdate(
           'UPDATE account SET balance_cents = balance_cents + ? WHERE id = ?',
           [t.amountCents * sign, t.toAccountId],
         );
@@ -531,7 +518,7 @@ class Repo {
     }
     if (t.accountId == null) return;
     final delta = t.type.isIncome ? t.amountCents : -t.amountCents;
-    await db.rawUpdate(
+    await w.rawUpdate(
       'UPDATE account SET balance_cents = balance_cents + ? WHERE id = ?',
       [reverse ? -delta : delta, t.accountId],
     );
@@ -548,27 +535,14 @@ class Repo {
     Txn principal, {
     bool? liftToNext,
   }) async {
-    final db = await Db.open();
     final startDay = await cycleStartDay();
-    final liftable = await _liftableCategoryIds(db, debt.ledgerId);
-    late int debtId;
-    await db.transaction((txn) async {
-      // 借出恒不计入预算：钱出去了，不是可花的钱。入口只给「借入」显示这个开关，
-      // 但口径由数据层兜住，不指望每个调用方都记得传 false。
-      final map = debt.toMap();
-      if (debt.direction.isReceivable) map['count_in_budget'] = 0;
-      debtId = await txn.insert('debt', map);
-      final row = principal.copyWith(
-        debtId: debtId,
-        type: debt.direction.isMoneyOut ? TxnType.expense : TxnType.income,
-      );
-      await txn.insert(
-        'txn',
-        _txnRow(row, periodFor(row, startDay, liftable, liftToNext: liftToNext)),
-      );
-      await _applyBalanceDelta(txn, row, reverse: false);
-    });
-    return debtId;
+    final liftable = await _liftableCategoryIds(
+      await Db.open(),
+      debt.ledgerId,
+    );
+    return WriteGateway.run(
+      _CreateDebt(debt, principal, startDay, liftable, liftToNext),
+    );
   }
 
   /// 某账本的全部借贷：未结清优先 → 有应还日的在前 → 应还日升序。
@@ -611,9 +585,8 @@ class Repo {
     if (amountCents > remain) {
       throw ArgumentError('还款金额不能超过剩余 ${Fmt.money(remain)}');
     }
-    final db = await Db.open();
     final startDay = await cycleStartDay();
-    final liftable = await _liftableCategoryIds(db, debt.ledgerId);
+    final liftable = await _liftableCategoryIds(await Db.open(), debt.ledgerId);
     final t = Txn(
       id: 0,
       ledgerId: debt.ledgerId,
@@ -624,21 +597,14 @@ class Repo {
       debtId: debt.id,
       note: '${debt.counterparty} 还款',
     );
-    await db.transaction((txn) async {
-      await txn.insert(
-        'txn',
-        _txnRow(t, periodFor(t, startDay, liftable)),
-      );
-      await _applyBalanceDelta(txn, t, reverse: false);
-      if (amountCents >= remain) {
-        await txn.update(
-          'debt',
-          {'closed_at': DateTime.now().toIso8601String()},
-          where: 'id = ?',
-          whereArgs: [debt.id],
-        );
-      }
-    });
+    await WriteGateway.run(
+      _RepayDebt(
+        txnRow: _txnRow(t, periodFor(t, startDay, liftable)),
+        t: t,
+        debtId: debt.id,
+        closeIt: amountCents >= remain,
+      ),
+    );
   }
 
   /// 手动结清 / 撤销结清。结清只改状态，不动流水与余额 ——
@@ -653,18 +619,8 @@ class Repo {
     );
   }
 
-  static Future<void> deleteDebt(int debtId) async {
-    final db = await Db.open();
-    await db.transaction((txn) async {
-      // 先回滚余额：把挂在这笔上的流水逐条反向应用
-      final rows = await txn.query('txn', where: 'debt_id = ?', whereArgs: [debtId]);
-      for (final r in rows) {
-        await _applyBalanceDelta(txn, Txn.fromMap(r), reverse: true);
-      }
-      await txn.delete('txn', where: 'debt_id = ?', whereArgs: [debtId]);
-      await txn.delete('debt', where: 'id = ?', whereArgs: [debtId]);
-    });
-  }
+  static Future<void> deleteDebt(int debtId) =>
+      WriteGateway.run(_DeleteDebt(debtId));
 
   /// 往来摘要：应收合计、应付合计、这段日期内到期且未结清的笔数。
   ///
@@ -1548,8 +1504,13 @@ class Repo {
         // 两个触发点挨得近时会把同一条规则的同一期插两遍 —— 房租记成两份。
         // 不改成唯一索引是因为那要升 schema v8，而老库里若已存在重复行，
         // 建索引会直接失败；「插入前查一次」代价只有一次主键查找。
+        //
+        // 这条还没搬进 WriteGateway（它外面还有「推进 next_run_date」一段，
+        // 整段搬进来要先把循环结构拆开）。这里只是把作用域包一层，
+        // 让 `_applyBalanceDelta` 的签名统一 —— 行为与 1.4.4 完全一致。
         final inserted = await db.transaction((txn) async {
-          final dup = await txn.query(
+          final w = WriteScope(txn);
+          final dup = await w.query(
             'txn',
             columns: const ['id'],
             where: 'recurring_id = ? AND date = ?',
@@ -1569,8 +1530,8 @@ class Repo {
             note: rule.note.isEmpty ? '周期账单' : rule.note,
             recurringId: rule.id,
           );
-          await txn.insert('txn', _txnRow(t, periodFor(t, startDay, liftable)));
-          await _applyBalanceDelta(txn, t, reverse: false);
+          await w.insert('txn', _txnRow(t, periodFor(t, startDay, liftable)));
+          await _applyBalanceDelta(w, t, reverse: false);
           return true;
         });
         if (inserted) created++;
@@ -1753,5 +1714,179 @@ class Repo {
     final m = int.parse(p[1]);
     final last = DateTime(y, m + 1, 0).day;
     return '$ym-${last.toString().padLeft(2, '0')}';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 写命令（WriteGateway 的载荷）
+//
+// 约定：这里只放「一次写入的完整语义」。计算归属期、查分类白名单这类**读**
+// 都在 `Repo.xxx` 里先做完再传进来 —— 那几个查询本来就在事务外，放进事务
+// 只会拉长持锁时间。
+//
+// 每个命令的 `verify` 都只校验「这次动过的账户」。全表对账在
+// `Integrity.check()` 里，不放在写入路径上。
+// ---------------------------------------------------------------------------
+
+/// 校验一笔流水影响到的账户（转账要校验两侧）。
+Future<void> _verifyTxnBalance(Verifier v, Txn t) async {
+  if (t.type == TxnType.transfer) {
+    await v.checkBalance(t.accountId);
+    await v.checkBalance(t.toAccountId);
+    return;
+  }
+  await v.checkBalance(t.accountId);
+}
+
+class _InsertTxn extends Command<int> {
+  _InsertTxn(this.t, this.row);
+
+  final Txn t;
+
+  /// 已算好归属期的行（`_txnRow` 的结果）
+  final Map<String, Object?> row;
+
+  @override
+  Future<int> apply(WriteScope w) async {
+    final id = await w.insert('txn', row);
+    await Repo._applyBalanceDelta(w, t, reverse: false);
+    return id;
+  }
+
+  @override
+  Future<void> verify(Verifier v) => _verifyTxnBalance(v, t);
+}
+
+class _UpdateTxn extends Command<void> {
+  _UpdateTxn(this.old, this.now, this.row);
+
+  final Txn old;
+  final Txn now;
+  final Map<String, Object?> row;
+
+  @override
+  Future<void> apply(WriteScope w) async {
+    // 先按旧值回滚余额，再写新行，再按新值应用 —— 三步同事务，
+    // 中间任何一步失败都不会留下「余额按旧值扣了、流水已是新值」的库。
+    await Repo._applyBalanceDelta(w, old, reverse: true);
+    await w.update('txn', row, where: 'id = ?', whereArgs: [now.id]);
+    await Repo._applyBalanceDelta(w, now, reverse: false);
+  }
+
+  @override
+  Future<void> verify(Verifier v) async {
+    // 改单可能换了账户（从现金改成支付宝），两侧都要校验
+    await _verifyTxnBalance(v, old);
+    await _verifyTxnBalance(v, now);
+  }
+}
+
+class _DeleteTxn extends Command<void> {
+  _DeleteTxn(this.t);
+
+  final Txn t;
+
+  @override
+  Future<void> apply(WriteScope w) async {
+    await Repo._applyBalanceDelta(w, t, reverse: true);
+    await w.delete('txn', where: 'id = ?', whereArgs: [t.id]);
+  }
+
+  @override
+  Future<void> verify(Verifier v) => _verifyTxnBalance(v, t);
+}
+
+class _CreateDebt extends Command<int> {
+  _CreateDebt(this.debt, this.principal, this.startDay, this.liftable, this.liftToNext);
+
+  final Debt debt;
+  final Txn principal;
+  final int startDay;
+  final Set<int> liftable;
+  final bool? liftToNext;
+
+  @override
+  Future<int> apply(WriteScope w) async {
+    // 借出恒不计入预算：钱出去了，不是可花的钱。入口只给「借入」显示这个开关，
+    // 但口径由数据层兜住，不指望每个调用方都记得传 false。
+    final map = debt.toMap();
+    if (debt.direction.isReceivable) map['count_in_budget'] = 0;
+
+    final debtId = await w.insert('debt', map);
+    // 本金流水的方向由方向决定，不接受调用方传 —— 否则「借出却记成收入」
+    // 会让账户余额反向。
+    final row = principal.copyWith(
+      debtId: debtId,
+      type: debt.direction.isMoneyOut ? TxnType.expense : TxnType.income,
+    );
+    await w.insert(
+      'txn',
+      Repo._txnRow(
+        row,
+        Repo.periodFor(
+          row,
+          startDay,
+          liftable,
+          liftToNext: liftToNext,
+        ),
+      ),
+    );
+    await Repo._applyBalanceDelta(w, row, reverse: false);
+    return debtId;
+  }
+
+  @override
+  Future<void> verify(Verifier v) => v.checkBalance(principal.accountId);
+}
+
+class _RepayDebt extends Command<void> {
+  _RepayDebt({
+    required this.txnRow,
+    required this.t,
+    required this.debtId,
+    required this.closeIt,
+  });
+
+  final Map<String, Object?> txnRow;
+  final Txn t;
+  final int debtId;
+  final bool closeIt;
+
+  @override
+  Future<void> apply(WriteScope w) async {
+    await w.insert('txn', txnRow);
+    await Repo._applyBalanceDelta(w, t, reverse: false);
+    if (closeIt) {
+      await w.update(
+        'debt',
+        {'closed_at': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [debtId],
+      );
+    }
+  }
+
+  @override
+  Future<void> verify(Verifier v) => v.checkBalance(t.accountId);
+}
+
+class _DeleteDebt extends Command<void> {
+  _DeleteDebt(this.debtId);
+
+  final int debtId;
+
+  @override
+  Future<void> apply(WriteScope w) async {
+    // 先回滚余额：把挂在这笔上的流水逐条反向应用，再连流水一起删
+    final rows = await w.query(
+      'txn',
+      where: 'debt_id = ?',
+      whereArgs: [debtId],
+    );
+    for (final r in rows) {
+      await Repo._applyBalanceDelta(w, Txn.fromMap(r), reverse: true);
+    }
+    await w.delete('txn', where: 'debt_id = ?', whereArgs: [debtId]);
+    await w.delete('debt', where: 'id = ?', whereArgs: [debtId]);
   }
 }

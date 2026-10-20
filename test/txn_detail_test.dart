@@ -21,6 +21,7 @@ import 'package:ledger/widgets/detail/txn_row.dart';
 import 'package:ledger/widgets/record_sheet.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'support/wait_write.dart';
 
 const _dbName = 'test_txn_detail.db';
 
@@ -123,6 +124,8 @@ void main() {
     await tester.runAsync(
       () => Future.delayed(const Duration(milliseconds: 200)),
     );
+    // 事务提交要跨 isolate 走完，假时钟下光靠一次 delayed 不够
+    await settleWrites(tester);
 
     final rows = await tester.runAsync(
       () => Repo.listTxns(

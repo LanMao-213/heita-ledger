@@ -86,13 +86,47 @@ balance_cents = opening_cents + 该账户流水合计
   sqflite 原本抛一串英文堆栈，启动页只能看到「启动失败」。现在抛
   `DbDowngradeException`，写清「账目都还在，不要卸载重装」。
 
+### 内部：写入网关 `WriteGateway`
+
+原来 12 个写方法各自决定要不要开事务 —— 1.4.1 那个 P0（清空数据只删了一半）和
+1.4.4 那个 `insertTxn` 漏包事务，是同一个病根的两次发作。现在改成结构约束：
+
+```dart
+await WriteGateway.run(InsertTxn(t, row));
+```
+
+事务边界只有这一处，业务代码**拿不到 `Database`**，所以「忘记开事务」在结构上不成立。
+本次搬进网关的六条，都是一次改多行/多表的路径：`insertTxn` / `updateTxn` / `deleteTxn` /
+`createDebt` / `repayDebt` / `deleteDebt`。其余二十多个写方法都是单条 SQL，本身原子，
+硬套事务只是浪费 —— 清单与判断标准在 `docs/写入口清单.md`。
+
+网关里还挂了一个**只在 debug / 测试里跑**的不变量校验：每次写入后核对
+`balance = opening + 流水合计`。release 包里这个常量折叠成 `false`，
+整段校验被编译器消掉，用户那个包零开销。校验失败**只警告不阻断** ——
+用户手机上的老库可能已经带着漂移，抛异常会让那次记账直接失败，
+等于拿历史问题卡住用户当下要办的事。
+
+### 门禁：不联网
+
+`tools/check_no_network.sh`，四层检查：运行时依赖白名单、源码里的网络调用、
+正式包清单的权限声明、以及（传了 APK 时）`aapt2 dump badging` 查 INTERNET 权限。
+已挂进 `docs/ci-workflow.template.yml`，启用 CI 后每次 push 都会跑。
+
+这不是洁癖 —— 华为口径「断网全功能可用」才能勾「单机APP」免备案，
+而一行 `import 'package:http/...'` 就能让这个资格悄悄失效，且不会有任何报错。
+
 ### 测试
 
-新增 `test/integrity_test.dart`（9 条）：干净库、事务化后余额仍对、余额被外部改坏
+新增 `test/integrity_test.dart`（9 条）、`test/command_test.dart`（5 条）：干净库、事务化后余额仍对、余额被外部改坏
 → 检出 → 重算修好且不动期初、**手填余额不算漂移**（回归）、搜索转义、孤儿分类、
 缺归属期、借贷超还、**v7 老库升 v8 后余额不变且期初回填正确**。
 
-`flutter analyze` 0 issue，`flutter test` **265 条全绿**（原 256 + 新增 9）。
+`flutter analyze` 0 issue，`flutter test` **270 条全绿**（原 256 + 体检 9 + 网关 5）。
+
+顺带调整了三个界面用例的等待方式（`test/support/wait_write.dart`）：写入改走网关后，
+一次保存要跨 isolate 走完「开事务 → 写 → 改余额 → 提交」，假时钟下光靠一次
+`runAsync(delayed)` 会读到提交前的状态。**断言本身一条没改**，只是把「等固定毫秒」
+换成「pump 与真实时间交替若干轮」。
 
 ### 待验证（真机）
 

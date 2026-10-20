@@ -65,9 +65,16 @@ class Db {
   /// 老用户打开会以为数据被改乱了。提示只出一次，见 [Store.boot]。
   static bool upgradedToTwoLevel = false;
 
+  /// 已经打开的连接，没有则为 null。
+  ///
+  /// 给 [WriteGateway] 用：库已经开着的时候不必再经过一次 `await`。
+  /// 少一个异步跳转在真机上无感，但在 `testWidgets` 的假时钟里，
+  /// 每多一次 await 就要多一次 pump 才能推进 —— 界面里触发写入的用例
+  /// 会因为「差一个微任务」而断言到旧数据。
+  static Database? get cached => _db;
+
   static Future<Database> open() async {
-    if (_db != null) return _db!;
-    final dir = await getDatabasesPath();
+    if (_db != null) return _db!;    final dir = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dir, fileName),
       version: _version,

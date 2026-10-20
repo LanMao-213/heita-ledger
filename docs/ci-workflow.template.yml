@@ -34,6 +34,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 先跑这条：它不依赖 Flutter，几秒钟就能判断「有没有混进联网的东西」。
+      # 放在最前面是为了让这类问题在最便宜的地方失败，而不是等到测试跑完。
+      - name: 不联网门禁
+        run: bash tools/check_no_network.sh
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.47.7
@@ -49,3 +54,32 @@ jobs:
       # 不加 --coverage：这个项目还没有覆盖率门槛，先让「跑没跑过」变成硬约束
       - name: 测试
         run: flutter test --reporter expanded
+
+  # 产物级门禁：源码扫描可能被绕过（反射、动态拼接），但**APK 里没有 INTERNET
+  # 权限**是系统级的硬事实 —— 发不出去就是发不出去。
+  # 只在 main 上跑：build 要几分钟，每个分支都跑性价比太低。
+  apk-permission:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # 仓库里没有 release.jks / key.properties，会退回 debug 签名 ——
+      # 这条 job 只关心「权限清单」，不关心签名。
+      - name: 构建 release APK
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: 检查 APK 权限
+        run: |
+          APK=$(ls build/app/outputs/flutter-apk/*-release.apk | head -1)
+          bash tools/check_no_network.sh "$APK"
