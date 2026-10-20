@@ -1,0 +1,51 @@
+# ⚠️ 这是模板，不是生效的 CI 配置。
+#
+# 为什么放在这里而不是 .github/workflows/：GitHub 令牌若没有 `workflow` scope，
+# 推送 `.github/workflows/**` 会被**整次 push 拒绝**（不是只拒那一个文件）：
+#   refusing to allow an OAuth App to create or update workflow ... without workflow scope
+# 放在 docs/ 下，任何人 `git add -A` 都不会踩这个坑。
+#
+# 启用步骤：
+#   gh auth refresh -h github.com -s workflow      # 浏览器里确认，令牌多一个 scope
+#   mkdir -p .github/workflows && cp docs/ci-workflow.template.yml .github/workflows/ci.yml
+#   git add .github && git commit -m "ci: analyze + test on push/PR" && git push
+# 之后这个模板文件可以删掉（或留着当备份）。
+
+name: 测试与静态检查
+
+# 为什么加这个（1.4.4）：仓库里除了 owner 还有一位 write 权限的协作者，
+# 而 256 条测试一直靠人手动跑 —— 1.4.1 的真机事故里，有两个就是「改动碰了
+# 查询层、没人拦」造成的。把 analyze + test 挂在 push/PR 上，是这里最便宜的护栏。
+#
+# 版本与本地工具链对齐（`flutter --version` → 3.47.7）。升 Flutter 时记得同步改
+# 下面这一行，否则 CI 用旧 SDK 跑、本地用新的，报警会失真。
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - name: 取依赖
+        run: flutter pub get
+
+      - name: 静态检查
+        run: flutter analyze
+
+      # 不加 --coverage：这个项目还没有覆盖率门槛，先让「跑没跑过」变成硬约束
+      - name: 测试
+        run: flutter test --reporter expanded

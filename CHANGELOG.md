@@ -102,8 +102,9 @@
 - 标签 `v1.4.4`，Release 挂了 `heita-ledger-1.4.4-arm64.apk`（versionCode 2012）与
   `-armv7.apk`（1012），可直接覆盖 1.4.1 / 1.4.2 / 1.4.3
 - **CI 没进去**：当时的 GitHub 令牌只有 `repo` 而没有 `workflow` scope，推
-  `.github/workflows/` 会被整次 push 拒绝。工作流文件已写好，等令牌补上 `workflow`
-  权限后单独提交一次即可（`gh auth refresh -h github.com -s workflow`）
+  `.github/workflows/` 会被整次 push 拒绝（**整次**，不是只拒那一个文件）。配置已写好，
+  但不放在 `.github/` 里 —— 放进去的话，任何人 `git add -A` 之后都会推不上去。
+  模板在 `docs/ci-workflow.template.yml`，补上 scope 后按文件头的三步启用
 
 ### 留给 1.5.0
 
