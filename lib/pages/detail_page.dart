@@ -208,7 +208,12 @@ class _TopBar extends StatelessWidget {
                     : null,
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await s.switchLedger(l.id);
+                  // 切过去的账本可能欠着好几期周期账单，补记是 switchLedger 做的，
+                  // 这里只负责说出来
+                  final added = await s.switchLedger(l.id);
+                  if (added > 0 && context.mounted) {
+                    showToast(context, '已补记 $added 笔周期账单');
+                  }
                 },
               ),
             const SizedBox(height: S.md),

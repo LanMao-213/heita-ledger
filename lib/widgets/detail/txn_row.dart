@@ -78,11 +78,24 @@ class TxnRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: T.body.copyWith(fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: T.body.copyWith(fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // 「周期账单」是它自己记的，不是用户点的。1.4.4 起补记会
+                      // 在回到前台时就发生，列表里凭空多出几笔不标一下，
+                      // 第一反应会是「我没记过这笔」。
+                      if (debt == null && txn.recurringId != null) ...[
+                        const SizedBox(width: 6),
+                        const _AutoTag(),
+                      ],
+                    ],
                   ),
                   if (subParts.isNotEmpty) ...[
                     const SizedBox(height: 2),
@@ -144,5 +157,28 @@ class TxnRow extends StatelessWidget {
     await Store.i.deleteTxn(txn);
     Haptics.warn();
     if (context.mounted) showToast(context, '已删除');
+  }
+}
+
+/// 「周期」小标签：这笔是周期账单自动生成的，不是用户自己点的。
+///
+/// 刻意做得很轻 —— 它只是「说明来源」的辅助信息，不该抢分类名和金额的注意力，
+/// 所以用最浅的文字色 + 和正文对齐的基线，而不是做成醒目的 chip。
+class _AutoTag extends StatelessWidget {
+  const _AutoTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: C.bg2,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Text(
+        '周期',
+        style: TextStyle(fontSize: 9.5, height: 1.35, color: C.ink3),
+      ),
+    );
   }
 }

@@ -1393,9 +1393,17 @@ class Repo {
   /// 补记所有到期的周期账单。
   ///
   /// ★ 单机应用没有后台服务，做不到「到点自动执行」。
-  ///   真实机制就是这里：**打开 App 时扫一遍 `next_run_date <= 今天` 的规则**，
+  ///   真实机制就是这里：**扫一遍 `next_run_date <= 今天` 的规则**，
   ///   逐条生成交易，然后把 `next_run_date` 推进到下一次。
   ///   交易日期用**规则本应触发的日期**，而不是补记当天 —— 否则账目会错位。
+  ///
+  ///   1.4.4 起有**两个**触发点：冷启动（`Store.boot`）和「从后台回到前台」
+  ///   （`Store.onAppResumed`）。加第二个是因为前者不够用：Android 上应用
+  ///   常驻后台过夜是常态，只靠冷启动的话，1 号该扣的房租可能三天后才补记，
+  ///   而这三天里余额和预算都是错的。
+  ///
+  ///   两个触发点意味着可能几乎同时调用，所以每期插入前都要查重（见下），
+  ///   调用方还得负责按账本限流（`Store.catchUpRecurring`）。
   ///
   /// 返回补记的条数，便于在界面上给用户一个提示。
   static Future<int> runDueRecurring(int ledgerId, {DateTime? now}) async {
@@ -1424,7 +1432,23 @@ class Repo {
         if (rule.endDate != null && runDate.compareTo(rule.endDate!) > 0) {
           break;
         }
-        await db.transaction((txn) async {
+        // 幂等护栏：这条规则的这一期已经有记录了就跳过，只推进日期。
+        //
+        // 为什么需要（1.4.4）：补记从一个触发点（冷启动）变成两个（再加上
+        // 「从后台回到前台」）。`txn` 表对 `(recurring_id, date)` 没有唯一约束，
+        // 两个触发点挨得近时会把同一条规则的同一期插两遍 —— 房租记成两份。
+        // 不改成唯一索引是因为那要升 schema v8，而老库里若已存在重复行，
+        // 建索引会直接失败；「插入前查一次」代价只有一次主键查找。
+        final inserted = await db.transaction((txn) async {
+          final dup = await txn.query(
+            'txn',
+            columns: const ['id'],
+            where: 'recurring_id = ? AND date = ?',
+            whereArgs: [rule.id, runDate],
+            limit: 1,
+          );
+          if (dup.isNotEmpty) return false;
+
           final t = Txn(
             id: 0,
             ledgerId: ledgerId,
@@ -1438,8 +1462,9 @@ class Repo {
           );
           await txn.insert('txn', _txnRow(t, periodFor(t, startDay, liftable)));
           await _applyBalanceDelta(txn, t, reverse: false);
-          created++;
+          return true;
         });
+        if (inserted) created++;
 
         final next = _advance(runDate, rule.freq, rule.interval);
         rule = RecurringRule(

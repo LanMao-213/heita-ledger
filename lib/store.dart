@@ -153,6 +153,37 @@ class Store extends ChangeNotifier {
   /// 启动时补记的周期账单条数（>0 时界面给一次提示）
   int recurringJustAdded = 0;
 
+  /// 补记的第一道闸：**每个账本**最近一次扫到哪一天。
+  ///
+  /// 按账本分开记，不是全局一个时间戳。全局的话，今天在「日常账本」补过，
+  /// 24 小时内切到「家庭账本」就会被误挡，那本账的房租永远等不到补记 ——
+  /// 这也顺带修掉了「切换账本从来不补」这个从 1.1.0 就在的老问题。
+  final Map<int, String> _recurringDoneOn = {};
+
+  /// 补记的第二道闸：同一时刻只允许一次在跑。
+  ///
+  /// 冷启动与「从后台回来」可能几乎同时触发，而 [Repo.runDueRecurring]
+  /// 不是原子的。重入时复用同一个 Future，不新开一条。
+  Future<int>? _recurringInFlight;
+
+  /// 上一次见到的「今天」和账本 —— 回到前台时拿它判断要不要重算
+  String _seenDay = '';
+  int _seenLedgerId = 0;
+
+  /// 测试用：假装上一次是另一天（真实值只由 boot / onAppResumed / switchLedger 维护）。
+  /// 没有时钟注入点，跨天场景只能靠这个缝来模拟。
+  @visibleForTesting
+  void debugSetSeenDay(String day) {
+    _seenDay = day;
+  }
+
+  /// 测试用：清空「今天这个账本已经扫过」的标记，等价于时间过去了。
+  @visibleForTesting
+  void debugResetRecurringGates() {
+    _recurringDoneOn.clear();
+    _recurringInFlight = null;
+  }
+
   /// 是否要提示「分类升级成两级了」。只在真的从老库升上来、且没提示过时为真。
   bool catsUpgradeJustDone = false;
 
@@ -212,7 +243,9 @@ class Store extends ChangeNotifier {
     ledgerId = await Repo.currentLedgerId();
     cycleStartDay = await Repo.cycleStartDay();
     resetCycleToToday();
-    recurringJustAdded = await Repo.runDueRecurring(ledgerId);
+    _seenDay = Fmt.date(DateTime.now());
+    _seenLedgerId = ledgerId;
+    recurringJustAdded = await catchUpRecurring();
 
     // 分类从「一级 + 名目」改成「分类 + 子分类」之后，老用户打开会看到一堆
     // 眼熟的分类换了名字（交通→出行、学习→成长），还多出一层子分类。
@@ -225,6 +258,73 @@ class Store extends ChangeNotifier {
     await loadAll();
     ready = true;
     notifyListeners();
+  }
+
+  /// 从后台回到前台：日期或账本变了，就重算游标并补记周期账单。
+  ///
+  /// 为什么必须有：这个应用没有后台服务（见 `Repo.runDueRecurring` 的注释），
+  /// 所有「到点该做的事」都挂在「打开应用」这一刻。而 Android 上应用常驻后台
+  /// 过夜是常态 —— 少了这个钩子，周期条会停在昨天、到期的房租要等下次冷启动
+  /// 才补记，中间那几天余额和预算全是错的。
+  ///
+  /// 返回补记的条数（0 = 没有新东西），交给界面决定要不要提示。
+  Future<int> onAppResumed() async {
+    if (!ready) return 0;
+    final today = Fmt.date(DateTime.now());
+    final ledgerChanged = ledgerId != _seenLedgerId;
+    // 同一天 + 同一个账本：什么都不用做。这就是「按账本各自核对一次」
+    if (today == _seenDay && !ledgerChanged) return 0;
+
+    // 先记下「我当时停在哪一期」，再决定要不要拨 ——
+    // 拨完之后 isCurrentPeriod 就变了，判断会失真
+    final wasCurrent = isCurrentPeriod;
+    _seenDay = today;
+    _seenLedgerId = ledgerId;
+
+    // 只在用户本来就停在「当前期」时才把游标拨到今天。
+    // 他若正翻 9 月的旧账，切出去回条微信再回来被拽回本月，等于抢方向盘。
+    if (wasCurrent) resetCycleToToday();
+
+    final added = await catchUpRecurring();
+    if (added > 0) recurringJustAdded = added;
+    await loadCycle(); // 内部会 notify 一次，这里不再重复
+    return added;
+  }
+
+  /// 补记到期周期账单，带两道防重复闸（见 [_recurringDoneOn] / [_recurringInFlight]）。
+  ///
+  /// 「多久查一次」「会不会同时跑两次」是应用层的事，不该塞进
+  /// [Repo.runDueRecurring] —— 那个方法只负责「该记什么」。
+  Future<int> catchUpRecurring() {
+    final today = Fmt.date(DateTime.now());
+
+    // 闸一：这个账本今天已经扫过
+    if (_recurringDoneOn[ledgerId] == today) {
+      return _recurringInFlight ?? Future<int>.value(0);
+    }
+    // 闸二：已有一次在跑就复用它，不新开
+    final running = _recurringInFlight;
+    if (running != null) return running;
+
+    final f = _runCatchUp(today);
+    _recurringInFlight = f;
+    return f.whenComplete(() {
+      if (identical(_recurringInFlight, f)) _recurringInFlight = null;
+    });
+  }
+
+  Future<int> _runCatchUp(String today) async {
+    final id = ledgerId;
+    final added = await Repo.runDueRecurring(id);
+    _recurringDoneOn[id] = today;
+
+    // 补记会动账户余额：界面上的净值必须跟着重算，
+    // 否则用户看到的是「明细里多了一笔房租，余额却没动」
+    if (id == ledgerId) {
+      accounts = await Repo.listAccounts();
+      netWorthCents = await Repo.totalBalanceCents();
+    }
+    return added;
   }
 
   /// 把当前期拨回「今天所在的那一期」
@@ -404,12 +504,24 @@ class Store extends ChangeNotifier {
     await loadStats();
   }
 
-  Future<void> switchLedger(int id) async {
+  /// 切账本。返回补记的周期账单条数（0 = 这本账没有欠账）。
+  Future<int> switchLedger(int id) async {
     ledgerId = id;
     // 分类 ID 属于账本：带着旧条件切过去只会筛出空结果或错数据
     _resetFilter();
     await Repo.setSetting('current_ledger_id', '$id');
     await loadAll();
+
+    // 切过来的这本账可能已经欠着好几期的周期账单。
+    // 1.4.3 之前这里什么都不做 —— 只有冷启动才补，等于「一个账本永远不补」。
+    _seenDay = Fmt.date(DateTime.now());
+    _seenLedgerId = id;
+    final added = await catchUpRecurring();
+    if (added > 0) {
+      recurringJustAdded = added;
+      await loadCycle(); // 补进来的记录要立刻出现在列表和概览里
+    }
+    return added;
   }
 
   /// 记一笔 / 改一笔 / 删一笔之后统一调这个刷新
@@ -671,6 +783,9 @@ class Store extends ChangeNotifier {
   /// 重新开库（清空数据之后用）
   Future<void> reboot() async {
     await Db.close();
+    // 库都换了：账本 id 和「今天补到哪」都作废，留着会让新库被旧时间戳挡住
+    _recurringDoneOn.clear();
+    _recurringInFlight = null;
     _resetFilter();
     await boot();
   }

@@ -612,7 +612,10 @@ class MinePage extends StatelessWidget {
                     : null,
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await s.switchLedger(l.id);
+                  final added = await s.switchLedger(l.id);
+                  if (added > 0 && context.mounted) {
+                    showToast(context, '已补记 $added 笔周期账单');
+                  }
                 },
               ),
             Padding(
@@ -654,7 +657,10 @@ class MinePage extends StatelessWidget {
                   if (name == null || name.isEmpty) return;
                   final id = await Repo.insertLedger(Ledger(id: 0, name: name));
                   if (ctx.mounted) Navigator.pop(ctx);
-                  await s.switchLedger(id);
+                  final added = await s.switchLedger(id);
+                  if (added > 0 && context.mounted) {
+                    showToast(context, '已补记 $added 笔周期账单');
+                  }
                 },
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(46),

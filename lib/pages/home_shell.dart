@@ -32,6 +32,12 @@ class _HomeShellState extends State<HomeShell> {
     initialPage: Store.i.tabIndex,
   );
 
+  /// 前后台切换的监听。
+  ///
+  /// 用 `AppLifecycleListener` 而不是 `WidgetsBindingObserver` 混入：少一个
+  /// mixin、少一个必须记得调 `super.didChangeAppLifecycleState` 的地方。
+  late final AppLifecycleListener _lifecycle;
+
   static const _tabs = [
     (icon: 'list', label: '明细'),
     (icon: 'pie', label: '图表'),
@@ -43,14 +49,25 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     Store.i.addListener(_syncPage);
+    // 从后台回来时补上「这段时间里该发生的事」：周期拨到今天、补记到期账单。
+    // 没有它，应用常驻后台过夜后周期条会停在昨天，房租要等下次冷启动才记。
+    _lifecycle = AppLifecycleListener(onResume: _onResume);
     WidgetsBinding.instance.addPostFrameCallback((_) => _notifyStartup());
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     Store.i.removeListener(_syncPage);
     _page.dispose();
     super.dispose();
+  }
+
+  /// 回到前台：交给 Store 判断要不要重算，这里只管说话
+  Future<void> _onResume() async {
+    final added = await Store.i.onAppResumed();
+    if (!mounted || added <= 0) return;
+    showToast(context, '已补记 $added 笔周期账单');
   }
 
   /// store 里的 tab 变了 → 页面滑过去（自己滑过去的情况在这里会直接 return）
