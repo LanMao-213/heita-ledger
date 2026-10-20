@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/haptics.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
@@ -11,8 +12,41 @@ import '../widgets/filter_sheet.dart';
 import 'period_all_page.dart';
 
 /// 明细页（首页）：按周期看每一笔。
-class DetailPage extends StatelessWidget {
+class DetailPage extends StatefulWidget {
   const DetailPage({super.key});
+
+  @override
+  State<DetailPage> createState() => _DetailPageState();
+}
+
+class _DetailPageState extends State<DetailPage> {
+  /// 翻期之后要把列表拉回顶部，所以必须自己持有 controller
+  /// （原来是隐式的 `PrimaryScrollController`，拿不到位置就没法回顶）。
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// 横滑翻一期。
+  ///
+  /// **方案 B**：横向手势只挂在顶部概览卡上，列表正文不接管 ——
+  /// 正文横滑仍然是切 Tab（`home_shell` 的 `PageView`）。理由：
+  /// 明细页是主场、翻期是高频动作，但「横滑切 Tab」是全局习惯，
+  /// 把它在整页上取消掉，代价比「手指要往上挪一点」大。
+  ///
+  /// 翻期没有转场动画（数据是瞬间替换的），所以必须给两样反馈：
+  /// 一下轻震 + 列表回顶。少任何一样，用户都会觉得「滑了没反应」。
+  Future<void> _flip(int delta) async {
+    final s = Store.i;
+    if (s.filtering) return; // 筛选和「哪一期」是两个维度，别互相踩
+    await s.shiftCycle(delta);
+    Haptics.tap();
+    // 不回顶的话会停在「上一期的第 3 天」这种半截位置，看起来像翻错了
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,10 +75,21 @@ class DetailPage extends StatelessWidget {
               //   换成 `SliverList.builder` 后只构建可视区域内的那几张日卡，
               //   滚动时才按需建下一张，摊还成本与屏高成正比，与总条数无关。
               child: CustomScrollView(
+                controller: _scroll,
                 slivers: [
-                  // 不加 const：这几块直接读 Store.i，const 会被 Flutter 当成
-                  // 「同一个 widget」跳过重建，筛选切换后数字会停在旧口径
-                  SliverToBoxAdapter(child: SummaryCard()),
+                  // 翻期的热区就是这一块。`enabled: false` 时**不注册**横向
+                  // 识别器，手势落回外层 PageView —— 这正是「筛选态下横滑
+                  // 仍然切 Tab」的实现方式，不是靠 return 拦。
+                  // 不加 const：SummaryCard 直接读 Store.i，const 会被 Flutter
+                  // 当成「同一个 widget」跳过重建，翻期后数字会停在旧口径
+                  SliverToBoxAdapter(
+                    child: SwipeFlip(
+                      enabled: !s.filtering,
+                      onPrev: () => _flip(-1),
+                      onNext: () => _flip(1),
+                      child: SummaryCard(),
+                    ),
+                  ),
                   if (s.visibleTxns.isEmpty)
                     SliverToBoxAdapter(
                       child: s.filtering
@@ -327,10 +372,6 @@ class _SearchDelegate extends SearchDelegate<String> {
   );
 }
 
-/// 顶部类型快捷筛选：全部 / 支出 / 收入 / 转账。
-///
-/// 只改 `TxnFilter.type`，用户已经设好的分类、金额区间、时间段原样保留
-/// （`TxnFilter.withType`），否则点一下「支出」就把别的条件清掉了。
 /// 明细被上限截断时，列表末尾的说明 + 「看全部」入口。
 ///
 /// 做成整条可点，而不是只在文字里放个链接：这一行的唯一用途就是跳转，

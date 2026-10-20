@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/cycle.dart';
 import '../../data/models.dart';
 import '../../data/pacing.dart';
+import '../../design/haptics.dart';
 import '../../design/tokens.dart';
 import '../../store.dart';
 import '../calendar_picker.dart';
@@ -16,29 +17,46 @@ import '../calendar_picker.dart';
 ///
 /// 日期从独立一行降成标签的注脚，是这张卡从「标题 + 数字」变成
 /// 「一个数字 + 它的限定条件」的关键 —— 第一眼只剩金额。
+///
+/// **双击**回到今天所在的期：1.4.5 起横滑概览卡就能一期一期地翻，
+/// 翻远了以后双击是最省事的回程（不用一期一期点回去，也不用在日历里
+/// 找今天）。和统计页的月份条是同一套手感 —— 单击开日历、双击回当前。
+///
+/// ⚠️ 同时挂 tap 与 doubleTap 的代价：单击要等 300ms 双击窗口
+/// （`kDoubleTapTimeout`），日历会晚一点点弹出来。这是「一个地方两种点击」
+/// 的固有成本，全应用只有两处这样（这行、统计页月份条），不是卡顿。
 class _PeriodHead extends StatelessWidget {
   const _PeriodHead({
     required this.from,
     required this.to,
     required this.onTap,
+    required this.onReset,
   });
 
   final String from;
   final String to;
   final VoidCallback onTap;
 
+  /// 双击回本期（已经在本期时是空操作，见调用点）
+  final VoidCallback onReset;
+
   @override
   Widget build(BuildContext context) {
+    final s = Store.i;
+    // 翻到期外还说「本期」就是错的。横滑之前翻期要点日历、不容易走远，
+    // 现在一滑就到上个月，这行字必须跟着变。
+    final label = s.isCurrentPeriod ? '本期支出' : '支出';
     return GestureDetector(
       onTap: onTap,
+      onDoubleTap: onReset,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
         height: 36,
         child: Row(
           children: [
-            const Text(
-              '本期支出',
-              style: TextStyle(
+            Text(
+              label,
+              style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
                 color: C.ink2,
@@ -124,6 +142,13 @@ class SummaryCard extends StatelessWidget {
               from: s.cycleFrom,
               to: s.cycleTo,
               onTap: () => showCalendarAndGo(context),
+              // 已经在本期就什么都不做：否则白跑一次 loadCycle，还多震一下，
+              // 用户会以为「双击有什么副作用」
+              onReset: () {
+                if (s.isCurrentPeriod) return;
+                Haptics.tap();
+                s.backToCurrentCycle();
+              },
             ),
           const SizedBox(height: 2),
           // 金额到六位数时用 FittedBox 收一点，保证永远单行

@@ -188,7 +188,7 @@ class CycleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = onDark ? C.bg : C.ink;
-    return _SwipeFlip(
+    return SwipeFlip(
       onPrev: onPrev,
       onNext: onNext,
       onTap: onTapLabel,
@@ -236,13 +236,20 @@ class CycleBar extends StatelessWidget {
 /// ⚠️ 同时注册 tap 与 doubleTap 的代价：单击要等一个双击判定窗口
 /// （`kDoubleTapTimeout`，300ms）才会触发。日历确实会晚 0.3 秒弹出，
 /// 这是「一个地方挂两种点击」的固有成本，不是卡顿。
-class _SwipeFlip extends StatefulWidget {
-  const _SwipeFlip({
+///
+/// ⚠️ [enabled] 为 false 时**不注册**横向识别器（不是注册了再 return）。
+/// 这条差别很实在：明细页外面是 `PageView`，横向手势是它切 Tab 用的。
+/// 注册了却不处理，等于在这一块挖掉「横滑切 Tab」；不注册，手势才会
+/// 老老实实落到外层去。所以「筛选态下不翻期」必须靠不注册实现。
+class SwipeFlip extends StatefulWidget {
+  const SwipeFlip({
+    super.key,
     required this.onPrev,
     required this.onNext,
     required this.child,
     this.onTap,
     this.onDoubleTap,
+    this.enabled = true,
   });
 
   final VoidCallback onPrev;
@@ -252,13 +259,16 @@ class _SwipeFlip extends StatefulWidget {
   /// 双击回到「当前」：手上翻了好几期之后，不用一期一期点回去
   final VoidCallback? onDoubleTap;
 
+  /// 关掉横向翻页（点击手势不受影响）
+  final bool enabled;
+
   final Widget child;
 
   @override
-  State<_SwipeFlip> createState() => _SwipeFlipState();
+  State<SwipeFlip> createState() => _SwipeFlipState();
 }
 
-class _SwipeFlipState extends State<_SwipeFlip> {
+class _SwipeFlipState extends State<SwipeFlip> {
   static const _velocityThreshold = 260.0; // px/s
   static const _distanceThreshold = 48.0; // px
 
@@ -283,28 +293,24 @@ class _SwipeFlipState extends State<_SwipeFlip> {
       behavior: HitTestBehavior.opaque,
       onTap: widget.onTap,
       onDoubleTap: widget.onDoubleTap,
-      onHorizontalDragStart: (_) => _dx = 0,
-      onHorizontalDragUpdate: (d) => _dx += d.delta.dx,
-      onHorizontalDragEnd: _end,
-      onHorizontalDragCancel: () => _dx = 0,
+      onHorizontalDragStart: widget.enabled ? (_) => _dx = 0 : null,
+      onHorizontalDragUpdate: widget.enabled ? (d) => _dx += d.delta.dx : null,
+      onHorizontalDragEnd: widget.enabled ? _end : null,
+      onHorizontalDragCancel: widget.enabled ? () => _dx = 0 : null,
       child: widget.child,
     );
   }
 }
 
-/// 「当前是哪一期」—— 明细页顶部只有这一个，不做左右翻期。
-///
-/// 翻期交给日历：点这一颗就弹日历，点哪天就跳到那天所在的期。理由是一期
-/// 可能跨两个月（10-15 → 11-14），左右箭头一次只挪一期，要回到三个月前
-/// 得连点三下，而且每次都得重新读一遍数字确认自己翻到哪了。
-///
-/// 日历图案贴在文字**里面**（右侧），不另起一个按钮：它表达的是
-/// 「这个时间段是可点的」，不是一个并列的入口。
-/// 周期标签：「10-15 → 11-14」，点它开日历挑日期。
+/// 「当前是哪一期」的标签：「10-15 → 11-14」，点它开日历挑日期。
 ///
 /// 不加外框、不带日历图标 —— 它就在概览卡里，外面再套一层胶囊会把
 /// 「一张卡里的一个数字」变成「卡里又长出来一个控件」。日历入口靠可点性
 /// 本身表达，不必再画一遍。
+///
+/// ⚠️ 这个标签**自己不管翻期**：明细页的横滑挂在外层的概览卡上
+/// （见 `DetailPage` 里的 `SwipeFlip`，方案 B —— 只热上部，列表正文
+/// 仍然横滑切 Tab）。所以这里只有 onTap。
 class PeriodChip extends StatelessWidget {
   const PeriodChip({
     super.key,
@@ -383,7 +389,7 @@ class MonthBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = onDark ? C.bg : C.ink;
-    return _SwipeFlip(
+    return SwipeFlip(
       onPrev: onPrev,
       onNext: onNext,
       onTap: onTapLabel,

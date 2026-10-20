@@ -167,13 +167,16 @@ void main() {
 
     // 周期还在
     expect(find.text(periodLabel(s.cycleFrom, s.cycleTo)), findsOneWidget);
-    // 但没有左右箭头 —— 翻期交给日历
+    // 但**永远不给左右箭头**：翻期靠横滑概览卡与日历两个入口，
+    // 箭头一次只挪一期，还得盯着数字确认翻到哪（D-11 / D-24）。
     expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
     expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
 
     // 点这行日期文字 → 日历卡片（上下滚动，不是左右翻月）
     await tester.tap(find.text(periodLabel(s.cycleFrom, s.cycleTo)));
     await tester.pump();
+    // 1.4.5 起这行同时挂了双击（回本期），单击要先等一个 300ms 的双击判定窗口
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.pump(const Duration(milliseconds: 400));
 
     // 不加标题、不加提示、不给「回到今天」按钮 —— 顶上只剩年份和周几
@@ -248,6 +251,10 @@ void main() {
 
     await tester.tap(find.text(periodLabel(s.cycleFrom, s.cycleTo)));
     await tester.pump();
+    // 1.4.5 起这行同时挂了双击（回本期），单击要等 300ms 的双击判定窗口；
+    // 再等面板动画走完 —— 日历是「先布局、再滚到今天」，动画中途量高度
+    // 会滚到一个离谱的位置（实测滚到 5200，整个列表飞出屏幕）。
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.pump(const Duration(milliseconds: 400));
 
     // 上月 1 号在初始视口上方（打开时只露出上月末两行多），
