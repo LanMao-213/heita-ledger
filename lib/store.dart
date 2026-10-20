@@ -6,6 +6,7 @@ import 'data/cycle.dart' as cyc;
 import 'data/models.dart';
 import 'data/repo.dart';
 import 'data/ui_flags.dart';
+import 'design/haptics.dart';
 
 /// 统计页的归集口径。
 ///
@@ -22,12 +23,26 @@ class Store extends ChangeNotifier {
 
   bool ready = false;
 
+  /// 触感反馈开关（我的 → 偏好）。真正的执行点在 `Haptics.enabled`，
+  /// 这里只是给界面读的那份副本 + 落库。
+  bool hapticsEnabled = true;
+
+  static const _kHaptics = 'ui.haptics';
+
+  /// 改开关：立即生效（内存）+ 落库（下次启动还记得）。
+  Future<void> setHapticsEnabled(bool on) async {
+    hapticsEnabled = on;
+    Haptics.enabled = on;
+    notifyListeners();
+    await Repo.setSetting(_kHaptics, on ? '1' : '0');
+  }
+
   /// 底部导航当前页：0 明细 / 1 图表 / 2 计划 / 3 我的。
   /// 放在 Store 里是为了让统计页「点某天看明细」能跨页切 Tab，
   /// 而不用给 HomeShell 开一个谁都能调的全局 key。
   int tabIndex = 0;
 
-  // ------------------------------------------------------- 通知合并（1.5.0）
+  // ------------------------------------------------------- 通知合并（1.4.5）
   //
   // `loadCycle()` 和 `loadStats()` 各自 `notifyListeners()`，所以「记一笔」
   // 会连着触发两次全树重建 —— 而用户真正需要的只是「最后那一次新状态」。
@@ -122,7 +137,7 @@ class Store extends ChangeNotifier {
 
   /// 明细一次最多取多少条（安全上限，不是产品上限）。
   ///
-  /// 1.5.0 之前这里是 500，而且**必须**卡住：明细页当时是
+  /// 1.4.5 之前这里是 500，而且**必须**卡住：明细页当时是
   /// `ListView(children: [...])` 的非懒加载列表，一期几千笔会一次性构建所有行。
   /// 现在明细页改成 `SliverList.builder`，只建可视区域内的那几张日卡，
   /// 分摊成本与总条数无关，所以上限提到 2000 只当「防止一次查询把内存打爆」的
@@ -289,8 +304,11 @@ class Store extends ChangeNotifier {
     // v3 → v4 升级后 `period_start` 是空的，先补齐。账单日默认 1 时回填结果
     // 等于月初，与升级前完全一致 —— 这一步不改任何查询口径。
     await Repo.backfillMissingPeriods();
-    // 界面实验开关（类型 chips / 空态第二行）从 setting 表读覆盖值
+    // 界面实验开关（空态第二行）从 setting 表读覆盖值
     await UiFlags.load();
+    // 触感开关：只有存过 '0' 才算关。老库没有这个键 → 保持默认开
+    hapticsEnabled = (await Repo.getSetting(_kHaptics)) != '0';
+    Haptics.enabled = hapticsEnabled;
     ledgerId = await Repo.currentLedgerId();
     cycleStartDay = await Repo.cycleStartDay();
     resetCycleToToday();

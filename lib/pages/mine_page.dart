@@ -140,6 +140,28 @@ class MinePage extends StatelessWidget {
               ],
             ),
           ),
+          // 偏好：目前只有触感一项。
+          //
+          // 为什么给这个开关：震动是「我们替用户做的决定」，而它恰好有两类人
+          // 会立刻反感 —— 开会/夜里记账的人、以及手机常年静音连触感也关掉的人。
+          // 系统层面关掉当然有效，但用户不会为了一个记账 App 去翻系统设置。
+          //
+          // 没有「音量」开关：这个应用**不出声**（全仓库没有一处 SystemSound /
+          // 音频库），没有开关可加。真要做提示音属于新功能，不是开关。
+          const SectionTitle('偏好'),
+          SectionCard(
+            padding: EdgeInsets.zero,
+            child: SettingRow(
+              icon: 'pulse',
+              title: '触感反馈',
+              subtitle: s.hapticsEnabled ? '记账、删除时短震一下' : '已关闭，不做任何震动',
+              onTap: () => s.setHapticsEnabled(!s.hapticsEnabled),
+              trailing: Switch(
+                value: s.hapticsEnabled,
+                onChanged: s.setHapticsEnabled,
+              ),
+            ),
+          ),
           // 「清空」单独拎出来：它和导出/导入不是一类操作，混在一张卡里容易误触
           const SectionTitle('危险操作'),
           SectionCard(
