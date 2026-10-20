@@ -120,12 +120,17 @@ class Store extends ChangeNotifier {
   int incomeCents = 0;
   int txnCount = 0;
 
-  /// 明细列表一次最多画多少条。
+  /// 明细一次最多取多少条（安全上限，不是产品上限）。
   ///
-  /// 超出部分**不丢**，但要走「本期全览」才看得到（`pages/period_all_page.dart`）：
-  /// 明细页是按天分卡的非懒加载列表，一期几千笔一次全建会直接卡死，
-  /// 而「一个月记几百笔」属于极端情况，不该让常态为它付代价。
-  static const txnPageLimit = 500;
+  /// 1.5.0 之前这里是 500，而且**必须**卡住：明细页当时是
+  /// `ListView(children: [...])` 的非懒加载列表，一期几千笔会一次性构建所有行。
+  /// 现在明细页改成 `SliverList.builder`，只建可视区域内的那几张日卡，
+  /// 分摊成本与总条数无关，所以上限提到 2000 只当「防止一次查询把内存打爆」的
+  /// 兜底 —— 一个月的个人记账几乎不可能碰到。
+  ///
+  /// 真碰到也不会静默丢：列表末尾仍是「仅显示最近 N 条 · 本期共 M 笔」+
+  /// 「查看本期全部」（`pages/period_all_page.dart`）。
+  static const txnPageLimit = 2000;
 
   /// 本期明细是否被 [txnPageLimit] 截断了 —— 截断了列表末尾要说明白
   bool txnTruncated = false;

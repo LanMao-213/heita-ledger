@@ -22,6 +22,10 @@ class DetailPage extends StatelessWidget {
     return AnimatedBuilder(
       animation: s,
       builder: (context, _) {
+        // 分组在这里算**一次**并复用：`groupedVisibleByDay` 每次访问都会重新
+        // 建一遍 map 再排序，放进 itemBuilder 就成了「每张卡算一遍」。
+        final groups = s.groupedVisibleByDay;
+
         return Column(
           children: [
             const _TopBar(),
@@ -29,31 +33,39 @@ class DetailPage extends StatelessWidget {
             if (UiFlags.typeChips) const _TypeChips(),
             if (s.filtering) _FilterBar(),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: S.xxl),
-                children: [
+              // ★ 懒加载（1.5.0）：原来是 `ListView(children: [...])`，一期几百笔
+              //   会一次性构建所有行 —— 1.4.4 的「明细只显示 500 条」就是为了躲它。
+              //   换成 `SliverList.builder` 后只构建可视区域内的那几张日卡，
+              //   滚动时才按需建下一张，摊还成本与屏高成正比，与总条数无关。
+              child: CustomScrollView(
+                slivers: [
                   // 不加 const：这几块直接读 Store.i，const 会被 Flutter 当成
                   // 「同一个 widget」跳过重建，筛选切换后数字会停在旧口径
-                  SummaryCard(),
+                  SliverToBoxAdapter(child: SummaryCard()),
                   if (s.visibleTxns.isEmpty)
-                    s.filtering
-                        ? const EmptyHint(
-                            icon: 'list',
-                            text: '没有符合条件的记录',
-                            hint: '试试放宽条件，或点上面的「重置」',
-                          )
-                        : const EmptyHint(
-                            icon: 'doc',
-                            text: '这一期还没有记账',
-                            hint: '点下面的「＋」记第一笔',
-                          )
-                  else ...[
-                    ..._dayGroups(context, s),
-                    // 被 500 条上限截断时说清楚，并给一条「看全部」的路。
-                    // 1.4.3 之前这里什么都不说：概览卡写 620 笔、列表只有 500 条，
-                    // 用户既不知道少了，也没地方看剩下的（见 period_all_page.dart）
-                    if (s.txnTruncated) const _MoreHint(),
-                  ],
+                    SliverToBoxAdapter(
+                      child: s.filtering
+                          ? const EmptyHint(
+                              icon: 'list',
+                              text: '没有符合条件的记录',
+                              hint: '试试放宽条件，或点上面的「重置」',
+                            )
+                          : const EmptyHint(
+                              icon: 'doc',
+                              text: '这一期还没有记账',
+                              hint: '点下面的「＋」记第一笔',
+                            ),
+                    )
+                  else
+                    SliverList.builder(
+                      // 超大批量时的兜底提示仍留在末尾（见 _MoreHint）：
+                      // 上限已经从 500 提到 2000，但「说不清楚少了」这个毛病不能回来
+                      itemCount: groups.length + (s.txnTruncated ? 1 : 0),
+                      itemBuilder: (context, i) => i >= groups.length
+                          ? const _MoreHint()
+                          : _dayCard(context, s, groups[i]),
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: S.xxl)),
                 ],
               ),
             ),
@@ -63,15 +75,20 @@ class DetailPage extends StatelessWidget {
     );
   }
 
-  List<Widget> _dayGroups(BuildContext context, Store s) {
-    final out = <Widget>[];
-    for (final (date, items) in s.groupedVisibleByDay) {
-      // 交叉归集：支出里的负数计入收入，收入里的负数计入支出
-      final dayExpense = sumBySide(items, TxnType.expense);
-      final dayIncome = sumBySide(items, TxnType.income);
+  /// 一天的卡：日期头 + 当日小计 + 当天的每一笔。
+  ///
+  /// 参数是「一天」而不是整个列表 —— 懒加载要求每次只产出一张卡。
+  Widget _dayCard(
+    BuildContext context,
+    Store s,
+    (String date, List<Txn> items) group,
+  ) {
+    final (date, items) = group;
+    // 交叉归集：支出里的负数计入收入，收入里的负数计入支出
+    final dayExpense = sumBySide(items, TxnType.expense);
+    final dayIncome = sumBySide(items, TxnType.income);
 
-      out.add(
-        Container(
+    return Container(
           margin: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
           decoration: BoxDecoration(
             color: C.bg,
@@ -134,10 +151,7 @@ class DetailPage extends StatelessWidget {
               ],
             ],
           ),
-        ),
-      );
-    }
-    return out;
+        );
   }
 }
 
