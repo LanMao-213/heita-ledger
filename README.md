@@ -3,7 +3,7 @@
 极简黑白灰风格的**本地记账 App**。不联网、不注册、不上传 —— 所有账目保存在设备本地的 SQLite 里，
 卸载即清除，靠导出 Excel 做备份。
 
-当前版本 **1.5.0**（包名 `com.heita.ledger`，Android）。改了什么看 [`CHANGELOG.md`](CHANGELOG.md)。
+当前版本 **1.4.1**（包名 `com.heita.ledger`，Android）。改了什么看 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ---
 
