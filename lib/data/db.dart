@@ -104,21 +104,39 @@ class Db {
     await _migrateTwoLevelCategories(db);
   }
 
-  /// 危险操作：清空全部业务数据（保留设置）
+  /// 清空时**子表在前、主表在后**：顺序错了会撞 `foreign_keys = ON`。
+  ///
+  /// `setting` 故意不在名单里 —— 它只放机器状态（当前账本、实验开关、提示是否
+  /// 出过），清账目不该顺手把「当前账本」抹成空串。[_seed] 会把它覆盖成新账本。
+  static const _wipeOrder = <String>[
+    'txn',
+    'debt',
+    'budget',
+    'saving_goal',
+    'recurring',
+    'txn_template',
+    'category',
+    'account',
+    'ledger',
+  ];
+
+  /// 危险操作：清空全部业务数据（保留设置，重建默认账本/账户/分类）。
+  ///
+  /// ★ **删除与重建必须在同一个事务里**。1.4.1 及以前是「事务里只删、事务
+  /// 外再 `_seed`」：`_seed` 往 `setting` 插 `current_ledger_id` 撞主键抛异常，
+  /// 而删除已经提交 —— 结果是数据被删了一半（分类账户重建了、账本序号变了），
+  /// `Store.reboot()` 也没执行，界面还挂着内存里的旧数据。用户看到的就是
+  /// 「点了没反应、数据还在」；下次冷启动 `current_ledger_id` 指向已删除的
+  /// 账本，明细与分类全空。事务化之后，任何一步失败都整体回滚，
+  /// 调用方可以放心对用户说「数据未改动」。
   static Future<void> wipeAllData() async {
     final db = await open();
     await db.transaction((txn) async {
-      await txn.delete('txn');
-      await txn.delete('debt');
-      await txn.delete('budget');
-      await txn.delete('saving_goal');
-      await txn.delete('recurring');
-      await txn.delete('txn_template');
-      await txn.delete('category');
-      await txn.delete('account');
-      await txn.delete('ledger');
+      for (final table in _wipeOrder) {
+        await txn.delete(table);
+      }
+      await _seed(txn);
     });
-    await _seed(db);
   }
 
   static Future<void> _createSchema(Database db) async {
@@ -317,7 +335,15 @@ class Db {
 
   /// 首次安装的默认数据：一个账本、几个常用账户、原型里的全套分类。
   /// **不预置任何交易记录** —— 账本应该从用户自己的第一笔开始。
-  static Future<void> _seed(Database db) async {
+  ///
+  /// 参数是 [DatabaseExecutor] 而不是 `Database`：清空数据时它要在**事务里**
+  /// 重建（见 [wipeAllData]），事务对象同样满足这个接口。
+  ///
+  /// 写 setting 一律用 [ConflictAlgorithm.replace]：这个函数会被「首次建库」和
+  /// 「清空重建」两条路径共用，后者库里的 setting 还在（当前账本、实验开关、
+  /// 各种「提示只出一次」的标记），直接 insert 会撞 `k` 主键。
+  /// 覆盖是对的：账本 id 变了，「当前账本」必须跟着换。
+  static Future<void> _seed(DatabaseExecutor db) async {
     final ledgerId = await db.insert('ledger', {
       'name': '日常账本',
       'icon': 'book',
@@ -343,9 +369,16 @@ class Db {
 
     await _seedCategories(db, ledgerId);
 
-    await db.insert('setting', {'k': 'current_ledger_id', 'v': '$ledgerId'});
-    await db.insert('setting', {'k': 'app_name', 'v': '黑塔消费日记'});
-    await db.insert('setting', {'k': 'schema_ready', 'v': '1'});
+    for (final (k, v) in [
+      ('current_ledger_id', '$ledgerId'),
+      ('app_name', '黑塔消费日记'),
+      ('schema_ready', '1'),
+    ]) {
+      await db.insert('setting', {
+        'k': k,
+        'v': v,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
   }
 
   /// 默认分类 —— 全部来自 `category_seed.dart`，这里不写死任何一个分类名。
@@ -353,13 +386,13 @@ class Db {
   /// 两级结构：先插一级（`parent_id` 为空），再挂子分类。
   /// `sort_order` 在每一层内部各自从 0 开始 —— 查询时按父级分组取，
   /// 一级与子级的编号互不干扰。
-  static Future<void> _seedCategories(Database db, int ledgerId) async {
+  static Future<void> _seedCategories(DatabaseExecutor db, int ledgerId) async {
     await _seedGroup(db, ledgerId, 'expense', kExpenseSeed);
     await _seedGroup(db, ledgerId, 'income', kIncomeSeed);
   }
 
   static Future<void> _seedGroup(
-    Database db,
+    DatabaseExecutor db,
     int ledgerId,
     String type,
     List<SeedCat> cats,

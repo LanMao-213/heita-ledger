@@ -426,9 +426,16 @@ class MinePage extends StatelessWidget {
       ),
     );
     if (ok != true) return;
-    await Db.wipeAllData();
-    await Store.i.reboot();
-    if (context.mounted) showToast(context, '已清空');
+    // 失败必须说出来：清空是单向门，1.4.1 里异常被悄悄吞掉，用户看到的就是
+    // 「点了没反应、数据还在」。现在删除与重建在同一个事务里（见
+    // `Db.wipeAllData`），抛异常等于整体回滚，所以可以明确说「数据未改动」。
+    try {
+      await Db.wipeAllData();
+      await Store.i.reboot();
+      if (context.mounted) showToast(context, '已清空');
+    } catch (e) {
+      if (context.mounted) showToast(context, '清空失败，数据未改动：$e');
+    }
   }
 
   // -------------------------------------------------------------- 账户管理

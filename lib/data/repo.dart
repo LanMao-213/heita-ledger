@@ -24,11 +24,26 @@ class Repo {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  /// 当前账本 id。
+  ///
+  /// ★ 存下来的 id **必须校验还活着**：1.4.1 的清空 bug 会在库里留下
+  /// 「`current_ledger_id` 指着已删除的账本」这种状态，直接沿用的话，
+  /// 明细、分类、预算全部按一个不存在的 ledger_id 去查 —— 界面上一片空白，
+  /// 记一笔也看不见（新记录挂在另一个账本上）。这里发现对不上就改成真实存在的
+  /// 那一本，让已经中招的库在下次启动时自愈，不用重装。
   static Future<int> currentLedgerId() async {
     final v = await getSetting('current_ledger_id');
-    if (v != null) {
-      final id = int.tryParse(v);
-      if (id != null) return id;
+    final saved = int.tryParse(v ?? '');
+    if (saved != null) {
+      final db = await Db.open();
+      final hit = await db.query(
+        'ledger',
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [saved],
+        limit: 1,
+      );
+      if (hit.isNotEmpty) return saved;
     }
     final ledgers = await listLedgers();
     if (ledgers.isEmpty) {
