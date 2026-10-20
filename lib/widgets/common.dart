@@ -25,7 +25,8 @@ class SectionCard extends StatelessWidget {
       margin: margin,
       padding: padding,
       decoration: BoxDecoration(
-        color: C.bg,
+        // 卡片面：浅色是纯白，黑塔版抬一档（见 C.cardBg 的注释）
+        color: C.cardBg,
         border: Border.all(color: C.line),
         borderRadius: BorderRadius.circular(R.card),
       ),
@@ -80,10 +81,13 @@ class Bar extends StatelessWidget {
         height: height,
         child: Stack(
           children: [
-            Container(color: const Color(0xFFEEF0F2)),
+            // 轨道底：浅色版是 #EEF0F2，黑塔版是暗石棕（见 C.handle）
+            Container(color: C.handle),
             FractionallySizedBox(
               widthFactor: v,
-              child: Container(color: color ?? (over ? C.over : C.ink)),
+              // 未超支时用强调色：黑白灰版 accent == ink（视觉不变），
+              // 黑塔版 accent == 咒法橙 —— 进度条是这版唯一大面积上色的地方
+              child: Container(color: color ?? (over ? C.over : C.accent)),
             ),
           ],
         ),

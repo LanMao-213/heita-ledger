@@ -248,7 +248,9 @@ class _CalendarPickerState extends State<_CalendarPicker> {
       padding: EdgeInsets.only(bottom: media.viewPadding.bottom),
       child: Container(
         decoration: const BoxDecoration(
-          color: C.bg,
+          // 抽屉面用「卡面」而不是「页面底」：露露缇雅版的底是天青，
+          // 抽屉再铺一层天青就成了整片蓝；卡面是暖白，读起来才是「纸」
+          color: C.cardBg,
           borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
         ),
         padding: const EdgeInsets.only(top: S.sm),
@@ -379,7 +381,8 @@ class _CalendarPickerState extends State<_CalendarPicker> {
                           style: const TextStyle(
                             fontSize: 216,
                             fontWeight: FontWeight.w900,
-                            color: Color(0x0F14161A),
+                            // 月份水印：浅底是黑 6%，暗底是骨白 8%（C.inkWash）
+                            color: C.inkWash,
                             height: 0.92,
                             letterSpacing: -6,
                           ),
@@ -420,7 +423,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
     // 会一起变浅，看不出「换月了」
     final Color fg;
     if (isToday) {
-      fg = C.bg;
+      fg = C.onTodayMark;
     } else if (!isActive) {
       fg = C.ink4;
     } else if (!inPeriod) {
@@ -448,7 +451,10 @@ class _CalendarPickerState extends State<_CalendarPicker> {
                 height: _dot,
                 alignment: Alignment.center,
                 decoration: isToday
-                    ? const BoxDecoration(color: C.ink, shape: BoxShape.circle)
+                    ? const BoxDecoration(
+                        color: C.todayMark,
+                        shape: BoxShape.circle,
+                      )
                     : null,
                 child: Text(
                   '$day',

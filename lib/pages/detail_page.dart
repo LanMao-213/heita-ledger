@@ -143,14 +143,15 @@ class _DetailPageState extends State<DetailPage> {
     return Container(
           margin: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
           decoration: BoxDecoration(
-            color: C.bg,
+            color: C.cardBg,
             borderRadius: BorderRadius.circular(R.card),
             border: Border.all(color: C.line),
             // 极淡的投影：白卡叠在白底上只靠 1px 描边，看起来还是一条长列表；
-            // 一点点投影就够让它「浮」起来，不至于抢走顶部概览卡的分量
+            // 一点点投影就够让它「浮」起来，不至于抢走顶部概览卡的分量。
+            // 暗底上 4% 的黑等于没有投影，所以这个值也是分主题的（C.cardShadow）。
             boxShadow: const [
               BoxShadow(
-                color: Color(0x0A14161A),
+                color: C.cardShadow,
                 blurRadius: 10,
                 offset: Offset(0, 2),
               ),

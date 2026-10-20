@@ -200,7 +200,8 @@ class _TabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: C.bg,
+        // 底栏跟着卡面走：露露缇雅版的页面底是天青，底栏再用天青就糊在一起
+        color: C.cardBg,
         border: Border(top: BorderSide(color: C.line)),
       ),
       child: SafeArea(
@@ -250,23 +251,25 @@ class _TabBar extends StatelessWidget {
               width: 54,
               height: 54,
               decoration: BoxDecoration(
-                color: C.ink,
+                // 记一笔：默认主题是主文字色（黑白灰原则）；露露缇雅版用深天青 ——
+                // 全屏最常用的一颗按钮。天青比绯红更合适（绯红留给「超支」）
+                color: C.accent,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: C.ink.withValues(alpha: 0.28),
+                    color: C.accent.withValues(alpha: 0.28),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
                   // 3px 白色描边：让按钮从 tabbar 上「切」出来，不然只是浮着
-                  const BoxShadow(color: C.bg, spreadRadius: 3),
+                  const BoxShadow(color: C.cardBg, spreadRadius: 3),
                 ],
               ),
               child: const Center(
                 child: LineIcon(
                   'plus',
                   size: 24,
-                  color: C.bg,
+                  color: C.onAccent,
                   strokeWidth: 1.8,
                 ),
               ),

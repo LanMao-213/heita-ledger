@@ -10,7 +10,7 @@ import '../calendar_picker.dart';
 
 /// 首页概览卡。
 ///
-/// 浅灰底（`C.bg2`）+ 描边，和下方白底明细卡正好反过来：
+/// 浅灰底（`C.heroBg`，默认主题下等于 `C.bg2`）+ 描边，和下方白底明细卡正好反过来：
 /// 一个「压下去」的汇总区，配一组「浮上来」的记录卡。之前是纯黑 hero，
 /// 在满屏黑白灰里太重，一进页面眼睛只能看到这块黑。
 /// 概览卡的抬头：「本期支出 · 10.01 – 10.31」，整行可点，点了弹日历。
@@ -141,9 +141,10 @@ class SummaryCard extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.xs),
       padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
       decoration: BoxDecoration(
-        color: C.bg2,
+        color: C.heroBg,
         borderRadius: BorderRadius.circular(R.lg),
-        border: Border.all(color: C.line),
+        // 描边分主题：默认主题是冷灰，露露缇雅版是薰衣草灰（C.heroEdge）
+        border: Border.all(color: C.heroEdge),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,8 +254,10 @@ class SummaryCard extends StatelessWidget {
                 value: pacing.usedRatio.clamp(0.0, 1.0),
                 minHeight: 6,
                 backgroundColor: C.line2,
+                // 未超支时用强调色：黑白灰版 accent == ink（视觉不变），
+                // 黑塔版是咒法橙 —— 概览卡上唯一的大面积彩色，正好压在进度上
                 valueColor: AlwaysStoppedAnimation(
-                  s.overBudget ? C.over : C.ink,
+                  s.overBudget ? C.over : C.accent,
                 ),
               ),
             ),

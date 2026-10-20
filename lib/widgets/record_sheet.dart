@@ -799,7 +799,9 @@ class _RecordSheetState extends State<RecordSheet> {
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [C.bg.withValues(alpha: 0), C.bg],
+                              // 渐隐的终点必须是面板自己的面（卡面），
+                              // 不是页面底 —— 否则暗一圈，像没画完
+                              colors: [C.cardBg.withValues(alpha: 0), C.cardBg],
                             ),
                           ),
                         ),
@@ -863,7 +865,8 @@ class _RecordSheetState extends State<RecordSheet> {
           // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
           // 留白不会跟着变白
           borderRadius: const BorderRadius.vertical(top: Radius.circular(R.lg)),
-          child: Container(color: C.bg, child: body),
+          // 面板面用卡面（暖白），不是页面底（天青）
+          child: Container(color: C.cardBg, child: body),
         ),
       ),
     );
@@ -1575,7 +1578,7 @@ class _LiftRow extends StatelessWidget {
                 width: 20,
                 height: 20,
                 decoration: const BoxDecoration(
-                  color: C.bg,
+                  color: C.cardBg,
                   shape: BoxShape.circle,
                 ),
               ),

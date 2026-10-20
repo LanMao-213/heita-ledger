@@ -937,8 +937,11 @@ class BudgetStat {
   int get overCents => over ? spentCents - budgetCents : 0;
 }
 
-/// 饼图切片用的取色：按金额从大到小套灰阶，保证深浅有意义
-Color monoSlot(int index) => kMono[index % kMono.length];
+/// 饼图切片用的取色：按金额从大到小套色阶，保证深浅有意义。
+///
+/// 色阶本身由主题决定（`kChart`）：默认是十档灰，黑塔版是骨白→天青→
+/// 咒法橙→绯红→秘法紫。调用点不用关心是哪一套。
+Color monoSlot(int index) => kChart[index % kChart.length];
 
 // --------------------------------------------------------------- 借贷往来
 
