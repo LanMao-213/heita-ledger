@@ -1559,6 +1559,39 @@ class Repo {
     });
   }
 
+  /// 按传入顺序重写分类的 `sort_order`（0..n-1）。
+  ///
+  /// 只动排序，不碰名称、图标、停用状态。停用的分类不参与排序 ——
+  /// 管理页把它们单独排在下面，拖的是「使用中」那一段。
+  static Future<void> reorderCategories(List<int> orderedIds) async {
+    final db = await Db.open();
+    await db.transaction((txn) async {
+      for (var i = 0; i < orderedIds.length; i++) {
+        await txn.update(
+          'category',
+          {'sort_order': i},
+          where: 'id = ?',
+          whereArgs: [orderedIds[i]],
+        );
+      }
+    });
+  }
+
+  /// 停用 / 恢复一个分类。
+  ///
+  /// 不级联：停用一级分类时，它的子分类保持原状。理由是一级分类消失后，
+  /// 子分类本来就到不了（选择器先选一级再选二级），级联反而会让「恢复一级」
+  /// 顺手把用户单独停用过的子分类也放出来。
+  static Future<void> setCategoryArchived(int id, {required bool archived}) async {
+    final db = await Db.open();
+    await db.update(
+      'category',
+      {'archived': archived ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   // -------------------------------------------------------------------- 工具
 
   /// 月份参数统一成日期区间，这样能吃到 `idx_txn_ledger_date` 索引；

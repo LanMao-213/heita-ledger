@@ -40,6 +40,7 @@ class _CatsPageState extends State<CatsPage> {
         animation: s,
         builder: (context, _) {
           final cats = _type.isExpense ? s.expenseCats : s.incomeCats;
+          final archived = s.archivedTopCats(_type);
           return Column(
             children: [
               Padding(
@@ -53,43 +54,64 @@ class _CatsPageState extends State<CatsPage> {
                 ),
               ),
               Expanded(
-                child: cats.isEmpty
+                child: cats.isEmpty && archived.isEmpty
                     ? const EmptyHint(text: '这个类型下还没有分类')
-                    : ListView.separated(
+                    : ReorderableListView.builder(
                         padding: const EdgeInsets.only(bottom: 90),
-                        itemCount: cats.length,
-                        separatorBuilder: (_, _) => const Divider(
-                          height: 1,
-                          color: C.line,
-                          indent: 64,
-                          endIndent: S.lg,
-                        ),
+                        // 手柄只放在左侧那一个位置，避免整行长按拖动和
+                        // 「点进子分类」抢手势
+                        buildDefaultDragHandles: false,
+                        itemCount: cats.length + (archived.isEmpty ? 0 : 1),
+                        onReorderItem: _onReorder,
                         itemBuilder: (context, i) {
+                          // 末尾那段是「已停用」，不参与排序
+                          if (i == cats.length) {
+                            return _ArchivedBlock(
+                              key: const ValueKey('archived-top'),
+                              hint: '已停用 ${archived.length} 个，不参与排序；点「恢复」放回上面的列表',
+                              cats: archived,
+                              onRestore: (c) =>
+                                  _setArchived(c, archived: false),
+                            );
+                          }
                           final c = cats[i];
                           final n = s.childrenOf(c.id).length;
-                          return SettingRow(
-                            icon: c.icon,
-                            title: c.name,
-                            subtitle: n == 0 ? '还没有子分类' : '$n 个子分类',
-                            // 整行可点：主操作是「进去管子分类」，
-                            // 改名/删除这种低频动作收进右侧菜单
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => _SubCatsPage(
-                                  parent: c,
-                                  onAdd: (ctx) => _edit(ctx, null, parent: c),
-                                  onEdit: (ctx, cat) => _edit(ctx, cat),
+                          return Column(
+                            key: ValueKey('top-${c.id}'),
+                            children: [
+                              SettingRow(
+                                leading: _dragHandle(i),
+                                icon: c.icon,
+                                title: c.name,
+                                subtitle: n == 0 ? '还没有子分类' : '$n 个子分类',
+                                // 整行可点：主操作是「进去管子分类」，
+                                // 改名/停用/删除这种低频动作收进右侧菜单
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => _SubCatsPage(
+                                      parent: c,
+                                      onAdd: (ctx) => _edit(ctx, null, parent: c),
+                                      onEdit: (ctx, cat) => _edit(ctx, cat),
+                                    ),
+                                  ),
+                                ),
+                                trailing: IconButton(
+                                  onPressed: () => _menu(context, c),
+                                  icon: const Icon(
+                                    Icons.more_horiz_rounded,
+                                    size: 20,
+                                    color: C.ink3,
+                                  ),
                                 ),
                               ),
-                            ),
-                            trailing: IconButton(
-                              onPressed: () => _menu(context, c),
-                              icon: const Icon(
-                                Icons.more_horiz_rounded,
-                                size: 20,
-                                color: C.ink3,
-                              ),
-                            ),
+                              if (i < cats.length - 1 || archived.isNotEmpty)
+                                const Divider(
+                                  height: 1,
+                                  color: C.line,
+                                  indent: 64,
+                                  endIndent: S.lg,
+                                ),
+                            ],
                           );
                         },
                       ),
@@ -107,6 +129,39 @@ class _CatsPageState extends State<CatsPage> {
         label: const Text('新增分类', style: TextStyle(fontSize: 14)),
       ),
     );
+  }
+
+  /// 拖拽手柄。`buildDefaultDragHandles: false` 之后由它决定从哪儿开始拖。
+  Widget _dragHandle(int index) => ReorderableDragStartListener(
+    index: index,
+    child: const Padding(
+      padding: EdgeInsets.only(right: S.xs),
+      child: Icon(Icons.drag_indicator_rounded, size: 20, color: C.ink4),
+    ),
+  );
+
+  /// 拖动一级分类后把新顺序写回 `sort_order`。
+  ///
+  /// `onReorderItem` 已经算好了「先移除再插入」的偏移，不用再手动减 1
+  /// （老的 `onReorder` 才需要自己调）。
+  Future<void> _onReorder(int oldIndex, int newIndex) async {
+    final cats = _type.isExpense ? Store.i.expenseCats : Store.i.incomeCats;
+    if (oldIndex >= cats.length) return; // 末尾「已停用」那段不可拖
+    final list = [...cats];
+    final item = list.removeAt(oldIndex);
+    final at = newIndex > list.length ? list.length : newIndex;
+    list.insert(at, item);
+    await Repo.reorderCategories(list.map((e) => e.id).toList());
+    await Store.i.afterCategoryChange();
+  }
+
+  /// 切换停用状态。停用后它从选择器、预算、统计里一起消失，
+  /// 但历史流水仍然指着它，明细里照常显示原名。
+  Future<void> _setArchived(Category c, {required bool archived}) async {
+    await Repo.setCategoryArchived(c.id, archived: archived);
+    await Store.i.afterCategoryChange();
+    if (!mounted) return;
+    showToast(context, archived ? '已停用「${c.name}」' : '已恢复「${c.name}」');
   }
 
   Future<void> _menu(BuildContext context, Category c) async {
@@ -140,6 +195,16 @@ class _CatsPageState extends State<CatsPage> {
                     ),
                   ),
                 );
+              },
+            ),
+            SettingRow(
+              icon: 'eye',
+              title: '停用',
+              // 停用不是删除：流水还指着这个分类，明细里照常显示
+              subtitle: '从记账选择器和预算里收起来，历史记录照常显示，随时可恢复',
+              onTap: () async {
+                Navigator.pop(ctx);
+                await _setArchived(c, archived: true);
               },
             ),
             SettingRow(
@@ -364,32 +429,50 @@ class _SubCatsPageState extends State<_SubCatsPage> {
         animation: s,
         builder: (context, _) {
           final subs = s.childrenOf(widget.parent.id);
-          if (subs.isEmpty) {
+          final archived = s.archivedChildrenOf(widget.parent.id);
+          if (subs.isEmpty && archived.isEmpty) {
             return const EmptyHint(text: '还没有子分类，点右下角添加');
           }
-          return ListView.separated(
+          return ReorderableListView.builder(
             padding: const EdgeInsets.only(bottom: 90),
-            itemCount: subs.length,
-            separatorBuilder: (_, _) => const Divider(
-              height: 1,
-              color: C.line,
-              indent: 64,
-              endIndent: S.lg,
-            ),
+            buildDefaultDragHandles: false,
+            itemCount: subs.length + (archived.isEmpty ? 0 : 1),
+            onReorderItem: _onReorder,
             itemBuilder: (context, i) {
+              if (i == subs.length) {
+                return _ArchivedBlock(
+                  key: const ValueKey('archived-sub'),
+                  hint: '已停用 ${archived.length} 个，不参与排序；点「恢复」放回上面的列表',
+                  cats: archived,
+                  onRestore: (c) => _setArchived(c, archived: false),
+                );
+              }
               final c = subs[i];
-              return SettingRow(
-                icon: c.icon,
-                title: c.name,
-                subtitle: c.name == widget.parent.name ? '与一级同名' : null,
-                trailing: IconButton(
-                  onPressed: () => _menu(context, c),
-                  icon: const Icon(
-                    Icons.more_horiz_rounded,
-                    size: 20,
-                    color: C.ink3,
+              return Column(
+                key: ValueKey('sub-${c.id}'),
+                children: [
+                  SettingRow(
+                    leading: _dragHandle(i),
+                    icon: c.icon,
+                    title: c.name,
+                    subtitle: c.name == widget.parent.name ? '与一级同名' : null,
+                    trailing: IconButton(
+                      onPressed: () => _menu(context, c),
+                      icon: const Icon(
+                        Icons.more_horiz_rounded,
+                        size: 20,
+                        color: C.ink3,
+                      ),
+                    ),
                   ),
-                ),
+                  if (i < subs.length - 1 || archived.isNotEmpty)
+                    const Divider(
+                      height: 1,
+                      color: C.line,
+                      indent: 64,
+                      endIndent: S.lg,
+                    ),
+                ],
               );
             },
           );
@@ -406,6 +489,32 @@ class _SubCatsPageState extends State<_SubCatsPage> {
     );
   }
 
+  Widget _dragHandle(int index) => ReorderableDragStartListener(
+    index: index,
+    child: const Padding(
+      padding: EdgeInsets.only(right: S.xs),
+      child: Icon(Icons.drag_indicator_rounded, size: 20, color: C.ink4),
+    ),
+  );
+
+  Future<void> _onReorder(int oldIndex, int newIndex) async {
+    final subs = Store.i.childrenOf(widget.parent.id);
+    if (oldIndex >= subs.length) return; // 末尾「已停用」那段不可拖
+    final list = [...subs];
+    final item = list.removeAt(oldIndex);
+    final at = newIndex > list.length ? list.length : newIndex;
+    list.insert(at, item);
+    await Repo.reorderCategories(list.map((e) => e.id).toList());
+    await Store.i.afterCategoryChange();
+  }
+
+  Future<void> _setArchived(Category c, {required bool archived}) async {
+    await Repo.setCategoryArchived(c.id, archived: archived);
+    await Store.i.afterCategoryChange();
+    if (!mounted) return;
+    showToast(context, archived ? '已停用「${c.name}」' : '已恢复「${c.name}」');
+  }
+
   Future<void> _menu(BuildContext context, Category c) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -420,6 +529,15 @@ class _SubCatsPageState extends State<_SubCatsPage> {
               onTap: () {
                 Navigator.pop(ctx);
                 widget.onEdit(context, c);
+              },
+            ),
+            SettingRow(
+              icon: 'eye',
+              title: '停用',
+              subtitle: '从记账选择器和预算里收起来，历史记录照常显示，随时可恢复',
+              onTap: () async {
+                Navigator.pop(ctx);
+                await _setArchived(c, archived: true);
               },
             ),
             SettingRow(
@@ -465,6 +583,54 @@ class _SubCatsPageState extends State<_SubCatsPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 列表末尾的「已停用」段。
+///
+/// 停用的分类不进选择器，但仍要能找回来，所以挂在同一张列表的末尾 ——
+/// 拖拽只作用于上面那段「使用中」的，这段永远不动。
+class _ArchivedBlock extends StatelessWidget {
+  const _ArchivedBlock({
+    super.key,
+    required this.hint,
+    required this.cats,
+    required this.onRestore,
+  });
+
+  final String hint;
+  final List<Category> cats;
+  final void Function(Category cat) onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: S.md),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.sm),
+          child: Text(hint, style: T.caption),
+        ),
+        for (final c in cats)
+          SettingRow(
+            icon: c.icon,
+            title: c.name,
+            trailing: TextButton(
+              onPressed: () => onRestore(c),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 32),
+                padding: const EdgeInsets.symmetric(horizontal: S.md),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                '恢复',
+                style: TextStyle(fontSize: 13, color: C.ink2),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

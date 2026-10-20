@@ -458,6 +458,7 @@ class SettingRow extends StatelessWidget {
     required this.icon,
     required this.title,
     this.subtitle,
+    this.leading,
     this.trailing,
     this.onTap,
     this.danger = false,
@@ -466,6 +467,10 @@ class SettingRow extends StatelessWidget {
   final String icon;
   final String title;
   final String? subtitle;
+
+  /// 图标左侧的附加控件。目前只给分类管理页放拖拽手柄用 ——
+  /// 有它的时候左边距收窄，避免手柄 + 图标挤在一起。
+  final Widget? leading;
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool danger;
@@ -476,9 +481,10 @@ class SettingRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 14),
+        padding: EdgeInsets.fromLTRB(leading == null ? S.lg : S.xs, 14, S.lg, 14),
         child: Row(
           children: [
+            ?leading,
             LineIcon(icon, size: 20, color: danger ? C.over : C.ink2),
             const SizedBox(width: S.md),
             Expanded(

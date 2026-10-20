@@ -43,13 +43,18 @@ class Store extends ChangeNotifier {
 
   // 分类
   //
-  // 两级分类（v6 起）：[allExpenseCats] 含全部节点，用于按 id 反查；
-  // [expenseCats] 只留一级 —— 筛选面板、预算、分类管理、录入左轮要的都是
-  // 一级，混着子分类列出来会出现「餐饮」和「正餐」并排的怪状。
+  // 两级分类（v6 起）：[allExpenseCats] 含「使用中」的全部节点（一级 + 子级），
+  // 用于按 id 反查；[expenseCats] 只留一级 —— 筛选面板、预算、分类管理、录入左轮
+  // 要的都是一级，混着子分类列出来会出现「餐饮」和「正餐」并排的怪状。
   List<Category> allExpenseCats = [];
   List<Category> allIncomeCats = [];
   List<Category> expenseCats = [];
   List<Category> incomeCats = [];
+
+  // 已停用的分类单独放：选择器、预算、统计一律不碰它们，
+  // 只有分类管理页要在「已停用」那一段里列出来好让用户恢复。
+  List<Category> archivedExpenseCats = [];
+  List<Category> archivedIncomeCats = [];
 
   // 记账模板（templates 按管理页顺序，recentTemplates 按使用频率取前 3）
   List<TxnTemplate> templates = [];
@@ -435,8 +440,34 @@ class Store extends ChangeNotifier {
   /// 分开查两次（`WHERE parent_id IS NULL` + 全量）会让两个列表的
   /// 加载时机不一致，改分类时界面会闪一下。
   Future<void> _loadCategories() async {
-    allExpenseCats = await Repo.listCategories(ledgerId, type: TxnType.expense);
-    allIncomeCats = await Repo.listCategories(ledgerId, type: TxnType.income);
+    final expAll = await Repo.listCategories(
+      ledgerId,
+      type: TxnType.expense,
+      includeArchived: true,
+    );
+    final incAll = await Repo.listCategories(
+      ledgerId,
+      type: TxnType.income,
+      includeArchived: true,
+    );
+    // 停用的不进 [allExpenseCats]：那些列表喂的是选择器、预算和统计，
+    // 停用的分类出现在那里就等于没停用。
+    archivedExpenseCats = [
+      for (final c in expAll)
+        if (c.archived) c,
+    ];
+    archivedIncomeCats = [
+      for (final c in incAll)
+        if (c.archived) c,
+    ];
+    allExpenseCats = [
+      for (final c in expAll)
+        if (!c.archived) c,
+    ];
+    allIncomeCats = [
+      for (final c in incAll)
+        if (!c.archived) c,
+    ];
     expenseCats = _topOnly(allExpenseCats);
     incomeCats = _topOnly(allIncomeCats);
   }
@@ -487,6 +518,14 @@ class Store extends ChangeNotifier {
     for (final c in allIncomeCats) {
       if (c.id == id) return c;
     }
+    // 停用的也要能反查到：历史流水、模板、周期账单都还指着它，
+    // 查不到就会被渲染成「已删除分类」。
+    for (final c in archivedExpenseCats) {
+      if (c.id == id) return c;
+    }
+    for (final c in archivedIncomeCats) {
+      if (c.id == id) return c;
+    }
     return null;
   }
 
@@ -500,6 +539,18 @@ class Store extends ChangeNotifier {
         if (c.parentId == parentId) c,
     ];
   }
+
+  /// 某一类型下已停用的一级分类 —— 只有分类管理页用得上
+  List<Category> archivedTopCats(TxnType type) =>
+      _topOnly(type.isExpense ? archivedExpenseCats : archivedIncomeCats);
+
+  /// 某个一级分类下已停用的子分类
+  List<Category> archivedChildrenOf(int parentId) => [
+    for (final c in archivedExpenseCats)
+      if (c.parentId == parentId) c,
+    for (final c in archivedIncomeCats)
+      if (c.parentId == parentId) c,
+  ];
 
   /// 子分类的父级；一级分类本身返回 null。
   /// 明细行要显示「正餐 · 餐饮」这种层级说明时用得上。
