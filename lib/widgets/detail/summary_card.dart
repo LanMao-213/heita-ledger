@@ -120,6 +120,23 @@ class SummaryCard extends StatelessWidget {
           )
         : null;
 
+    // 没设预算的期：底栏**不消失**，换成这一期的小总结（日均 / 最大一笔 / 环比）。
+    //
+    // 预算按「期」存（`budget.period_start`），翻到上个月那张表里通常没有记录，
+    // 以前整块底栏直接消失 —— 卡片高度从 300px 掉到 150px，下面的列表跟着窜一下，
+    // 而空出来的地方什么都不说。翻期又能一滑就到，这个跳动会反复出现。
+    //
+    // 只做纯计算，不查库：天数由 Pacing 现算，最大一笔从已加载的 txns 里取，
+    // 上一期的合计在 loadCycle 里**仅当这一期没预算时**才取（见 store 的注释）。
+    final summary = !filtering && budget == null
+        ? Pacing.ofRange(
+            from: s.cycleFrom,
+            to: s.cycleTo,
+            totalCents: null,
+            usedCents: s.expenseCents,
+          )
+        : null;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.xs),
       padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
@@ -191,12 +208,18 @@ class SummaryCard extends StatelessWidget {
             const SizedBox(height: S.md),
             Row(
               children: [
-                Text(
-                  '本期预算 ${Fmt.money(s.expenseCents)} / '
-                  '${Fmt.money(cap)}',
-                  style: TextStyle(fontSize: 12, color: dim),
+                // 左边让出剩余宽度：金额到五位数（12,000.00）时，
+                // 两段文字并排会把右边「剩多少」顶出卡片 —— 真机上表现为右侧被裁
+                Expanded(
+                  child: Text(
+                    '本期预算 ${Fmt.money(s.expenseCents)} / '
+                    '${Fmt.money(cap)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: dim),
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: S.sm),
                 Text(
                   s.overBudget
                       ? '超支 ${Fmt.money(s.overBudgetCents)}'
@@ -209,11 +232,17 @@ class SummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            // 借入计入预算时单列一行：挤在同一行里，右侧「剩多少」会被顶出屏幕
+            // 借入计入预算时，卡片上的大数字是「额度 + 借入」（9,000），
+            // 这一行说明那 3,000 是哪来的 —— 借来的钱确实能花，
+            // 大数字若还停在 6,000，用户会以为预算没变。存的额度不动，下期自动还原。
+            //
+            // 措辞按用户口径：**额度在前、借入在括号里**。6,000 是基准，3,000 是加成，
+            // 上一行的 9,000 是结果，三个数一眼能对上；倒过来写（「含借入 3,000（额度 6,000）」）
+            // 得倒着读一遍才知道 9,000 怎么来的。
             if (borrowed > 0) ...[
               const SizedBox(height: 4),
               Text(
-                '含借入 ${Fmt.money(borrowed)}（额度 ${Fmt.money(budget!)}）',
+                '额度 ${Fmt.money(budget!)}（含借入 ${Fmt.money(borrowed)}）',
                 style: TextStyle(fontSize: 11.5, color: faint),
               ),
             ],
@@ -247,10 +276,106 @@ class SummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-          ],
+          ] else if (summary != null)
+            _NoBudgetSummary(pacing: summary),
         ],
       ),
     );
+  }
+}
+
+/// 没设预算的期，底栏的替身：日均 / 环比上一期 / 最大一笔。
+///
+/// 存在的理由是**别让卡片塌掉**。以前翻到没预算的期，这一整块消失，
+/// 卡片矮一半、下面的列表跳一下，空出来的地方还不说明任何事。
+///
+/// 三个数字的分工：
+/// - **日均**是这期最经得起横向比较的数（期长 28–31 天不等，比总额不公平）；
+/// - **环比**用日均比，不用总额比 —— 上期 31 天、这期 28 天时总额比会骗人；
+/// - **最大一笔**是唯一能让人想起「这个月钱花哪儿了」的单点信息，比笔数有内容。
+class _NoBudgetSummary extends StatelessWidget {
+  const _NoBudgetSummary({required this.pacing});
+
+  final Pacing pacing;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    final faint = C.ink3;
+    final dim = C.ink2;
+
+    // 最大一笔从**已加载的这一期流水**里取，不发查询。
+    // 只认「支出 + 正数」：支出里的负数是交叉归集（退款冲抵），它不是一笔花销。
+    Txn? biggest;
+    for (final t in s.txns) {
+      if (t.type != TxnType.expense || t.amountCents <= 0) continue;
+      if (biggest == null || t.amountCents > biggest.amountCents) biggest = t;
+    }
+    final cat = biggest == null ? null : s.categoryOf(biggest.categoryId)?.name;
+
+    // 「已过 N 天」只对正在过的期有意义；看已经过完的期说「整期 N 天」
+    final dayText = pacing.finished
+        ? '整期 ${pacing.totalDays} 天'
+        : '已过 ${pacing.passedDays} 天';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: S.lg),
+        const Divider(height: 1, color: C.line),
+        const SizedBox(height: S.md),
+        Row(
+          children: [
+            Text(
+              '日均 ${Fmt.money(pacing.perDayRealCents)}',
+              style: TextStyle(fontSize: 12, color: dim),
+            ),
+            const Spacer(),
+            Text(
+              _compare(s, pacing),
+              style: TextStyle(fontSize: 12, color: faint),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                biggest == null
+                    ? ''
+                    : '最大一笔 ${Fmt.money(biggest.amountCents)}'
+                          '${cat == null ? '' : ' · $cat'}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.5, color: faint),
+              ),
+            ),
+            const SizedBox(width: S.sm),
+            // 只放天数，不再重复「N 笔」—— 上面那行右边本来就写着笔数，
+            // 一屏里同一个数字出现两次，只会让人怀疑是不是两个数
+            Text(
+              dayText,
+              style: TextStyle(fontSize: 11.5, color: faint),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 环比上一期，比的是**日均**。
+  ///
+  /// 措辞的四种情况都要说人话：上一期压根没记账 ≠ 上一期花了 0 元 ≠ 持平。
+  /// 只有上期有真实支出时才算百分比，否则会出现「多 100%」「除以零」这类假话。
+  String _compare(Store s, Pacing pacing) {
+    final prev = s.prevPeriod;
+    if (prev == null || prev.count == 0) return '上一期没有记账';
+    final prevDaily = prev.expense ~/ (prev.days == 0 ? 1 : prev.days);
+    if (prevDaily <= 0) return '上一期没有支出';
+    final pct = ((pacing.perDayRealCents - prevDaily) * 100 / prevDaily).round();
+    if (pct == 0) return '与上一期持平';
+    return pct > 0 ? '比上一期多 $pct%' : '比上一期少 ${-pct}%';
   }
 }
 

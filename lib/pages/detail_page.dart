@@ -42,6 +42,10 @@ class _DetailPageState extends State<DetailPage> {
   Future<void> _flip(int delta) async {
     final s = Store.i;
     if (s.filtering) return; // 筛选和「哪一期」是两个维度，别互相踩
+    // 右边界：今天所在的期之后不许翻。
+    // 未来的期不可能有账，翻过去只会看到一片 0.00 —— 分不清是「没记账」还是
+    // 「翻过头了」。想提前给下一期设预算，走计划页或日历（那两条路没封）。
+    if (delta > 0 && s.isCurrentPeriod) return;
     await s.shiftCycle(delta);
     Haptics.tap();
     // 不回顶的话会停在「上一期的第 3 天」这种半截位置，看起来像翻错了

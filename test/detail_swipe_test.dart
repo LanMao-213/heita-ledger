@@ -7,7 +7,8 @@
 // 「明细页还能不能横滑切 Tab」。
 //
 // 三条用例各自钉一件事：
-//   1) 概览卡上左滑 → 翻到下一期、**tabIndex 还是 0**、列表回顶；
+//   1) 概览卡上**右滑** → 翻到上一期、**tabIndex 还是 0**、列表回顶；
+//   1b) 停在本期时左滑 → 不动（1.4.6 的右边界：不许翻到未来期）；
 //   2) 列表正文横滑 → 仍然切到图表页（方案 B 的边界）；
 //   3) 筛选态下概览卡横滑 → 不翻期，且手势落回外层（tabIndex 变 1）。
 //      这条是靠「不注册识别器」实现的，靠 return 拦会表现为「滑了没反应」。
@@ -114,7 +115,7 @@ void main() {
 
   /// 概览卡在「正常态」下的中心点由 `getCenter` 现算，不写死坐标 ——
   /// 卡片高度随预算块、金额行数变化，写死一行数字迟早对不上。
-  testWidgets('概览卡左滑：翻到下一期，不切 Tab，列表回顶', (tester) async {
+  testWidgets('概览卡右滑：翻到上一期，不切 Tab，列表回顶', (tester) async {
     await seed(tester);
     await pumpApp(tester);
     final s = Store.i;
@@ -134,16 +135,38 @@ void main() {
     await tester.pump();
     expect(pos.pixels, greaterThan(0), reason: '前提：列表得先滚下去');
 
+    // 右滑 = 上一期。**不能用左滑**：1.4.6 起今天所在的期就是右边界，
+    // 往未来翻被禁了（见下面那条用例），从本期左滑什么都不会发生。
     final card = tester.getCenter(find.byType(SummaryCard));
-    await tester.flingFrom(card, const Offset(-320, 0), 1200);
+    await tester.flingFrom(card, const Offset(320, 0), 1200);
     // 等 isCurrentPeriod 变 false，而不是等 cycleFrom 变 ——
     // shiftCycle 先改 cycleFrom 再 await loadCycle，只等前者会读到旧的口径标志
     await waitUntil(tester, () => !s.isCurrentPeriod);
 
-    expect(s.cycleFrom, isNot(from), reason: '左滑要翻到下一期');
+    expect(s.cycleFrom, isNot(from), reason: '右滑要翻到上一期');
     expect(s.tabIndex, 0, reason: '翻期不许把明细页的横滑切 Tab 一起吃掉');
     expect(s.isCurrentPeriod, isFalse);
     expect(pos.pixels, 0, reason: '翻期后必须回顶，否则会停在上一期的半截位置');
+  });
+
+  testWidgets('停在本期时左滑：不许翻到未来，什么都不变', (tester) async {
+    await seed(tester);
+    await pumpApp(tester);
+    final s = Store.i;
+    final from = s.cycleFrom;
+    expect(s.isCurrentPeriod, isTrue, reason: '前提：从本期出发');
+
+    final card = tester.getCenter(find.byType(SummaryCard));
+    await tester.flingFrom(card, const Offset(-320, 0), 1200);
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      s.cycleFrom,
+      from,
+      reason: '未来期不可能有账，翻过去只有一片 0.00，分不清「没记账」还是「翻过头了」',
+    );
+    expect(s.isCurrentPeriod, isTrue);
+    expect(s.tabIndex, 0, reason: '翻不动也不能把这一下漏给外层去切 Tab');
   });
 
   testWidgets('列表正文横滑：仍然切到图表页（方案 B 的边界）', (tester) async {

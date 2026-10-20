@@ -183,6 +183,14 @@ class Store extends ChangeNotifier {
 
   /// 当前期的预算（预算也按周期，D13 已改）
   int? totalBudgetCents;
+
+  /// 上一期的支出合计、笔数、天数 —— **只在当前期没设预算时**才有值。
+  ///
+  /// 明细页底栏在没预算的期换成「日均 / 环比上一期」的小总结，环比要用它。
+  /// 有预算的期这个字段恒为 null，`loadCycle` 也不会为它多查一次库 ——
+  /// 一次记账要跑 loadCycle，不能为了一个不显示的文案给它加查询。
+  ({int expense, int count, int days})? prevPeriod;
+
   List<BudgetStat> budgetStats = [];
 
   /// 统计页的归集口径
@@ -451,6 +459,31 @@ class Store extends ChangeNotifier {
     recentTemplates = await Repo.recentTemplates(ledgerId);
   }
 
+  /// 取上一期的支出合计（只给「没设预算的期」的小总结用）。
+  ///
+  /// **有预算的期直接清空、一次都不查** —— `loadCycle` 每次记账都要跑，
+  /// 不能为了一条不显示的文案给它加一次查询。
+  Future<void> _loadPrevPeriod() async {
+    if (totalBudgetCents != null || cycleFrom.isEmpty) {
+      prevPeriod = null;
+      return;
+    }
+    final prevFrom = cyc.shiftCycleDate(cycleFrom, cycleStartDay, -1);
+    final prevTo = Fmt.date(
+      cyc
+          .shiftCycle(DateTime.parse(prevFrom), cycleStartDay, 1)
+          .subtract(const Duration(days: 1)),
+    );
+    final t = await Repo.rangeTotals(ledgerId, prevFrom, prevTo);
+    prevPeriod = (
+      expense: t.$1,
+      count: t.$3,
+      // 期长现算：环比比的是日均，分母不能借用这一期的天数
+      days:
+          DateTime.parse(prevTo).difference(DateTime.parse(prevFrom)).inDays + 1,
+    );
+  }
+
   /// 载入当前期：明细页、计划页、预算都看这一份
   Future<void> loadCycle() async {
     final totals = await Repo.rangeTotals(ledgerId, cycleFrom, cycleTo);
@@ -458,6 +491,7 @@ class Store extends ChangeNotifier {
     incomeCents = totals.$2;
     txnCount = totals.$3;
     totalBudgetCents = await Repo.totalBudgetCents(ledgerId, cycleFrom);
+    await _loadPrevPeriod();
     budgetStats = await Repo.budgetStats(
       ledgerId: ledgerId,
       periodStart: cycleFrom,
@@ -725,6 +759,8 @@ class Store extends ChangeNotifier {
 
   Future<void> afterBudgetChange() async {
     totalBudgetCents = await Repo.totalBudgetCents(ledgerId, cycleFrom);
+    // 预算被删掉时这个期会切到「小总结」底栏，环比数据要跟着补上
+    await _loadPrevPeriod();
     budgetStats = await Repo.budgetStats(
       ledgerId: ledgerId,
       periodStart: cycleFrom,

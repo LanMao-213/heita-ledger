@@ -231,10 +231,13 @@ class _TotalBudgetCard extends StatelessWidget {
             // 借入计入预算时，卡片上的额度直接显示成「额度 + 借入」（9000），
             // 下面小字说明这多出来的 3000 是借的 —— 借来的钱确实能花，
             // 大数字若还停在 6000，用户会以为预算没变。存的额度不动，下期自动还原。
+            //
+            // 措辞与明细页概览卡一致：**额度在前、借入在括号里**（D-26）。
+            // 两处同一件事用两种写法，用户会以为是两个不同的数。
             if (borrowed > 0) ...[
               const SizedBox(height: S.xs),
               Text(
-                '含借入 ${Fmt.money(borrowed)}（额度 ${Fmt.money(budget)}）',
+                '额度 ${Fmt.money(budget)}（含借入 ${Fmt.money(borrowed)}）',
                 style: T.caption.copyWith(color: C.ink3),
               ),
             ],
