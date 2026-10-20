@@ -569,24 +569,24 @@ class MinePage extends StatelessWidget {
 
     final balance = Fmt.parseCents(balCtl.text);
     if (acc == null) {
+      // 新账户还没有流水，手填的余额就是期初值 —— v8 起必须显式写，
+      // 否则默认 0 会让「余额 = 期初 + 流水合计」当场不成立
       await Repo.insertAccount(
         Account(
           id: 0,
           name: name,
           kind: kind,
           balanceCents: balance,
+          openingCents: balance,
           includeInTotal: include,
           sortOrder: 999,
         ),
       );
     } else {
-      await Repo.updateAccount(
-        acc.copyWith(
-          name: name,
-          kind: kind,
-          balanceCents: balance,
-          includeInTotal: include,
-        ),
+      // 手填余额改的是期初（opening_cents），不是余额本身，见 Repo.saveAccount
+      await Repo.saveAccount(
+        acc.copyWith(name: name, kind: kind, includeInTotal: include),
+        balance,
       );
     }
     await Store.i.afterAccountChange();

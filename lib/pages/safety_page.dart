@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../data/backup_service.dart';
+import '../data/integrity.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
+import '../store.dart';
 import '../widgets/common.dart';
 import '../widgets/restore_flow.dart';
 
@@ -26,6 +28,7 @@ class _SafetyPageState extends State<SafetyPage> {
   List<SnapshotInfo> _items = const [];
   bool _loading = true;
   bool _busy = false;
+  bool _checking = false;
 
   @override
   void initState() {
@@ -125,6 +128,80 @@ class _SafetyPageState extends State<SafetyPage> {
     }
   }
 
+  /// 数据体检：只读检查，发现问题后可以让用户主动点「重算余额」。
+  ///
+  /// 为什么放在这一页、而不是启动时自动跑：体检要读全表，放在启动路径上会
+  /// 拖慢冷启动；而这一页本来就是「数据出事了来这儿」的入口。
+  Future<void> _runCheck() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    try {
+      final report = await Integrity.check();
+      if (!mounted) return;
+      await _showReport(report);
+    } catch (e) {
+      if (mounted) showToast(context, '检查失败：$e');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _showReport(IntegrityReport report) async {
+    final fix = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          report.ok ? '数据正常' : '发现 ${report.issues.length} 项问题',
+          style: T.section,
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(report.summary, style: T.caption),
+              if (!report.ok) const SizedBox(height: S.md),
+              for (final issue in report.issues)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: S.sm),
+                  child: Text(
+                    '${issue.kind.label}：${issue.detail}',
+                    style: T.body2,
+                  ),
+                ),
+              if (report.hasFixable) ...[
+                const SizedBox(height: S.sm),
+                const Text(
+                  '「重算余额」按「期初 + 流水合计」把余额改回来，'
+                  '不会动期初值（你手填的那个基准）。',
+                  style: T.caption,
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('关闭', style: TextStyle(color: C.ink2)),
+          ),
+          if (report.hasFixable)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('重算余额', style: TextStyle(color: C.ink)),
+            ),
+        ],
+      ),
+    );
+    if (fix != true) return;
+
+    final fixed = await Integrity.recalcBalances();
+    // 余额变了，内存里的账户副本还是旧的，首页/统计会继续显示错数字
+    await Store.i.afterAccountChange();
+    if (!mounted) return;
+    showToast(context, fixed == 0 ? '没有需要修正的账户' : '已修正 $fixed 个账户的余额');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -156,6 +233,22 @@ class _SafetyPageState extends State<SafetyPage> {
           : ListView(
               padding: const EdgeInsets.only(bottom: S.xxl),
               children: [
+                const SectionTitle('数据体检'),
+                SectionCard(
+                  padding: EdgeInsets.zero,
+                  child: SettingRow(
+                    icon: 'shield',
+                    title: '检查数据完整性',
+                    subtitle: _checking ? '正在检查…' : '核对余额、归属期、借贷与引用',
+                    trailing: const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: C.ink4,
+                    ),
+                    onTap: _checking ? null : _runCheck,
+                  ),
+                ),
+                const SizedBox(height: S.md),
                 const SectionTitle('自动快照'),
                 SectionCard(
                   child: Column(

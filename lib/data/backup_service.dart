@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'db.dart';
+import 'integrity.dart';
 import 'repo.dart';
 
 /// 备份/恢复过程中的用户可读错误。
@@ -245,6 +246,12 @@ abstract final class BackupService {
     if (sv is int && sv < Db.schemaVersion) {
       await Db.upgradeRestoredData();
     }
+
+    // v7 及以前的备份里没有 `opening_cents`，灌进新库后全是默认值 0，
+    // 「余额 = 期初 + 流水」会当场不成立 —— 但账本其实是对的：老库里的
+    // 「余额」本来就是用户手填的绝对值。这里把它认成新基准，
+    // 恢复完立刻自洽，不然第一次体检会报一堆假问题。
+    await Integrity.adoptCurrentBalances();
 
     return counts;
   }

@@ -179,6 +179,51 @@ class Repo {
     await db.delete('account', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// 某账户的流水合计。加减规则与 [_applyBalanceDelta] **逐字对应**：
+  /// 收入 +、支出 −、转账在转出端 −、在转入端 +。
+  ///
+  /// 金额允许为负（键盘行首打 `-` 就是负数），所以这里不做 `ABS`。
+  static Future<int> accountFlowSum(int accountId) async {
+    final db = await Db.open();
+    final r = await db.rawQuery('''
+      SELECT COALESCE(SUM(CASE
+        WHEN t.type = 'income'                                THEN  t.amount_cents
+        WHEN t.type = 'expense'                               THEN -t.amount_cents
+        WHEN t.type = 'transfer' AND t.account_id    = ?      THEN -t.amount_cents
+        WHEN t.type = 'transfer' AND t.to_account_id = ?      THEN  t.amount_cents
+        ELSE 0 END), 0) AS s
+      FROM txn t WHERE t.account_id = ? OR t.to_account_id = ?
+    ''', [accountId, accountId, accountId, accountId]);
+    return (r.first['s'] as int?) ?? 0;
+  }
+
+  /// 保存账户编辑：名称 / 类型 / 是否计入总资产 + 用户手填的「实际余额」。
+  ///
+  /// 手填余额改的是 **期初值**（`opening_cents`），不是余额本身 —— 直接写
+  /// `balance_cents` 会打破恒等式 `余额 = 期初 + 流水合计`，下次体检就报一条
+  /// 假的「余额不一致」。两列在同一个事务里写，不会出现只更新一半。
+  ///
+  /// [a] 是**新值**（调用方已 copyWith 过），[balanceCents] 是用户在输入框里
+  /// 打出来的数字。
+  static Future<void> saveAccount(Account a, int balanceCents) async {
+    final flow = await accountFlowSum(a.id);
+    final db = await Db.open();
+    await db.transaction((txn) async {
+      await txn.update(
+        'account',
+        {
+          'name': a.name,
+          'kind': a.kind.code,
+          'include_in_total': a.includeInTotal ? 1 : 0,
+          'balance_cents': balanceCents,
+          'opening_cents': balanceCents - flow,
+        },
+        where: 'id = ?',
+        whereArgs: [a.id],
+      );
+    });
+  }
+
   // ------------------------------------------------------------------- 分类
 
   static Future<List<Category>> listCategories(
@@ -417,11 +462,19 @@ class Repo {
     final db = await Db.open();
     final startDay = await cycleStartDay();
     final liftable = await _liftableCategoryIds(db, t.ledgerId);
-    final id = await db.insert(
-      'txn',
-      _txnRow(t, periodFor(t, startDay, liftable, liftToNext: liftToNext)),
+    final row = _txnRow(
+      t,
+      periodFor(t, startDay, liftable, liftToNext: liftToNext),
     );
-    await _applyBalanceDelta(db, t, reverse: false);
+    // 写流水与改余额必须在**同一个事务**里。1.4.5 之前这里是裸的两条：
+    // 流水插进去了、`_applyBalanceDelta` 抛异常的话，就留下「有这笔账、
+    // 余额没扣」的库，而且没有任何界面会报警。updateTxn / deleteTxn 早就
+    // 是事务包住的，只有这条新增路径漏了 —— 与它们对齐。
+    late int id;
+    await db.transaction((txn) async {
+      id = await txn.insert('txn', row);
+      await _applyBalanceDelta(txn, t, reverse: false);
+    });
     return id;
   }
 
@@ -755,20 +808,23 @@ class Repo {
   /// 拼 id 列表在分类多时会撞 SQLite 的参数上限，而且列表与合计必须共用同一份
   /// 条件（[searchTxns] 和 [sumFiltered] 都走 [_txnWhere]），拼列表就得两处各拼一遍。
   static (String, List<Object?>) _keywordClause(String k) {
-    final like = '%$k%';
+    final like = '%${_escapeLike(k)}%';
     // 分类：命中自己的名字，或者它父分类的名字。
     // 记录大多挂在子分类上（餐饮 / 正餐），用户搜的是「餐饮」。
+    // 每个 LIKE 都带 `ESCAPE '\'`：不加的话，搜「50%」会命中全部记录，
+    // 搜「a_b」会命中「aab」—— 关键词里的这两个字符必须当字面量。
     const catSql =
         'category_id IN (SELECT c.id FROM category c '
         'LEFT JOIN category p ON c.parent_id = p.id '
-        'WHERE c.name LIKE ? OR p.name LIKE ?)';
+        "WHERE c.name LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\')";
     // 账户：转出与转入都算「跟这个账户有关」
     const accSql =
-        '(account_id IN (SELECT id FROM account WHERE name LIKE ?) '
-        'OR to_account_id IN (SELECT id FROM account WHERE name LIKE ?))';
+        "(account_id IN (SELECT id FROM account WHERE name LIKE ? ESCAPE '\\') "
+        "OR to_account_id IN (SELECT id FROM account "
+        "WHERE name LIKE ? ESCAPE '\\'))";
 
     final parts = <String>[
-      '(${_keywordCols.map((c) => '$c LIKE ?').join(' OR ')})',
+      '(${_keywordCols.map((c) => "$c LIKE ? ESCAPE '\\'").join(' OR ')})',
       catSql,
       accSql,
     ];
@@ -788,12 +844,21 @@ class Repo {
     if (isNumber && digits.length >= 2) {
       // 「38.5」→「385」，再在 amount_cents 的文本里找包含关系：
       // 38.50 / 138.50 / 3.85 都能被搜到，符合「我记不清具体多少」的用法
-      parts.add('CAST(amount_cents AS TEXT) LIKE ?');
+      parts.add("CAST(amount_cents AS TEXT) LIKE ? ESCAPE '\\'");
       args.add('%$digits%');
     }
 
     return ('(${parts.join(' OR ')})', args);
   }
+
+  /// 把关键词里的 `\` `%` `_` 转义成字面量（配合 SQL 里的 `ESCAPE '\'`）。
+  ///
+  /// 顺序不能反：先转义反斜杠本身，否则 `\%` 会被二次转义成 `\\%`，
+  /// 反而变成「一个反斜杠 + 通配符」。
+  static String _escapeLike(String raw) => raw
+      .replaceAll(r'\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
 
   /// 「按某个分类筛」的条件：**把它的子分类一起带上**。
   ///

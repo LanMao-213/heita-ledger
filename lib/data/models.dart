@@ -213,6 +213,7 @@ class Account {
     required this.name,
     this.kind = AccountKind.cash,
     this.balanceCents = 0,
+    this.openingCents = 0,
     this.includeInTotal = true,
     this.sortOrder = 0,
     this.archived = false,
@@ -222,6 +223,13 @@ class Account {
   final String name;
   final AccountKind kind;
   final int balanceCents;
+
+  /// 期初 / 手工校准值（schema v8）。
+  ///
+  /// 恒等式：`balanceCents == openingCents + 该账户流水合计`。
+  /// 用户手填「实际余额」时改的是 opening（见 `Repo.setAccountBalance`），
+  /// 流水只负责增减 balance —— 两者分开之后余额才可对账。
+  final int openingCents;
   final bool includeInTotal;
   final int sortOrder;
   final bool archived;
@@ -233,6 +241,7 @@ class Account {
     name: m['name'] as String,
     kind: AccountKind.fromCode((m['kind'] as String?) ?? 'cash'),
     balanceCents: (m['balance_cents'] as int?) ?? 0,
+    openingCents: (m['opening_cents'] as int?) ?? 0,
     includeInTotal: ((m['include_in_total'] as int?) ?? 1) == 1,
     sortOrder: (m['sort_order'] as int?) ?? 0,
     archived: ((m['archived'] as int?) ?? 0) == 1,
@@ -243,6 +252,7 @@ class Account {
     'name': name,
     'kind': kind.code,
     'balance_cents': balanceCents,
+    'opening_cents': openingCents,
     'include_in_total': includeInTotal ? 1 : 0,
     'sort_order': sortOrder,
     'archived': archived ? 1 : 0,
@@ -252,6 +262,7 @@ class Account {
     String? name,
     AccountKind? kind,
     int? balanceCents,
+    int? openingCents,
     bool? includeInTotal,
     int? sortOrder,
     bool? archived,
@@ -260,6 +271,7 @@ class Account {
     name: name ?? this.name,
     kind: kind ?? this.kind,
     balanceCents: balanceCents ?? this.balanceCents,
+    openingCents: openingCents ?? this.openingCents,
     includeInTotal: includeInTotal ?? this.includeInTotal,
     sortOrder: sortOrder ?? this.sortOrder,
     archived: archived ?? this.archived,

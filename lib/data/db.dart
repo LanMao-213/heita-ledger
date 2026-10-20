@@ -3,6 +3,27 @@ import 'package:sqflite/sqflite.dart';
 
 import 'category_seed.dart';
 
+/// 库里的数据版本比当前 App 新（用户装回了旧包）。
+///
+/// 不处理的话 sqflite 会抛一条英文堆栈，用户在启动页看到的是「启动失败 +
+/// DatabaseException(… onDowngrade …)」。账本类应用里这句噪音很危险：
+/// 用户的第一反应是「卸载重装」，而卸载 = 本地账目全清。
+class DbDowngradeException implements Exception {
+  const DbDowngradeException({required this.found, required this.supported});
+
+  /// 磁盘上那份库的版本
+  final int found;
+
+  /// 当前 App 支持的版本
+  final int supported;
+
+  @override
+  String toString() =>
+      '这份账本来自更新的版本（数据版本 $found），当前应用只支持到 $supported。\n'
+      '请装回最新版本后再打开。\n'
+      '账目都还在，不要卸载重装 —— 卸载会把它们一起清掉。';
+}
+
 /// 本地 SQLite 存储。
 ///
 /// ★ 单机应用的前提：**不发任何 HTTP 请求、不接任何统计/崩溃上报/广告 SDK**。
@@ -30,7 +51,10 @@ class Db {
   ///    留在父级，明细里显示为一级分类名。
   /// 7：新增 `debt`（借贷往来）+ `txn.debt_id`。借贷产生的流水挂在 debt 上，
   ///    统计一律排除；老数据 `debt_id` 全为 NULL，行为不变。
-  static const _version = 7;
+  /// 8：`account` 增加 `opening_cents`（期初 / 手工校准值）。
+  ///    **余额从此可对账**：`balance_cents = opening_cents + 流水合计`。
+  ///    老库按 `opening = 余额 − 流水合计` 回填，升级后余额一分不变。
+  static const _version = 8;
 
   /// 当前 schema 版本。备份文件里会记下来，恢复时用来判断兼容性。
   static int get schemaVersion => _version;
@@ -81,6 +105,15 @@ class Db {
         if (oldVersion < 7) {
           await _addDebtTable(db);
         }
+        if (oldVersion < 8) {
+          await _addOpeningBalanceColumn(db);
+        }
+      },
+      // 装了旧版本（库里的 schema 比这个包新）时走到这里。sqflite 默认会直接
+      // 抛异常，用户在启动页只看到一行英文堆栈。这里换成一句能看懂的话 ——
+      // 账目都还在，别卸载重装（卸载等于清空）。
+      onDowngrade: (db, oldVersion, newVersion) async {
+        throw DbDowngradeException(found: oldVersion, supported: newVersion);
       },
     );
     return _db!;
@@ -157,6 +190,9 @@ class Db {
         name             TEXT    NOT NULL,
         kind             TEXT    NOT NULL DEFAULT 'cash',
         balance_cents    INTEGER NOT NULL DEFAULT 0,
+        -- v8：期初 / 手工校准值。余额 = opening_cents + 流水合计，
+        -- 有了这个基准才能对账（见 Integrity.check）
+        opening_cents    INTEGER NOT NULL DEFAULT 0,
         include_in_total INTEGER NOT NULL DEFAULT 1,
         sort_order       INTEGER NOT NULL DEFAULT 0,
         archived         INTEGER NOT NULL DEFAULT 0
@@ -333,8 +369,58 @@ class Db {
     );
   }
 
-  /// 首次安装的默认数据：一个账本、几个常用账户、原型里的全套分类。
-  /// **不预置任何交易记录** —— 账本应该从用户自己的第一笔开始。
+  /// v7 → v8：`account` 增加 `opening_cents`（期初 / 手工校准值）。
+  ///
+  /// 为什么需要：余额一直是「用户手填的数字」和「流水增减的结果」混在一起的
+  /// **同一个字段**。于是「余额对不对」这件事根本无法校验 —— 没有基准，
+  /// 任何比对都会把用户手填的那部分当成漂移。把基准单独存一份之后，
+  /// 余额变成 `opening_cents + 流水合计`，成了可重算、可对账的派生值：
+  ///
+  /// - 老库：按 `opening = 当前余额 − 流水合计` 回填，升级后**余额一分不变**，
+  ///   而「数据体检」从第一次启动就能用；
+  /// - 新库 / 新建账户：`opening` 默认 0，用户手填余额时同步写 opening。
+  ///
+  /// 幂等：只在真的新加了这一列之后回填（重复回填会把漂移"吃"进 opening，
+  /// 等于把问题藏起来）。
+  static Future<void> _addOpeningBalanceColumn(Database db) async {
+    final hasAccount = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'account'",
+    );
+    if (hasAccount.isEmpty) return;
+
+    final cols = await db.rawQuery('PRAGMA table_info(account)');
+    if (cols.any((c) => c['name'] == 'opening_cents')) return;
+
+    await db.execute(
+      'ALTER TABLE account ADD COLUMN opening_cents INTEGER NOT NULL DEFAULT 0',
+    );
+
+    // 没有 txn 表（测试造的极简库）就没有流水，opening 直接等于余额。
+    final hasTxn = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'txn'",
+    );
+    if (hasTxn.isEmpty) {
+      await db.execute('UPDATE account SET opening_cents = balance_cents');
+      return;
+    }
+
+    // 回填公式必须与 `Repo._applyBalanceDelta` 逐字对应，
+    // 否则升级完第一次体检就会报一堆假的"余额不一致"。
+    await db.execute('''
+      UPDATE account SET opening_cents = balance_cents - COALESCE((
+        SELECT SUM(CASE
+          WHEN t.type = 'income'                                THEN  t.amount_cents
+          WHEN t.type = 'expense'                               THEN -t.amount_cents
+          WHEN t.type = 'transfer' AND t.account_id    = account.id THEN -t.amount_cents
+          WHEN t.type = 'transfer' AND t.to_account_id = account.id THEN  t.amount_cents
+          ELSE 0 END)
+        FROM txn t
+        WHERE t.account_id = account.id OR t.to_account_id = account.id
+      ), 0)
+    ''');
+  }
+
+  /// 首次安装的默认数据：一个账本、几个常用账户、原型里的全套分类。  /// **不预置任何交易记录** —— 账本应该从用户自己的第一笔开始。
   ///
   /// 参数是 [DatabaseExecutor] 而不是 `Database`：清空数据时它要在**事务里**
   /// 重建（见 [wipeAllData]），事务对象同样满足这个接口。
