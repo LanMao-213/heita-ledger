@@ -10,8 +10,10 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
+import '../widgets/restore_flow.dart';
 import 'cats_page.dart';
 import 'recurring_page.dart';
+import 'safety_page.dart';
 import 'templates_page.dart';
 
 class MinePage extends StatelessWidget {
@@ -124,6 +126,16 @@ class MinePage extends StatelessWidget {
                   title: '从备份恢复',
                   subtitle: '会覆盖当前全部数据，覆盖前自动留快照',
                   onTap: () => _restore(context),
+                ),
+                const Divider(height: 1, color: C.line, indent: 52),
+                SettingRow(
+                  icon: 'shield',
+                  title: '数据安全',
+                  subtitle: '清空 / 恢复前的自动快照，可回滚',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SafetyPage()),
+                  ),
                 ),
               ],
             ),
@@ -304,8 +316,6 @@ class MinePage extends StatelessWidget {
   // ------------------------------------------------------------------ 恢复
 
   static Future<void> _restore(BuildContext context) async {
-    final s = Store.i;
-
     // 1. 选文件 + 读出来校验（校验失败不会碰数据库）
     final Map<String, Object?> payload;
     final BackupSummary summary;
@@ -320,85 +330,9 @@ class MinePage extends StatelessWidget {
     }
     if (!context.mounted) return;
 
-    // 2. 二次确认 —— 这是覆盖式写入，必须让人看清要拿什么换什么
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('从备份恢复？', style: T.section),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('这份备份里有：', style: T.caption),
-            const SizedBox(height: S.xs),
-            Text(summary.text, style: T.body),
-            const SizedBox(height: S.md),
-            const Text(
-              '恢复会**覆盖**当前的全部数据。\n覆盖前会自动存一份当前数据的快照，'
-              '万一恢复错了还能再导回来。',
-              style: T.body2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消', style: TextStyle(color: C.ink2)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('覆盖并恢复', style: TextStyle(color: C.over)),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-
-    // 3. 先留快照，再覆盖
-    String snapshot;
-    try {
-      snapshot = await BackupService.writeSnapshot();
-    } catch (e) {
-      if (context.mounted) showToast(context, '没能生成快照，已取消：$e');
-      return;
-    }
-
-    try {
-      final counts = await BackupService.restore(payload);
-      await s.reloadAfterRestore();
-      if (!context.mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('恢复完成', style: T.section),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${counts['txn'] ?? 0} 笔记录 · ${counts['account'] ?? 0} 个账户 · '
-                '${counts['category'] ?? 0} 个分类',
-                style: T.body,
-              ),
-              const SizedBox(height: S.md),
-              const Text('覆盖前的数据已存到：', style: T.caption),
-              const SizedBox(height: S.xs),
-              Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
-              const SizedBox(height: S.sm),
-              const Text('如果这次恢复的结果不对，可以把这份快照再导回来。', style: T.caption),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('知道了', style: TextStyle(color: C.ink)),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (context.mounted) showToast(context, '恢复失败，数据未改动：$e');
-    }
+    // 2~4. 二次确认 → 先留快照 → 覆盖 → 结果弹窗，全在 [runRestoreFlow] 里
+    //      （「数据安全」页恢复自动快照走的是同一套，口径必须是同一份）
+    await runRestoreFlow(context, payload: payload, summary: summary);
   }
 
   // ------------------------------------------------------------------ 清空
@@ -409,8 +343,8 @@ class MinePage extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('清空全部数据？', style: T.section),
         content: const Text(
-          '所有账目、账户、分类、目标都会被删除，且无法恢复。\n\n'
-          '建议先导出 Excel 备份。',
+          '所有账目、账户、分类、目标都会被删除，恢复成刚装好的样子。\n\n'
+          '清空前会自动存一份快照，后悔了可以从「我的 → 数据安全」里找回来。',
           style: T.body2,
         ),
         actions: [
@@ -425,14 +359,54 @@ class MinePage extends StatelessWidget {
         ],
       ),
     );
-    if (ok != true) return;
-    // 失败必须说出来：清空是单向门，1.4.1 里异常被悄悄吞掉，用户看到的就是
+    if (ok != true || !context.mounted) return;
+
+    // 先留快照再清：清空是单向门，1.4.1 就栽在「不可逆 + 静默失败」上。
+    // 留不下就**不清**，和「从备份恢复」的策略保持一致 —— 宁可这次没清成，
+    // 也不要开一条找不回来的口子。
+    final String snapshot;
+    try {
+      snapshot = await BackupService.writeSnapshot(reason: 'wipe');
+    } catch (e) {
+      if (context.mounted) showToast(context, '没能生成快照，已取消：$e');
+      return;
+    }
+
+    // 失败必须说出来：异常在 1.4.1 里被悄悄吞掉，用户看到的就是
     // 「点了没反应、数据还在」。现在删除与重建在同一个事务里（见
     // `Db.wipeAllData`），抛异常等于整体回滚，所以可以明确说「数据未改动」。
     try {
       await Db.wipeAllData();
       await Store.i.reboot();
-      if (context.mounted) showToast(context, '已清空');
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('已清空', style: T.section),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('账目、账户、分类都已恢复成刚装好的样子。', style: T.body2),
+              const SizedBox(height: S.md),
+              const Text('清空前的数据已存到：', style: T.caption),
+              const SizedBox(height: S.xs),
+              Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
+              const SizedBox(height: S.sm),
+              const Text(
+                '要找回来的话，去「我的 → 数据安全」用这份快照恢复。',
+                style: T.caption,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('知道了', style: TextStyle(color: C.ink)),
+            ),
+          ],
+        ),
+      );
     } catch (e) {
       if (context.mounted) showToast(context, '清空失败，数据未改动：$e');
     }
