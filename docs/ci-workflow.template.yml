@@ -5,11 +5,12 @@
 #   refusing to allow an OAuth App to create or update workflow ... without workflow scope
 # 放在 docs/ 下，任何人 `git add -A` 都不会踩这个坑。
 #
-# 启用步骤：
+# ✅ 2026-10-20：1.4.5 分支上已落地为 `.github/workflows/ci.yml`。
+# 这份模板保留作备份与差异对照 —— 改 CI 时两处要同步，否则下次照着模板重建会丢改动。
+#
+# ⚠️ 推 `.github/workflows/**` 需要令牌带 `workflow` scope，缺了是**整次 push 被拒**：
 #   gh auth refresh -h github.com -s workflow      # 浏览器里确认，令牌多一个 scope
-#   mkdir -p .github/workflows && cp docs/ci-workflow.template.yml .github/workflows/ci.yml
-#   git add .github && git commit -m "ci: analyze + test on push/PR" && git push
-# 之后这个模板文件可以删掉（或留着当备份）。
+# 这台机器上的 gh 令牌没有这个 scope，所以要由带 scope 的账号推一次。
 
 name: 测试与静态检查
 
