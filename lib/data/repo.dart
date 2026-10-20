@@ -688,11 +688,9 @@ class Repo {
         ..add(categoryId);
     }
     if (keyword != null && keyword.trim().isNotEmpty) {
-      where.write(' AND $_keywordWhere');
-      final k = '%${keyword.trim()}%';
-      for (var i = 0; i < _keywordCols.length; i++) {
-        args.add(k);
-      }
+      final (kwSql, kwArgs) = _keywordClause(keyword.trim());
+      where.write(' AND $kwSql');
+      args.addAll(kwArgs);
     }
     final rows = await db.query(
       'txn',
@@ -747,8 +745,55 @@ class Repo {
     'place_to',
   ];
 
-  static final _keywordWhere =
-      '(${_keywordCols.map((c) => '$c LIKE ?').join(' OR ')})';
+  /// 关键词匹配：文本列 + 分类名 + 账户名 + 金额。
+  ///
+  /// 为什么不止搜文本列（1.4.4）：用户脑海里的索引不是「我当初在备注里写了什么」，
+  /// 而是「在餐饮花的」「38 块 5 那笔」「用支付宝付的」。只搜 note/person/subject/
+  /// place_* 的话，这几条最常想的线索全都搜不到 —— 而 0 条结果看起来像「没记过」。
+  ///
+  /// 全部用**子查询**取 id，不在 Dart 里先查一遍再拼 `IN (...)`：
+  /// 拼 id 列表在分类多时会撞 SQLite 的参数上限，而且列表与合计必须共用同一份
+  /// 条件（[searchTxns] 和 [sumFiltered] 都走 [_txnWhere]），拼列表就得两处各拼一遍。
+  static (String, List<Object?>) _keywordClause(String k) {
+    final like = '%$k%';
+    // 分类：命中自己的名字，或者它父分类的名字。
+    // 记录大多挂在子分类上（餐饮 / 正餐），用户搜的是「餐饮」。
+    const catSql =
+        'category_id IN (SELECT c.id FROM category c '
+        'LEFT JOIN category p ON c.parent_id = p.id '
+        'WHERE c.name LIKE ? OR p.name LIKE ?)';
+    // 账户：转出与转入都算「跟这个账户有关」
+    const accSql =
+        '(account_id IN (SELECT id FROM account WHERE name LIKE ?) '
+        'OR to_account_id IN (SELECT id FROM account WHERE name LIKE ?))';
+
+    final parts = <String>[
+      '(${_keywordCols.map((c) => '$c LIKE ?').join(' OR ')})',
+      catSql,
+      accSql,
+    ];
+    final args = <Object?>[
+      for (var i = 0; i < _keywordCols.length; i++) like,
+      like,
+      like,
+      like,
+      like,
+    ];
+
+    // 金额只在「关键词就是个数字」时参与匹配。
+    // 否则「午饭」也会被当成金额去比一遍；而且一位数（「1」）几乎能匹配全部记录，
+    // 噪音会盖掉真正命中的那几条。所以要两位以上。
+    final digits = k.replaceAll(RegExp(r'[^0-9]'), '');
+    final isNumber = RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(k);
+    if (isNumber && digits.length >= 2) {
+      // 「38.5」→「385」，再在 amount_cents 的文本里找包含关系：
+      // 38.50 / 138.50 / 3.85 都能被搜到，符合「我记不清具体多少」的用法
+      parts.add('CAST(amount_cents AS TEXT) LIKE ?');
+      args.add('%$digits%');
+    }
+
+    return ('(${parts.join(' OR ')})', args);
+  }
 
   /// 「按某个分类筛」的条件：**把它的子分类一起带上**。
   ///
@@ -774,10 +819,9 @@ class Repo {
 
     final k = keyword?.trim() ?? '';
     if (k.isNotEmpty) {
-      where.add(_keywordWhere);
-      for (var i = 0; i < _keywordCols.length; i++) {
-        args.add('%$k%');
-      }
+      final (kwSql, kwArgs) = _keywordClause(k);
+      where.add(kwSql);
+      args.addAll(kwArgs);
     }
     if (filter?.type != null) {
       where.add('type = ?');

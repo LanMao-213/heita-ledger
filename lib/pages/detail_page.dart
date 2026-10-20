@@ -270,6 +270,11 @@ class _TopBar extends StatelessWidget {
 }
 
 class _SearchDelegate extends SearchDelegate<String> {
+  /// 搜索范围 1.4.4 起扩到分类名、账户名、金额 —— 输入框里得先说清，
+  /// 否则用户还是只会往备注上试
+  @override
+  String get searchFieldLabel => '备注、分类、账户、金额';
+
   @override
   List<Widget>? buildActions(BuildContext context) => [
     if (query.isNotEmpty)
