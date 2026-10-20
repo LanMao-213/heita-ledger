@@ -442,7 +442,10 @@ class _RecordSheetState extends State<RecordSheet> {
             accountId: _accountId,
           ),
         );
-        await store.afterTxnChange();
+        await store.afterTxnInserted(
+          date: _date,
+          periodStart: periodStartOf(_date, store.cycleStartDay),
+        );
         if (!mounted) return;
         Navigator.pop(context, true);
         return;
@@ -491,7 +494,20 @@ class _RecordSheetState extends State<RecordSheet> {
           await store.afterTemplateChange();
         }
       }
-      await store.afterTxnChange();
+      // 新记的一笔：刷新 + 把视角搬到这笔身上（清筛选、对齐期、回明细）
+      // 编辑走 [afterTxnChange] 就够 —— 用户正在看的就是那一行，跳期反而打断
+      if (_isEdit) {
+        await store.afterTxnChange();
+      } else {
+        await store.afterTxnInserted(
+          date: _date,
+          periodStart: periodStartOf(
+            _date,
+            store.cycleStartDay,
+            liftToNext: _liftOn,
+          ),
+        );
+      }
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (err) {
@@ -572,10 +588,17 @@ class _RecordSheetState extends State<RecordSheet> {
     final bottomInset = keyboard > media.viewPadding.bottom
         ? keyboard
         : media.viewPadding.bottom;
-    // 焦点在备注里、且输入法真的弹出时，才把数字键盘收起来。
-    // 只看焦点不看键盘高度的话，用户用输入法自带的「完成」收起键盘后，
-    // 数字键盘不会回来，连确认键一起消失。
-    final typingNote = keyboard > 0 && _hasTextFocus;
+    // 备注框一拿到焦点，数字键盘立刻收起来 —— **不等输入法真的升起**。
+    //
+    // 旧写法是 `keyboard > 0 && _hasTextFocus`，看着更"精确"，但真机上输入法
+    // 从 0 升到全高有 3~5 帧：这几帧里面板正被 bottomInset 顶着往上走，290dp 的
+    // 数字键盘还赖在下面，可滚动区被压成 0，备注框先被挤没再弹回来 ——
+    // 用户的原话是「点一下备注卡片，面板重新打开了一次」。改成跟焦点走之后，
+    // 顺序变成「数字键盘先收起 → 输入法再升起」，全程只有一个方向的位移。
+    //
+    // 只对**备注**用这个提前量：「借给谁」「出发地」这些填完还得接着按数字，
+    // 键盘早收一拍反而碍事，它们仍按「输入法真的占了下半屏」判断。
+    final typingNote = _noteFocus.hasFocus || (keyboard > 0 && _hasTextFocus);
     // 0.90：顶部多了「最近模板」那排之后，0.88 会把备注框切掉一条。
     final maxH = (media.size.height - bottomInset) * 0.90;
 
@@ -762,15 +785,31 @@ class _RecordSheetState extends State<RecordSheet> {
             // 写备注时数字键盘让位：它 270dp 高，和系统键盘叠在一起会把可滚动区
             // 压成 0，备注框照样看不见；何况这时候本来也按不到数字。
             // 不给「完成」按钮：输入法自带的那颗 + 收起键盘，都是「写完了」。
-            if (!typingNote) ...[
-              const Divider(height: 1, color: C.line),
-              CalcKeypad(
-                onKey: _pressKey,
-                onConfirm: _save,
-                canConfirm: _canSave && !_saving,
-                keyHeight: keyH,
-              ),
-            ],
+            //
+            // 让位要**滑下去**，不能直接抽走：键盘升起时面板整体被顶高，如果
+            // 这 270dp 在同一帧里消失，画面就是「先缩一下、再跳一下」——
+            // 用户的原话是「点备注像重新打开了一次面板」。
+            // 只给这一块加动画，整个面板仍然逐帧跟随 viewInsets：键盘高度是
+            // 连续变化的，给面板加动画会让它永远追不上键盘（见下面的长注释）。
+            AnimatedSize(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: typingNote
+                  ? const SizedBox(width: double.infinity)
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Divider(height: 1, color: C.line),
+                        CalcKeypad(
+                          onKey: _pressKey,
+                          onConfirm: _save,
+                          canConfirm: _canSave && !_saving,
+                          keyHeight: keyH,
+                        ),
+                      ],
+                    ),
+            ),
           ],
         );
       },

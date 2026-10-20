@@ -104,6 +104,57 @@ void main() {
     expect(find.text('确认'), findsOneWidget);
   });
 
+  // 真机上的第三个坑（1.4.1 用户反馈）：点备注卡片时，面板像「重新打开了一次」。
+  // 根因是数字键盘要等输入法真的升起（`viewInsets > 0`）才收起 —— 输入法升起
+  // 那几帧里面板正被顶高、而 290dp 的数字键盘还占着位置，可滚动区被压成 0，
+  // 备注框先被挤没、再弹回来。所以这里钉住：**点下去的那一帧**键盘就让位，
+  // 不等输入法。
+  testWidgets('点备注的那一帧数字键盘就让位，不等输入法升起', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, _screenH * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.runAsync(() => Store.i.boot());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (c) => Center(
+            child: TextButton(
+              onPressed: () => showRecordSheet(c),
+              child: const Text('记一笔'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('记一笔'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CalcKeypad), findsOneWidget);
+
+    // 只点、只 pump 一帧：此时 viewInsets 还是 0（输入法还没起来）
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    expect(
+      find.byType(CalcKeypad),
+      findsNothing,
+      reason: '数字键盘必须跟着焦点走，等输入法升起会让面板先挤扁再弹回来',
+    );
+    expect(tester.takeException(), isNull);
+
+    // 输入法随后升起：面板让开，仍然不溢出
+    tester.view.viewInsets = const FakeViewPadding(bottom: _keyboardH * 2);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CalcKeypad), findsNothing);
+
+    // 收起键盘（输入法「完成」）→ 数字键盘和确认键回来
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+    expect(find.byType(CalcKeypad), findsOneWidget);
+  });
+
   testWidgets('小屏 + 底部手势条：键盘最后一排不会被裁掉', (tester) async {
     // 360 × 740 是那台真机的逻辑尺寸量级；底部 24 是手势条的高度。
     tester.view.physicalSize = const Size(360 * 3, 740 * 3);

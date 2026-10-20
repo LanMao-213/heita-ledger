@@ -3,7 +3,7 @@
 极简黑白灰风格的**本地记账 App**。不联网、不注册、不上传 —— 所有账目保存在设备本地的 SQLite 里，
 卸载即清除，靠导出 Excel 做备份。
 
-当前版本 **1.4.1+9**（包名 `com.heita.ledger`，Android）。
+当前版本 **1.4.2+10**（包名 `com.heita.ledger`，Android）。
 
 ## 接手先看这里
 
@@ -17,6 +17,8 @@
 
 **当前状态**：1.4.1 已发版（[Releases](https://github.com/LanMao-213/heita-ledger/releases/latest)），
 但还有 **6 项真机手感没验完**，清单在 `CHANGELOG.md` 的「待测试」小节。
+1.4.2 是 Redmi 真机反馈的修复版（清空数据没反应 / 记完看不见 / 点备注像重开面板），
+明细见 `CHANGELOG.md` 顶部。
 要开始干活，直接跳到交接说明[第 11 节](docs/交接说明.md#11-当前状态从这里接2026-10-20-1540)。
 
 ---

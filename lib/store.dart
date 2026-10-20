@@ -424,6 +424,39 @@ class Store extends ChangeNotifier {
     if (filtering) await applyFilter(filter);
   }
 
+  /// 新记一笔之后的收口：**保证这笔一定出现在明细里**。
+  ///
+  /// 1.4.1 的问题：明细列表读的是「当前这一期的 txn」（`rangeListTxns` 按
+  /// `period_start` 过滤），而保存成功只刷新数据、不动游标。于是有三种情况
+  /// 会「记完看不见」：
+  /// 1. 之前左右划过周期条，游标停在别的期；
+  /// 2. 这笔收入被「工资抬期」（D22-R1）自动算进了下一期；
+  /// 3. 明细上还挂着筛选条件（筛「餐饮」时记了一笔交通）。
+  ///
+  /// 三种都表现为「输入金额、点确认、什么都没发生」。用户的下一步动作是
+  /// 再记一遍 —— 所以这里不再让界面自己猜，而是把视角直接搬到这笔身上：
+  /// 清筛选 → 游标对齐到这笔所在的期 → 切回明细页。
+  ///
+  /// [periodStart] 由调用方按 [periodStartOf] 算好传进来（和 `Repo.periodFor`
+  /// 同一口径，含抬期），不在这里重新推断，免得两处口径漂移。
+  Future<void> afterTxnInserted({
+    required String date,
+    required String periodStart,
+  }) async {
+    _resetFilter();
+    if (periodStart != cycleFrom) {
+      final (from, to) = cyc.cycleRange(
+        DateTime.parse(periodStart),
+        cycleStartDay,
+      );
+      cycleFrom = from;
+      cycleTo = to;
+    }
+    // 从图表/计划页的 FAB 记的账也一样：跳回明细，否则「记完看不见」只是换个形式
+    tabIndex = 0;
+    await afterTxnChange();
+  }
+
   /// 删除一笔（会同时回滚账户余额，由 Repo 负责）
   Future<void> deleteTxn(Txn t) async {
     await Repo.deleteTxn(t);
