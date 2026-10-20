@@ -197,6 +197,33 @@ void main() {
     await _shot(tester, 'build/visual/shot_16_cats.png');
     expect(tester.takeException(), isNull, reason: '分类管理页有布局溢出');
 
+    // ---- 分类管理（停用一个，看末尾的「已停用」段）----
+    // 挑最后一个（「其他」），不影响后面点「餐饮」进子分类
+    final victim = Store.i.expenseCats.last;
+    await tester.runAsync(() async {
+      await Repo.setCategoryArchived(victim.id, archived: true);
+      await Store.i.afterCategoryChange();
+    });
+    await tester.pumpAndSettle();
+    // 停用段在列表末尾，先滚到底，才能看到「恢复」有没有被悬浮按钮压住
+    await tester.dragUntilVisible(
+      find.text('恢复'),
+      find.byType(Scrollable).first,
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_23_cats_archived.png');
+    expect(tester.takeException(), isNull, reason: '「已停用」段有布局溢出');
+    // 拍完复原，后面的截图仍按「全部分类都在」的状态走
+    await tester.runAsync(() async {
+      await Repo.setCategoryArchived(victim.id, archived: false);
+      await Store.i.afterCategoryChange();
+    });
+    await tester.pumpAndSettle();
+    // 刚才滚到了底部，这里滚回顶部 —— 后面要点「餐饮」进子分类，它在第一行
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 600));
+    await tester.pumpAndSettle();
+
     // ---- 子分类列表（以餐饮为例）----
     await tester.tap(find.text('餐饮').first);
     await tester.pumpAndSettle();

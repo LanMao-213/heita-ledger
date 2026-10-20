@@ -630,6 +630,9 @@ class _ArchivedBlock extends StatelessWidget {
               ),
             ),
           ),
+        // 末行会被右下角的「新增」悬浮按钮压住，留一截余量，
+        // 滚到底时「恢复」正好露出来
+        const SizedBox(height: 72),
       ],
     );
   }
