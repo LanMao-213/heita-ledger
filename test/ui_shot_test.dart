@@ -13,10 +13,13 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/app.dart';
+import 'package:ledger/data/backup_service.dart';
 import 'package:ledger/data/cycle.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/design/tokens.dart';
+import 'package:ledger/pages/safety_page.dart';
 import 'package:ledger/store.dart';
 import 'package:ledger/widgets/pickers.dart';
 import 'package:path/path.dart' as p;
@@ -381,6 +384,42 @@ void main() {
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_10_filter_empty.png');
     expect(tester.takeException(), isNull, reason: '筛选空结果页有布局溢出');
+
+    // ---- 数据安全（自动快照列表）----
+    // 单测里没有 path_provider 的平台通道，快照目录指到临时目录
+    final snapDir = Directory.systemTemp.createTempSync('heita_shot_');
+    BackupService.snapshotDirOverride = () async => snapDir;
+    addTearDown(() {
+      BackupService.snapshotDirOverride = null;
+      try {
+        if (snapDir.existsSync()) snapDir.deleteSync(recursive: true);
+      } on FileSystemException {
+        // Windows 上临时目录偶尔还被句柄占着（截图用的 png 刚关）。
+        // 只是个临时目录，删不掉就留给系统，不值得让整条测试挂掉。
+      }
+    });
+    await tester.runAsync(() => BackupService.writeSnapshot(reason: 'wipe'));
+    // 必须自己套一层 RepaintBoundary(_shotKey)：整棵树被换掉之后，
+    // _shot() 找的就是这个 key，漏了会直接空指针。
+    //
+    // 建树也放进 runAsync：页面的 initWithState 里就要读文件（listSnapshots），
+    // 在假时钟里那个 Future 永远回不来，会一直卡在加载态。
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: _shotKey,
+          child: MaterialApp(
+            theme: buildAppTheme(),
+            debugShowCheckedModeBanner: false, // 否则右上角会盖一条 DEBUG 斜带
+            home: const SafetyPage(),
+          ),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+    await _shot(tester, 'build/visual/shot_24_safety.png');
+    expect(tester.takeException(), isNull, reason: '数据安全页有布局溢出');
   });
 }
 
