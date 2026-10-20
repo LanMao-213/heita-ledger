@@ -12,6 +12,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/debt_grouping.dart';
+import 'package:ledger/data/integrity.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/dev/seed.dart';
@@ -131,6 +132,22 @@ void main() {
       (await Repo.listDebts(ledgerId: ledgerId)).length,
       before * 2,
       reason: '证明 seedDemoData 本身不设幂等守卫，守卫在 IfNeeded 那一层',
+    );
+  });
+
+  // 演示数据是「按真机走查的需要」手工造的，很容易造出「余额和流水对不上」
+  // 这种自伤 —— 1.4.5 真机第一次跑体检就抓到过（微信 1744 / 应 -3256，
+  // 因为种子改余额时绕过了 saveAccount）。这条把它钉在 CI 里。
+  test('演示数据灌完：数据体检必须是干净的', () async {
+    await _freshDb();
+    await Store.i.boot();
+    await seedDemoDataIfNeeded();
+
+    final report = await Integrity.check();
+    expect(
+      report.ok,
+      isTrue,
+      reason: '假账也是账，体检不过说明种子写坏了：${report.summary}',
     );
   });
 }

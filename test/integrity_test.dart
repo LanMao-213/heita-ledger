@@ -199,6 +199,41 @@ void main() {
     expect(kinds(r), contains(IntegrityKind.missingPeriod));
   });
 
+  test('带余额新建账户不会自造漂移', () async {
+    // dev 种子 / Excel 导入都会「建账户时直接给一个初始余额」。
+    // 新建账户还没有流水，所以期初必须等于这个余额，否则体检第一条就报错。
+    await Repo.insertAccount(
+      const Account(id: 0, name: '带余额的卡', balanceCents: 500000),
+    );
+
+    final r = await Integrity.check();
+    expect(
+      r.ok,
+      isTrue,
+      reason: '建账户时给的余额就是期初，不能算成漂移：${r.summary}',
+    );
+
+    final acc = (await Repo.listAccounts()).firstWhere(
+      (a) => a.name == '带余额的卡',
+    );
+    expect(acc.balanceCents, 500000);
+    expect(acc.openingCents, 500000);
+
+    // 之后再记账，余额照常增减
+    await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: ledgerId,
+        type: TxnType.expense,
+        amountCents: 30000,
+        date: '$month-20',
+        categoryId: catFood,
+        accountId: acc.id,
+      ),
+    );
+    expect((await Integrity.check()).ok, isTrue);
+  });
+
   test('借贷已还超过本金能被发现', () async {    final debtId = await Repo.createDebt(
       Debt(
         id: 0,

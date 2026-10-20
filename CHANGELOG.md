@@ -106,6 +106,30 @@ await WriteGateway.run(InsertTxn(t, row));
 用户手机上的老库可能已经带着漂移，抛异常会让那次记账直接失败，
 等于拿历史问题卡住用户当下要办的事。
 
+### 真机首次运行发现并修掉的自伤（`insertAccount` / `updateAccount`）
+
+第一次在真机上点「检查数据完整性」，它就报了 1 项：
+
+> 账户余额与流水不一致：微信：账面 1,744.00，按期初 + 流水应为 -3,256.00
+
+差 5,000.00 —— 正好是 dev 种子给微信设的初始余额。根因是两条写路径绕过了
+v8 的恒等式：
+
+- `insertAccount(Account(balanceCents: 5000))` 建账户时只写余额、`opening_cents`
+  留默认 0 —— 而新账户还没有流水，期初必须等于余额；
+- `updateAccount` 把整个 `toMap()` 写回去，顺手把 `opening_cents` 抹成 0
+  （dev 种子正是用它改初始余额）。
+
+现在：
+
+- `insertAccount` 强制 `opening = balance`（新账户没有流水，恒等式只能是这个）；
+- `updateAccount` **不再写** `balance_cents` / `opening_cents` —— 这两列只有
+  `saveAccount`（用户手填余额，反算期初）和 `_applyBalanceDelta`（流水增减）能改；
+- dev 种子改初始余额改走 `saveAccount`。
+
+新增两条回归：`integrity_test` 的「带余额新建账户不会自造漂移」、
+`seed_test` 的「演示数据灌完：数据体检必须是干净的」（后者能直接拦住这次这类自伤）。
+
 ### 内部：通知合并（记一笔不再重建两遍）
 
 `afterTxnChange()` 里 `loadCycle()` 和 `loadStats()` 各自 `notifyListeners()`，
@@ -141,7 +165,7 @@ await WriteGateway.run(InsertTxn(t, row));
 → 检出 → 重算修好且不动期初、**手填余额不算漂移**（回归）、搜索转义、孤儿分类、
 缺归属期、借贷超还、**v7 老库升 v8 后余额不变且期初回填正确**。
 
-`flutter analyze` 0 issue，`flutter test` **275 条全绿**（原 256 + 体检 9 + 网关 5 + 迁移链 2 + 通知合并 3）。
+`flutter analyze` 0 issue，`flutter test` **277 条全绿**（256 + 体检 10 + 网关 5 + 迁移链 2 + 通知合并 3 + 种子体检 1）。
 
 顺带调整了三个界面用例的等待方式（`test/support/wait_write.dart`）：写入改走网关后，
 一次保存要跨 isolate 走完「开事务 → 写 → 改余额 → 提交」，假时钟下光靠一次

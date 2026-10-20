@@ -165,14 +165,32 @@ class Repo {
     return (r.first['t'] as int?) ?? 0;
   }
 
+  /// 建账户。
+  ///
+  /// ★ v8 起 `opening_cents` 必须与 `balance_cents` 一致 —— 新建账户还没有
+  ///   任何流水，`余额 = 期初 + 流水合计` 要成立只能是「期初 = 余额」。
+  ///   这里**强制**对齐，不信调用方传了什么：dev 种子、Excel 导入建空账户、
+  ///   以后任何新入口都会走这条，漏一个就会出现「账面 1744、按流水 -3256」
+  ///   这种自造的漂移（1.4.5 真机体检发现的第一个问题就是它）。
   static Future<int> insertAccount(Account a) async {
     final db = await Db.open();
-    return db.insert('account', a.toMap());
+    final map = a.toMap()..['opening_cents'] = a.balanceCents;
+    return db.insert('account', map);
   }
 
+  /// 改账户的「属性」：名称 / 类型 / 是否计入总资产 / 排序 / 停用。
+  ///
+  /// ★ **不写 `balance_cents` 与 `opening_cents`**。
+  ///   这两列是一对恒等式的两端（`余额 = 期初 + 流水合计`），只有两条路能改它们：
+  ///   `saveAccount`（用户手填余额 → 反算期初）和 `_applyBalanceDelta`（流水增减）。
+  ///   如果这里跟着 `toMap()` 一起写，调用方随手构造一个 `Account(balanceCents: x)`
+  ///   就会把期初抹成 0 —— 1.4.5 真机体检第一眼就抓到了这个（微信 1744 / 应 -3256）。
   static Future<void> updateAccount(Account a) async {
     final db = await Db.open();
-    await db.update('account', a.toMap(), where: 'id = ?', whereArgs: [a.id]);
+    final map = a.toMap()
+      ..remove('balance_cents')
+      ..remove('opening_cents');
+    await db.update('account', map, where: 'id = ?', whereArgs: [a.id]);
   }
 
   static Future<void> deleteAccount(int id) async {

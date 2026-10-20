@@ -66,16 +66,18 @@ Future<void> seedDemoData(int ledgerId) async {
       if (a.name != name) continue;
       if (a.balanceCents != initialCents) {
         // 期初余额：只动余额，不动账户本身的名字/图标
-        await Repo.updateAccount(
+        // 改的是「这个账户如今有多少钱」，必须走 saveAccount：
+        // 它会反算期初，保持 余额 = 期初 + 流水 成立
+        await Repo.saveAccount(
           Account(
             id: a.id,
             name: a.name,
             kind: a.kind,
-            balanceCents: initialCents,
             includeInTotal: a.includeInTotal,
             sortOrder: a.sortOrder,
             archived: a.archived,
           ),
+          initialCents,
         );
       }
       return a.id;
