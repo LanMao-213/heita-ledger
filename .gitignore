@@ -49,5 +49,9 @@ app.*.map.json
 *.keystore
 **/key.properties
 
+# 出好的安装包：惯例放在仓库同级目录（apk/），本来就不在版本库范围内。
+# 这条是兜底 —— 万一把 apk/ 挪进来或从别处拷进来，别让几十 MB 二进制跟着提交。
+apk/
+
 # Widget Preview related
 .widget_preview/
