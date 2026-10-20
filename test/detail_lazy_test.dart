@@ -1,4 +1,4 @@
-// 明细列表懒加载的自检（1.5.0）。
+// 明细列表懒加载的自检（1.4.5）。
 //
 // 为什么值得单独测：懒加载是**看不见**的 —— 界面长得一模一样，只有「实际建了
 // 多少个 widget」能证明它生效。而这正是 1.4.4 把上限卡在 500 的原因：
@@ -64,7 +64,7 @@ void main() {
 
       // 按天铺开：一天一张卡，20 张卡、200 行
       for (var d = 0; d < days; d++) {
-        final day = '${month}-${(d + 1).toString().padLeft(2, '0')}';
+        final day = '$month-${(d + 1).toString().padLeft(2, '0')}';
         for (var i = 0; i < perDay; i++) {
           await Repo.insertTxn(
             Txn(

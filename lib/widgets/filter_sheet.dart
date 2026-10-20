@@ -144,7 +144,8 @@ class _FilterSheetState extends State<_FilterSheet> {
   /// 切到「收入」时分类必须清掉：支出分类配收入条件永远是空结果
   void _setType(TxnType? t) => _edit(() {
     _type = _type == t ? null : t;
-    if (_type == TxnType.income) _categoryId = null;
+    // 只有「支出」能按分类筛：收入不按分类、转账也没有分类
+    if (_type != TxnType.expense) _categoryId = null;
   });
 
   void _reset() => _edit(() {
@@ -282,7 +283,9 @@ class _FilterSheetState extends State<_FilterSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _block('类型', _typeRow()),
-                    _block('分类', _categoryBlock(s)),
+                    // 转账没有分类，这一块直接不出现 —— 留着会让人以为能筛
+                    if (_type != TxnType.transfer)
+                      _block('分类', _categoryBlock(s)),
                     _block('账户', _accountBlock(s)),
                     _block('金额（元）', _amountRow()),
                     _block(
@@ -344,6 +347,15 @@ class _FilterSheetState extends State<_FilterSheet> {
             label: '收入',
             selected: _type == TxnType.income,
             onTap: () => _setType(TxnType.income),
+          ),
+          const SizedBox(width: S.sm),
+          // 「转账」是 1.4.5 补的：明细页顶部那排快捷筛选撤掉之后，
+          // 这里是「只看转账」唯一的入口。转账不属于收支两侧，
+          // 选中时必须把分类一起清掉（见 _setType），否则条件会互相打架。
+          _ToggleChip(
+            label: '转账',
+            selected: _type == TxnType.transfer,
+            onTap: () => _setType(TxnType.transfer),
           ),
         ],
       ),

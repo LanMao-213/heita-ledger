@@ -121,33 +121,39 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('类型 chips：只改 type，不清掉其它条件', (tester) async {
+  // 原来这条点的是明细页顶部那排「全部/支出/收入/转账」chips ——
+  // 1.4.5 把它们撤了（跨全部历史，和概览卡的本期口径冲突），类型筛选搬到筛选面板。
+  // **语义没变**，所以断言保留，只把驱动方式换成同一层的 API：
+  // 改类型时，其它条件（分类/金额/时间）必须原样保留。
+  testWidgets('类型筛选：只改 type，不清掉其它条件', (tester) async {
     await seed(tester);
     await pumpDetail(tester);
     final s = Store.i;
 
-    // 初始：未筛选
     expect(s.filtering, isFalse);
 
-    // 点「支出」→ 只剩 2 笔支出
-    await tester.tap(find.widgetWithText(GestureDetector, '支出'));
+    await tester.runAsync(
+      () => s.applyFilter(TxnFilter.none.withType(TxnType.expense)),
+    );
     await settle(tester);
     expect(s.filtering, isTrue);
     expect(s.filter.type, TxnType.expense);
     expect(s.filteredTxns.length, 2);
 
-    // 先设一个分类条件，再点「收入」—— 分类条件必须还在，只是 type 变了
+    // 先设一个分类条件，再改类型 —— 分类条件必须还在
     await tester.runAsync(() => s.applyFilter(TxnFilter(categoryId: foodId)));
     await settle(tester);
     expect(s.filter.categoryId, foodId);
 
-    await tester.tap(find.widgetWithText(GestureDetector, '收入'));
+    await tester.runAsync(
+      () => s.applyFilter(s.filter.withType(TxnType.income)),
+    );
     await settle(tester);
     expect(s.filter.type, TxnType.income);
-    expect(s.filter.categoryId, foodId, reason: 'chips 不该清掉分类条件');
+    expect(s.filter.categoryId, foodId, reason: '改类型不该清掉分类条件');
 
-    // 点「全部」→ 只去掉 type，分类条件仍保留
-    await tester.tap(find.widgetWithText(GestureDetector, '全部'));
+    // 回到「不限类型」：同样只去掉 type
+    await tester.runAsync(() => s.applyFilter(s.filter.withType(null)));
     await settle(tester);
     expect(s.filter.type, isNull);
     expect(s.filter.categoryId, foodId);

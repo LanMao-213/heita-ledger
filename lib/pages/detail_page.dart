@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../data/models.dart';
 import '../data/repo.dart';
-import '../data/ui_flags.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
@@ -29,11 +28,15 @@ class DetailPage extends StatelessWidget {
         return Column(
           children: [
             const _TopBar(),
-            // 类型快捷筛选：留了开关（UiFlags.typeChips），后期看效果决定去留
-            if (UiFlags.typeChips) const _TypeChips(),
+            // 顶部那排「全部/支出/收入/转账」在 1.4.5 移除了，两个原因：
+            // 1) 它走的是 `searchTxns`（跨全部历史），而紧跟其下的概览卡是「本期」——
+            //    两个数字上下并排却不同口径，用户只会觉得对不上；
+            // 2) 类型筛选在筛选面板里已经有了，两套入口并存时状态容易混。
+            // 现在「只看某类型」走筛选面板（那里也补了「转账」），
+            // 筛选条会把「全部历史」写明，口径不再含糊。
             if (s.filtering) _FilterBar(),
             Expanded(
-              // ★ 懒加载（1.5.0）：原来是 `ListView(children: [...])`，一期几百笔
+              // ★ 懒加载（1.4.5）：原来是 `ListView(children: [...])`，一期几百笔
               //   会一次性构建所有行 —— 1.4.4 的「明细只显示 500 条」就是为了躲它。
               //   换成 `SliverList.builder` 后只构建可视区域内的那几张日卡，
               //   滚动时才按需建下一张，摊还成本与屏高成正比，与总条数无关。
@@ -328,63 +331,6 @@ class _SearchDelegate extends SearchDelegate<String> {
 ///
 /// 只改 `TxnFilter.type`，用户已经设好的分类、金额区间、时间段原样保留
 /// （`TxnFilter.withType`），否则点一下「支出」就把别的条件清掉了。
-class _TypeChips extends StatelessWidget {
-  const _TypeChips();
-
-  static const _items = <(TxnType?, String)>[
-    (null, '全部'),
-    (TxnType.expense, '支出'),
-    (TxnType.income, '收入'),
-    (TxnType.transfer, '转账'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Store.i;
-    final cur = s.filter.type;
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: S.xl, vertical: 2),
-        itemCount: _items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: S.sm),
-        itemBuilder: (context, i) {
-          final (type, label) = _items[i];
-          final on = cur == type;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              final f = s.filter.withType(type);
-              if (f.isEmpty) {
-                s.clearFilter();
-              } else {
-                s.applyFilter(f);
-              }
-            },
-            child: Container(
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: on ? C.ink : C.bg2,
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: on ? C.bg : C.ink2,
-                  fontWeight: on ? FontWeight.w500 : FontWeight.w400,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
 /// 明细被上限截断时，列表末尾的说明 + 「看全部」入口。
 ///
 /// 做成整条可点，而不是只在文字里放个链接：这一行的唯一用途就是跳转，
@@ -448,6 +394,10 @@ class _FilterBar extends StatelessWidget {
     final s = Store.i;
     final f = s.filter;
     final chips = <String>[
+      // 口径写在脸上：明细的筛选一律跨**全部历史**，而上面的概览卡只算本期。
+      // 不写明的话，筛完就会看到「上面本期 5,061、下面列出去年的收入」——
+      // 1.4.5 撤掉顶部快捷筛选之后，这里是唯一需要解释范围的地方。
+      if (f.dateFrom == null && f.dateTo == null) '全部历史',
       if (f.type != null) f.type!.label,
       if (f.categoryId != null) s.categoryOf(f.categoryId)?.name ?? '已删除分类',
       if (f.accountId != null) s.accountOf(f.accountId)?.name ?? '已删除账户',
