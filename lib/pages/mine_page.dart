@@ -147,7 +147,9 @@ class MinePage extends StatelessWidget {
             child: SettingRow(
               icon: 'more',
               title: '清空全部数据',
-              subtitle: '不可撤销，恢复成刚装好的样子',
+              // 1.4.3 起清空前会自动留快照、能从「数据安全」回滚，
+              // 再写「不可撤销」就是骗人 —— 这行是 1.4.3 改弹窗时漏下的
+              subtitle: '会先自动存一份快照，可找回',
               danger: true,
               onTap: () => _wipe(context),
             ),
