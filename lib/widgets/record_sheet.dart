@@ -13,10 +13,25 @@ import 'common.dart';
 import 'calc_keypad.dart';
 import 'picker_wheels.dart';
 
+/// 保存成功后带出来的信息，给「已记账 · 10-01 至 10-31」这类提示用。
+///
+/// 为什么要带期标签：这笔钱最后落在哪一期，是「工资抬期」「账单日不是 1 号」
+/// 这些规则决定的，用户看不见。1.4.2 修掉「记完在明细里找不到」之后还差一句
+/// 话告诉他**记到哪去了** —— 否则跳期只是「界面自己跳了一下」。
+class RecordOutcome {
+  const RecordOutcome({required this.periodStart, required this.periodLabel});
+
+  /// 这笔的归属期首日（`YYYY-MM-DD`），和 `txn.period_start` 同一口径
+  final String periodStart;
+
+  /// 归属期的可读区间，如 `10-01 至 10-31`
+  final String periodLabel;
+}
+
 /// 打开「记一笔」面板。传入 [editing] 则为编辑模式。
-/// 返回 true 表示保存成功。
-Future<bool?> showRecordSheet(BuildContext context, {Txn? editing}) {
-  return showModalBottomSheet<bool>(
+/// 返回 null 表示取消；非 null 表示保存成功，并带上这笔落在哪一期。
+Future<RecordOutcome?> showRecordSheet(BuildContext context, {Txn? editing}) {
+  return showModalBottomSheet<RecordOutcome>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -442,12 +457,10 @@ class _RecordSheetState extends State<RecordSheet> {
             accountId: _accountId,
           ),
         );
-        await store.afterTxnInserted(
-          date: _date,
-          periodStart: periodStartOf(_date, store.cycleStartDay),
-        );
+        final periodStart = periodStartOf(_date, store.cycleStartDay);
+        await store.afterTxnInserted(date: _date, periodStart: periodStart);
         if (!mounted) return;
-        Navigator.pop(context, true);
+        Navigator.pop(context, _outcomeOf(periodStart));
         return;
       }
       if (_isEdit) {
@@ -496,25 +509,37 @@ class _RecordSheetState extends State<RecordSheet> {
       }
       // 新记的一笔：刷新 + 把视角搬到这笔身上（清筛选、对齐期、回明细）
       // 编辑走 [afterTxnChange] 就够 —— 用户正在看的就是那一行，跳期反而打断
+      // 这笔落在哪一期：和 `Repo.periodFor` 同一口径（含抬期）。
+      // 提示文案和「跳期跳到哪里」都用它，不另算一遍。
+      final periodStart = periodStartOf(
+        _date,
+        store.cycleStartDay,
+        liftToNext: _liftOn,
+      );
       if (_isEdit) {
         await store.afterTxnChange();
       } else {
-        await store.afterTxnInserted(
-          date: _date,
-          periodStart: periodStartOf(
-            _date,
-            store.cycleStartDay,
-            liftToNext: _liftOn,
-          ),
-        );
+        await store.afterTxnInserted(date: _date, periodStart: periodStart);
       }
       if (!mounted) return;
-      Navigator.pop(context, true);
+      Navigator.pop(context, _outcomeOf(periodStart));
     } catch (err) {
       if (!mounted) return;
       setState(() => _saving = false);
       showToast(context, '保存失败：$err');
     }
+  }
+
+  /// 归属期首日 → 带区间文案的结果对象（`10-01 至 10-31`）
+  RecordOutcome _outcomeOf(String periodStart) {
+    final (from, to) = cycleRange(
+      DateTime.parse(periodStart),
+      Store.i.cycleStartDay,
+    );
+    return RecordOutcome(
+      periodStart: periodStart,
+      periodLabel: cycleLabel(from, to),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -622,7 +647,8 @@ class _RecordSheetState extends State<RecordSheet> {
               title: _isEdit ? '编辑记录' : '记一笔',
               action: _isEdit
                   ? TextButton(
-                      onPressed: () => Navigator.pop(context, false),
+                      // 取消：弹出 null，调用方按「没保存」处理
+                      onPressed: () => Navigator.pop(context),
                       child: const Text('取消', style: TextStyle(color: C.ink2)),
                     )
                   : TextButton(

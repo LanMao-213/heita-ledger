@@ -98,11 +98,12 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Future<void> _openRecord() async {
-    final saved = await showRecordSheet(context);
-    if (saved == true && mounted) {
-      Haptics.success();
-      showToast(context, '已记账');
-    }
+    final outcome = await showRecordSheet(context);
+    if (outcome == null || !mounted) return;
+    Haptics.success();
+    // 带上归属期：抬期、账单日不是 1 号这些规则会让这笔落到别的期，
+    // 而界面上只看得到「记完了」—— 一句话说清它记到哪去了
+    showToast(context, '已记账 · ${outcome.periodLabel}');
   }
 
   @override
