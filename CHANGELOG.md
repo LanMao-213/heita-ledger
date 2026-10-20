@@ -117,11 +117,12 @@ await WriteGateway.run(InsertTxn(t, row));
 
 ### 测试
 
-新增 `test/integrity_test.dart`（9 条）、`test/command_test.dart`（5 条）：干净库、事务化后余额仍对、余额被外部改坏
+新增 `test/integrity_test.dart`（9 条）、`test/command_test.dart`（5 条）、
+`test/migrate_v5_to_v8_test.dart`（2 条，v5→v8 全链路迁移 + 老备份恢复）：干净库、事务化后余额仍对、余额被外部改坏
 → 检出 → 重算修好且不动期初、**手填余额不算漂移**（回归）、搜索转义、孤儿分类、
 缺归属期、借贷超还、**v7 老库升 v8 后余额不变且期初回填正确**。
 
-`flutter analyze` 0 issue，`flutter test` **270 条全绿**（原 256 + 体检 9 + 网关 5）。
+`flutter analyze` 0 issue，`flutter test` **272 条全绿**（原 256 + 体检 9 + 网关 5 + 迁移链 2）。
 
 顺带调整了三个界面用例的等待方式（`test/support/wait_write.dart`）：写入改走网关后，
 一次保存要跨 isolate 走完「开事务 → 写 → 改余额 → 提交」，假时钟下光靠一次
