@@ -191,7 +191,7 @@ class _PersonRow extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
         padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: S.md),
         decoration: BoxDecoration(
-          // 卡片面：默认主题是纯白，露露缇雅版是暖白（见 C.cardBg）
+          // 卡片面：纯白，比纸白底亮一档（见 C.cardBg）
           color: C.cardBg,
           borderRadius: BorderRadius.circular(R.card),
           border: Border.all(color: C.line),
@@ -349,7 +349,7 @@ class _DebtRow extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
         padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: S.md),
         decoration: BoxDecoration(
-          // 卡片面：默认主题是纯白，露露缇雅版是暖白（见 C.cardBg）
+          // 卡片面：纯白，比纸白底亮一档（见 C.cardBg）
           color: C.cardBg,
           borderRadius: BorderRadius.circular(R.card),
           border: Border.all(color: C.line),

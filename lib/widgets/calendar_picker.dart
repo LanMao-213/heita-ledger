@@ -248,8 +248,8 @@ class _CalendarPickerState extends State<_CalendarPicker> {
       padding: EdgeInsets.only(bottom: media.viewPadding.bottom),
       child: Container(
         decoration: const BoxDecoration(
-          // 抽屉面用「卡面」而不是「页面底」：露露缇雅版的底是天青，
-          // 抽屉再铺一层天青就成了整片蓝；卡面是暖白，读起来才是「纸」
+          // 抽屉面用「卡面」而不是「页面底」：底已经是最浅的纸白，
+          // 抽屉再铺纸白就整片同色；卡面是纯白，压下去才看得出这是一层浮起来的面
           color: C.cardBg,
           borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
         ),

@@ -143,7 +143,7 @@ class SummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: C.heroBg,
         borderRadius: BorderRadius.circular(R.lg),
-        // 描边分主题：默认主题是冷灰，露露缇雅版是薰衣草灰（C.heroEdge）
+        // 描边比普通描边（C.line）再暖一档，和压下去的卡身同族（C.heroEdge）
         border: Border.all(color: C.heroEdge),
       ),
       child: Column(

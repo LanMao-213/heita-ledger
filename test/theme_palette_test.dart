@@ -22,15 +22,15 @@ double _contrast(Color a, Color b) {
 }
 
 void main() {
-  group('配色可用性（两套主题共用这一组断言）', () {
-    test('ThemeData 是亮色的 —— 露露缇雅版不是深色模式', () {
+  group('配色可用性（纸墨单套色板）', () {
+    test('ThemeData 是亮色的 —— 纸墨不是深色模式', () {
       // 这一条是需求本身：「我们现在做的不是深色模式」。
       // 之前按黑塔阵营基调（暗石底 + 骨白）做过一版，是深色的，已废弃。
       expect(buildAppTheme().brightness, Brightness.light);
       expect(
         C.bg.computeLuminance(),
         greaterThan(0.5),
-        reason: '底必须是亮的（明亮天空），深色模式这条会挂',
+        reason: '底必须是亮的（纸白），深色模式这条会挂',
       );
       expect(
         C.ink.computeLuminance(),
@@ -39,14 +39,14 @@ void main() {
       );
     });
 
-    test('主文字 / 超支 / 辅助文字在底上都看得清', () {
+    test('主文字 / 超支 / 次要 / 辅助文字在底上都看得清', () {
       expect(_contrast(C.ink, C.bg), greaterThan(7), reason: '主文字 AAA');
       expect(_contrast(C.ink2, C.bg), greaterThan(4.5), reason: '次要文字 AA');
       expect(_contrast(C.over, C.bg), greaterThan(4.5), reason: '超支 AA');
-      // 辅助文字只要求 2.5：默认主题的 `C.ink3` 是 #9AA0A8，在白底上只有
-      // 2.6:1 —— 那是既有问题，这一轮不动（改了就不是「保留现在版本」了）。
-      // 露露缇雅版的 ink3 是 5.1:1，所以这条对它是白送的。
-      expect(_contrast(C.ink3, C.bg), greaterThan(2.5), reason: '辅助文字（既有下限）');
+      // 辅助文字是 12.5px 的 caption 在用，必须过 AA —— 旧色板这里是 2.6:1，
+      // 这一轮已经提到 5.2:1，所以下限写死 4.5（不再是当年的 2.5）。
+      expect(_contrast(C.ink3, C.bg), greaterThanOrEqualTo(4.5), reason: '辅助文字 AA');
+      expect(_contrast(C.ink3, C.cardBg), greaterThanOrEqualTo(4.5), reason: '卡片上的辅助文字 AA');
     });
 
     test('进度条填充与轨道的对比度 ≥ 3（图形对象的下限）', () {
@@ -56,89 +56,62 @@ void main() {
 
     test('面与面之间分得开，层级不塌', () {
       // 概览卡「压下去」、明细卡「浮上来」、卡里的胶囊再降一档（D-09）。
-      // 任意两档同色，那一层就消失了 —— 露露缇雅版最容易踩的是
-      // 「卡片面用暖白、卡内的未选中态也用暖白」，整片可点区域会看不见。
-      //
-      // 注意：卡片面 **可以** 等于底色（默认主题就是白卡压在白底上，靠描边
-      // 和 4% 投影分开，见 D-10），所以这里不比较 bg 与 cardBg。
+      // 任意两档同色，那一层就消失了。
       expect(C.heroBg, isNot(C.cardBg), reason: '概览卡 ≠ 明细卡');
       expect(C.bg2, isNot(C.cardBg), reason: '卡内次级面 ≠ 卡面');
       expect(C.bg2, isNot(C.bg), reason: '输入底 ≠ 页面底');
-      // 不比较 heroBg 与 bg2：默认主题里它们本来就都是 #F4F5F6
-      // （概览卡就是「浅灰底的那块」），强行拆开等于改掉现有设计。
+      // 纸墨版把概览卡和卡内次级面拆成了两个值（旧色板两者都是 #F4F5F6）：
+      // 概览卡要读起来是「压下去的纸」，次级面要读起来是「沉下去的槽」。
+      expect(C.heroBg, isNot(C.bg2), reason: '概览卡 ≠ 卡内次级面');
+      expect(C.heroEdge, isNot(C.line), reason: '概览卡描边与普通描边不同族就没必要拆');
     });
   });
 
-  group('默认包的颜色一个都没变', () {
-    test('15 个 token 还是 1.4.4 的那 15 个值', () {
-      if (kHeita) return;
-      // 加第二套配色时，把「写死的字面量」换成了 token。这组断言就是那句话的
-      // 证据：只要有一个值被顺手改掉，`git diff` 里看不见的那点色差就会在这里爆。
-      expect(C.ink, const Color(0xFF14161A));
-      expect(C.ink2, const Color(0xFF5C626B));
-      expect(C.ink3, const Color(0xFF9AA0A8));
-      expect(C.ink4, const Color(0xFFC4C9CF));
-      expect(C.inkWash, const Color(0x0F14161A));
-      expect(C.bg, const Color(0xFFFFFFFF));
-      expect(C.bg2, const Color(0xFFF4F5F6));
-      expect(C.bg3, const Color(0xFFFAFAFB));
-      expect(C.line, const Color(0xFFE8EAEC));
-      expect(C.line2, const Color(0xFFDFE2E5));
-      expect(C.over, const Color(0xFFA3231A));
-      expect(C.overD, const Color(0xFFE8493A));
-      expect(C.stage, const Color(0xFFE8EAEF));
-      // 新增 token 在默认主题下必须**等于某个旧值**，否则就是新设计
-      expect(C.accent, C.ink, reason: '黑白灰原则：强调色 = 主文字色');
-      expect(C.onAccent, C.bg);
-      expect(C.cardBg, C.bg, reason: '白卡压白底，靠描边 + 投影分开（D-10）');
-      expect(C.heroBg, C.bg2);
-      expect(C.heroEdge, C.line);
-      expect(C.handle, const Color(0xFFEEF0F2));
-      expect(C.cardShadow, const Color(0x0A14161A));
-      expect(C.accentSoft, C.bg2);
+  group('纸墨色板的值被钉死', () {
+    test('24 个颜色 token 与十档色阶', () {
+      // 换单套色板时把「两套三元表达式」换成了字面量。这组断言是那句话的证据：
+      // 只要有一个值被顺手改掉，肉眼看不见的那点色差会在这里先红。
+      expect(C.ink, const Color(0xFF1C1A17));
+      expect(C.ink2, const Color(0xFF5C5850));
+      expect(C.ink3, const Color(0xFF6F695C));
+      expect(C.ink4, const Color(0xFFB9B2A5));
+      expect(C.inkWash, const Color(0x0F1C1A17));
+      expect(C.bg, const Color(0xFFFBFAF7));
+      expect(C.bg2, const Color(0xFFEFEBE3));
+      expect(C.bg3, const Color(0xFFF7F5F0));
+      expect(C.line, const Color(0xFFE6E2DA));
+      expect(C.line2, const Color(0xFFDBD5C9));
+      expect(C.over, const Color(0xFFA6321F));
+      expect(C.overD, const Color(0xFFC4472F));
+      expect(C.stage, const Color(0xFFE8E5DD));
+      // 强调色 === 主文字色（纸墨原则：不引入装饰色）
+      expect(C.accent, C.ink, reason: '强调色 = 主文字色');
+      // 压在深色块上的字必须是纯白：纸白 #FBFAF7 压上去会脏，且对比度略低
+      expect(C.onAccent, const Color(0xFFFFFFFF));
+      expect(C.accentSoft, C.bg2, reason: '选中胶囊底与卡内次级面同一档');
       expect(C.accentWash, C.bg2);
       expect(C.todayMark, C.ink);
-      expect(C.onTodayMark, C.bg);
-      // 图表色阶保持十档灰
+      expect(C.onTodayMark, const Color(0xFFFFFFFF));
+      expect(C.cardShadow, const Color(0x0A1C1A17));
+      expect(C.handle, const Color(0xFFE9E4DA));
+      expect(C.heroEdge, const Color(0xFFE3DED4));
+      // 白卡压纸白底，靠描边 + 投影分开（D-10）
+      expect(C.cardBg, const Color(0xFFFFFFFF));
+      expect(C.heroBg, const Color(0xFFF3F1EC));
+      // 图表色阶：暖灰十档，越靠前越主要
       expect(kChart, const [
-        Color(0xFF14161A),
-        Color(0xFF2E343C),
-        Color(0xFF474E58),
-        Color(0xFF616874),
-        Color(0xFF7B8390),
-        Color(0xFF949CA8),
-        Color(0xFFAAB1BC),
-        Color(0xFFBCC2CC),
-        Color(0xFFCDD2D8),
-        Color(0xFFDCE0E4),
+        Color(0xFF1C1A17),
+        Color(0xFF332F29),
+        Color(0xFF4A453C),
+        Color(0xFF605A4F),
+        Color(0xFF766F62),
+        Color(0xFF8C8477),
+        Color(0xFFA29A8C),
+        Color(0xFFB8B0A2),
+        Color(0xFFCFC7B9),
+        Color(0xFFE4DED2),
       ]);
-    });
-  });
-
-  group('露露缇雅·泽金版（--dart-define=HEITA=1）', () {
-    test('四色原色真的用上了', () {
-      if (!kHeita) {
-        // 默认跑测试时不带 dart-define，这一组自动跳过。
-        // 要验露露缇雅版：`flutter test --dart-define=HEITA=1`
-        return;
-      }
-      expect(C.over, const Color(0xFF814864), reason: '绯红（绯带）→ 超支');
-      expect(C.cardBg, const Color(0xFFFDFBF8), reason: '暖白（白裙）→ 卡片面');
-      expect(C.ink4, const Color(0xFFBC9DB1), reason: '薰衣草 → 占位/弱分割');
-      expect(C.accentSoft, const Color(0xFF9AC7D3), reason: '天青 → 徽标底');
-      // 天青原色太亮，不能直接当文字色 —— 只能配深绯紫的字
-      expect(_contrast(C.ink, C.accentSoft), greaterThan(4.5));
-      expect(_contrast(C.accentSoft, C.bg), lessThan(3), reason: '所以天青不当文字色');
-    });
-
-    test('超支色与强调色分得开（否则「超支」看不出来）', () {
-      if (!kHeita) return;
-      // 明度只差 1.4 —— 绯红 #814864 与深天青 #3E7A8B 都压在中间调，
-      // 这是「四色方案」的固有结果：四色里没有一档是给「亮强调」留的。
-      // 所以「超支」靠**色相翻转**（青 → 绯）表达，不靠明度；
-      // 真要一眼看出，得靠旁边的「超支 X」文案，颜色只是辅助。
-      expect(_contrast(C.over, C.accent), greaterThan(1.3));
-      expect(C.over, isNot(C.accent));
+      expect(kChart.length, 10, reason: '饼图切片按十档循环');
     });
   });
 }

@@ -200,7 +200,7 @@ class _TabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        // 底栏跟着卡面走：露露缇雅版的页面底是天青，底栏再用天青就糊在一起
+        // 底栏跟着卡面走：底栏用页面底就与内容糊在一起，用卡面才浮得起来
         color: C.cardBg,
         border: Border(top: BorderSide(color: C.line)),
       ),
@@ -251,8 +251,8 @@ class _TabBar extends StatelessWidget {
               width: 54,
               height: 54,
               decoration: BoxDecoration(
-                // 记一笔：默认主题是主文字色（黑白灰原则）；露露缇雅版用深天青 ——
-                // 全屏最常用的一颗按钮。天青比绯红更合适（绯红留给「超支」）
+                // 记一笔：主文字色（纸墨原则：不引入装饰色）。全屏最常用的一颗
+                // 按钮靠位置和大小被看见，不靠颜色 —— 红色只留给「超支」
                 color: C.accent,
                 shape: BoxShape.circle,
                 boxShadow: [

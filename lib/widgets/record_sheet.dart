@@ -865,7 +865,7 @@ class _RecordSheetState extends State<RecordSheet> {
           // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
           // 留白不会跟着变白
           borderRadius: const BorderRadius.vertical(top: Radius.circular(R.lg)),
-          // 面板面用卡面（暖白），不是页面底（天青）
+          // 面板面用卡面（纯白），不是页面底（纸白）：底与面同色会糊成一片
           child: Container(color: C.cardBg, child: body),
         ),
       ),
