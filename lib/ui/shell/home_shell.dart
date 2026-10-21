@@ -8,6 +8,7 @@ import '../../theme/typography.dart';
 import '../pages/detail/detail_page.dart';
 import '../pages/mine/mine_page.dart';
 import '../pages/plan/plan_page.dart';
+import '../pages/record/record_sheet.dart';
 import '../pages/stats/stats_page.dart';
 import '../widgets/toast.dart';
 
@@ -35,19 +36,34 @@ class _HomeShellState extends State<HomeShell> {
     super.dispose();
   }
 
+  /// 中央「记一笔」：开面板 → 回执 → 搬游标 → toast。
+  ///
+  /// 「搬游标」**只在 Store 里做一次**（`afterTxnInserted` 会清筛选 + 对齐期 +
+  /// 重查）。UI 这里只负责「回到明细页 + 说一句话」，绝不自己改 cycle ——
+  /// 原版 1.4.1 的「记完看不见」就是两处各搬一遍、搬歪了。
+  Future<void> _onRecord() async {
+    final RecordOutcome? outcome = await showRecordSheet(context);
+    if (outcome == null || !mounted) return;
+    await BookScope.of(context).afterTxnInserted(outcome.periodStart);
+    if (!mounted) return;
+    _goTo(ShellStore.tabDetail);
+    showToast(context, '已记账 · ${outcome.label}');
+  }
+
   /// 点底栏：先改 Store（底栏高亮立刻响应），再翻页。
   ///
   /// 点当前 tab 时**直接返回**：不重放翻页动画，也不发通知
   /// （`ShellStore.switchTab` 对同值也是空操作，两处都挡一次）。
-  void _onBarSelect(int tab) {
+  void _onBarSelect(int tab) => _goTo(tab);
+
+  /// 切 tab（底栏点、或记完一笔之后回来都用它，保证底栏与页面同步）。
+  void _goTo(int tab) {
     final ShellStore shell = ShellScope.of(context);
-    if (shell.tabIndex == tab) return;
+    if (shell.tabIndex == tab) {
+      return;
+    }
     shell.switchTab(tab);
-    _controller.animateToPage(
-      tab,
-      duration: Dur.page,
-      curve: Ease.enter,
-    );
+    _controller.animateToPage(tab, duration: Dur.page, curve: Ease.enter);
   }
 
   @override
@@ -73,9 +89,7 @@ class _HomeShellState extends State<HomeShell> {
         current: shell.tabIndex,
         onSelect: _onBarSelect,
       ),
-      floatingActionButton: _RecordFab(
-        onTap: () => showToast(context, '记一笔面板在阶段 2 落地'),
-      ),
+      floatingActionButton: _RecordFab(onTap: _onRecord),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }

@@ -156,6 +156,18 @@ class PlanStore extends StoreBase {
         borrowedInBudgetCents: borrowedInBudgetCents,
       );
 
+  /// 借贷行的「应还 11-30」文案（没约定应还日返回 null）。
+  String? dueLabelOf(int? debtId) {
+    if (debtId == null) return null;
+    for (final Debt d in _debtList) {
+      if (d.id != debtId) continue;
+      final LocalDate? due = d.dueDate;
+      if (due == null) return null;
+      return '应还 ${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
+    }
+    return null;
+  }
+
   /// 标记统计过期（记账后调用：**只打标记，不查统计**）。
   void markStatsStale() {
     _statsStale = true;

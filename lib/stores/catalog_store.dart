@@ -3,6 +3,7 @@ import '../data/repo/account_repo.dart';
 import '../data/repo/category_repo.dart';
 import '../data/repo/debt_repo.dart';
 import '../data/repo/goal_repo.dart';
+import '../data/repo/ledger_repo.dart';
 import '../data/repo/template_repo.dart';
 import '../data/services/summary_service.dart';
 import 'shell_store.dart';
@@ -29,6 +30,7 @@ class CatalogStore extends StoreBase {
   int _receivableCents = 0;
   int _payableCents = 0;
   bool _loaded = false;
+  String _ledgerName = '';
 
   List<Account> get accounts => _accountList;
   CategoryTree get tree => _tree;
@@ -44,6 +46,9 @@ class CatalogStore extends StoreBase {
   /// 是否已经加载过一次（首帧骨架判定用）。
   bool get loaded => _loaded;
 
+  /// 当前账本名（明细页顶部显示）。
+  String get ledgerName => _ledgerName;
+
   Account? accountById(int? id) {
     if (id == null) return null;
     for (final Account a in _accountList) {
@@ -54,9 +59,13 @@ class CatalogStore extends StoreBase {
 
   String accountName(int? id) => accountById(id)?.name ?? '未指定账户';
 
+  /// 分类显示名（`餐饮 · 正餐`；未分类返回「未分类」）。
+  String displayName(int? id) => _tree.displayName(id);
+
   /// 一次查全（账户 / 分类树 / 模板 / 目标 / 往来与净资产）。
   Future<void> loadCatalog(int ledgerId) async {
     await batchNotifyAsync<void>(() async {
+      _ledgerName = (await const LedgerRepo().current())?.name ?? '';
       _accountList = await _accounts.list();
       _tree = CategoryTree(await _categories.all(ledgerId));
       _templateList = await _templates.all(ledgerId);

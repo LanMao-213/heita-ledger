@@ -10,6 +10,7 @@ import 'package:heita_ledger/ui/boot/splash.dart';
 import 'package:heita_ledger/ui/pages/detail/detail_page.dart';
 import 'package:heita_ledger/ui/pages/mine/mine_page.dart';
 import 'package:heita_ledger/ui/pages/plan/plan_page.dart';
+import 'package:heita_ledger/ui/pages/record/record_keypad.dart';
 import 'package:heita_ledger/ui/pages/stats/stats_page.dart';
 import 'package:heita_ledger/ui/shell/home_shell.dart';
 
@@ -189,13 +190,12 @@ void main() {
       );
     });
 
-    testWidgets('四页都保活：切走再回来滚动位置不变', (WidgetTester tester) async {
+    testWidgets('四页都保活：切走再回来状态还是同一个', (WidgetTester tester) async {
       await _pumpApp(tester);
 
-      await tester.drag(find.byType(DetailPage), const Offset(0, -260));
-      await tester.pumpAndSettle();
-      final double scrolled = _offsetOf(tester, find.byType(DetailPage));
-      expect(scrolled, greaterThan(0), reason: '这一页得真的能滚，否则保活无从断言');
+      // 空库时明细页没有内容可滚（滚动位置的守恒由下一条「计划」用例盯着），
+      // 这里守的是更根本的一条：切走再回来 State 没被重建。
+      final State<StatefulWidget> before = tester.state(find.byType(DetailPage));
 
       await tester.tap(find.byKey(const ValueKey<String>('nav-我的')));
       await tester.pumpAndSettle();
@@ -204,7 +204,12 @@ void main() {
       await tester.tap(find.byKey(const ValueKey<String>('nav-明细')));
       await tester.pumpAndSettle();
 
-      expect(_offsetOf(tester, find.byType(DetailPage)), closeTo(scrolled, 0.5));
+      expect(
+        identical(tester.state(find.byType(DetailPage)), before),
+        isTrue,
+        reason: 'State 换人 = 保活失效，列表滚动位置会跟着丢',
+      );
+      expect(find.byType(DetailPage), findsOneWidget);
     });
 
     testWidgets('四页各自独立滚动位置，互不串台', (WidgetTester tester) async {
@@ -281,15 +286,20 @@ void main() {
       expect(persisted, <String>['aurora']);
     });
 
-    testWidgets('浮钮占位：点一下给提示，不崩', (WidgetTester tester) async {
+    testWidgets('浮钮 → 真的打开记一笔面板（阶段 2 已接上）', (WidgetTester tester) async {
       await _pumpApp(tester);
 
       await tester.tap(find.byKey(const ValueKey<String>('fab-record')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
-      expect(find.text('记一笔面板在阶段 2 落地'), findsOneWidget);
+      expect(find.text('记一笔'), findsOneWidget);
+      expect(find.byType(RecordKeypad), findsOneWidget);
       expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(const ValueKey<String>('record-close')));
+      await tester.pumpAndSettle();
+      expect(find.byType(RecordKeypad), findsNothing);
+      expect(find.byType(HomeShell), findsOneWidget, reason: '关掉面板不会把关壳带走');
     });
   });
 }

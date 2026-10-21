@@ -26,6 +26,7 @@ class BookStore extends StoreBase {
   List<Txn> _items = <Txn>[];
   bool _hasMore = false;
   bool _loaded = false;
+  bool _loadingMore = false;
 
   TxnQuery _query = const TxnQuery();
   TxnSearchResult? _searchResult;
@@ -43,6 +44,9 @@ class BookStore extends StoreBase {
   List<Txn> get items => _items;
 
   bool get hasMore => _hasMore;
+
+  /// 正在取下一页（末尾状态行据此显示「正在加载…」）。
+  bool get isLoadingMore => _loadingMore;
 
   TxnQuery get query => _query;
 
@@ -106,18 +110,34 @@ class BookStore extends StoreBase {
 
   /// 加载下一页（keyset：带着上一页最后一行的 date+id）。
   Future<void> loadMore() async {
-    if (!_hasMore || isFiltering || _items.isEmpty) return;
-    final Txn last = _items.last;
-    final List<Txn> next = await _txnRepo.pageByPeriod(
-      ledgerId: _ledgerId,
-      period: _cycle,
-      after: TxnCursor(date: last.date, id: last.id!),
-    );
-    batchNotify(() {
-      _items = <Txn>[..._items, ...next];
-      _hasMore = next.length >= SqlFragments.pageSize;
+    if (_loadingMore || !_hasMore || isFiltering || _items.isEmpty) return;
+    _loadingMore = true;
+    notifyListeners();
+    try {
+      final Txn last = _items.last;
+      final List<Txn> next = await _txnRepo.pageByPeriod(
+        ledgerId: _ledgerId,
+        period: _cycle,
+        after: TxnCursor(date: last.date, id: last.id!),
+      );
+      _loadingMore = false;
+      batchNotify(() {
+        _items = <Txn>[..._items, ...next];
+        // 取回不足一页 → 到底（不用再问一次数据库）
+        _hasMore = next.length >= SqlFragments.pageSize;
+        notifyListeners();
+      });
+    } catch (_) {
+      _loadingMore = false;
       notifyListeners();
-    });
+    }
+  }
+
+  /// 直接跳到某一期（日历选日期后调）。
+  Future<void> jumpTo(Period period) async {
+    if (period.from == _cycle.from) return;
+    _cycle = period;
+    await reloadCycle();
   }
 
   /// 应用筛选条件（跨全部历史）。空条件等于「清筛选」。

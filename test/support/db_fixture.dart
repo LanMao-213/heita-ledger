@@ -10,7 +10,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// 3. 平台通道不碰（这里只跑 SQLite）。
 Future<void> openTestDb() async {
   sqfliteFfiInit();
-  databaseFactory = databaseFactoryFfi;
+  // ★ 必须用「无 isolate」的工厂：`testWidgets` 跑在 FakeAsync 里，DB 请求如果
+  // 走 isolate 往返，等的是真实时间，FakeAsync 不会推进 → `await` 永久挂住
+  // （表现是 pumpAndSettle / pumpWidget "did not complete"）。
+  databaseFactory = databaseFactoryFfiNoIsolate;
   Db.fileName = inMemoryDatabasePath;
   await Db.close();
   await Db.open();

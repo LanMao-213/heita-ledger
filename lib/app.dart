@@ -66,39 +66,43 @@ class _HeitaAppState extends State<HeitaApp> {
     final BootRunner runner = widget.bootRunner ?? _runBoot;
     return ListenableBuilder(
       listenable: widget.shell,
+      // 四层作用域必须包在 `MaterialApp` **外面**：底部面板（记一笔 / 筛选 /
+      // 搜索 / 日历）走 Navigator 的 Overlay，路由的 context 挂在 MaterialApp
+      // 之下；作用域放里面，面板里 `CatalogScope.watch` 会直接断言「缺失」。
       builder: (BuildContext context, Widget? _) {
-        return MaterialApp(
-          title: '黑塔账本',
-          debugShowCheckedModeBanner: false,
-          theme: buildTheme(widget.shell.palette, Brightness.light),
-          locale: const Locale('zh', 'CN'),
-          supportedLocales: const <Locale>[Locale('zh', 'CN')],
-          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          builder: (BuildContext context, Widget? child) {
-            final MediaQueryData data = MediaQuery.of(context);
-            return MediaQuery(
-              data: data.copyWith(
-                textScaler: data.textScaler.clamp(
-                  minScaleFactor: 0.8,
-                  maxScaleFactor: 2.0,
-                ),
-              ),
-              child: child ?? const SizedBox.shrink(),
-            );
-          },
-          home: ShellScope(
-            store: widget.shell,
-            child: BookScope(
-              store: _book,
-              child: CatalogScope(
-                store: _catalog,
-                child: PlanScope(
-                  store: _plan,
-                  child: BootGate(shell: widget.shell, runner: runner),
+        return ShellScope(
+          store: widget.shell,
+          child: BookScope(
+            store: _book,
+            child: CatalogScope(
+              store: _catalog,
+              child: PlanScope(
+                store: _plan,
+                child: MaterialApp(
+                  title: '黑塔账本',
+                  debugShowCheckedModeBanner: false,
+                  theme: buildTheme(widget.shell.palette, Brightness.light),
+                  locale: const Locale('zh', 'CN'),
+                  supportedLocales: const <Locale>[Locale('zh', 'CN')],
+                  localizationsDelegates:
+                      const <LocalizationsDelegate<dynamic>>[
+                        GlobalMaterialLocalizations.delegate,
+                        GlobalWidgetsLocalizations.delegate,
+                        GlobalCupertinoLocalizations.delegate,
+                      ],
+                  builder: (BuildContext context, Widget? child) {
+                    final MediaQueryData data = MediaQuery.of(context);
+                    return MediaQuery(
+                      data: data.copyWith(
+                        textScaler: data.textScaler.clamp(
+                          minScaleFactor: 0.8,
+                          maxScaleFactor: 2.0,
+                        ),
+                      ),
+                      child: child ?? const SizedBox.shrink(),
+                    );
+                  },
+                  home: BootGate(shell: widget.shell, runner: runner),
                 ),
               ),
             ),
