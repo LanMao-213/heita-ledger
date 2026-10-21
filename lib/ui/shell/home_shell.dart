@@ -1,0 +1,220 @@
+import 'package:flutter/material.dart';
+
+import '../../core/scope.dart';
+import '../../stores/shell_store.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/palette.dart';
+import '../../theme/typography.dart';
+import '../pages/detail/detail_page.dart';
+import '../pages/mine/mine_page.dart';
+import '../pages/plan/plan_page.dart';
+import '../pages/stats/stats_page.dart';
+import '../widgets/toast.dart';
+
+/// 应用外壳（架构设计 §2.2 / M01-F01、M01-F02）。
+///
+/// 结构是**最终结构**（阶段 0 就把壳定死，后面只往里填页面内容）：
+/// - `PageView` 横滑 4 页，每页自己 `AutomaticKeepAliveClientMixin` 保活；
+/// - 底部 5 槽：明细 / 图表 / ＋ / 计划 / 我的，中央是「记一笔」浮钮；
+/// - 底栏与 `PageView` 的 `tabIndex` 双向同步（点底栏翻页、滑页面点亮底栏）。
+///
+/// 只订阅 [ShellStore]：其余数据变化不会让底栏重建。
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key});
+
+  @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  final PageController _controller = PageController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// 点底栏：先改 Store（底栏高亮立刻响应），再翻页。
+  ///
+  /// 点当前 tab 时**直接返回**：不重放翻页动画，也不发通知
+  /// （`ShellStore.switchTab` 对同值也是空操作，两处都挡一次）。
+  void _onBarSelect(int tab) {
+    final ShellStore shell = ShellScope.of(context);
+    if (shell.tabIndex == tab) return;
+    shell.switchTab(tab);
+    _controller.animateToPage(
+      tab,
+      duration: Dur.page,
+      curve: Ease.enter,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ShellStore shell = ShellScope.watch(context);
+    final AppPalette pal = context.pal;
+
+    return Scaffold(
+      backgroundColor: pal.bg,
+      body: PageView(
+        controller: _controller,
+        // 滑动手势由页面自己接管（明细页将来要横滑翻期，筛选态下更要让出外层的
+        // PageView），这里保持默认的整页滚动。
+        onPageChanged: (int page) => ShellScope.of(context).switchTab(page),
+        children: const <Widget>[
+          DetailPage(),
+          StatsPage(),
+          PlanPage(),
+          MinePage(),
+        ],
+      ),
+      bottomNavigationBar: _HomeBar(
+        current: shell.tabIndex,
+        onSelect: _onBarSelect,
+      ),
+      floatingActionButton: _RecordFab(
+        onTap: () => showToast(context, '记一笔面板在阶段 2 落地'),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+    );
+  }
+}
+
+/// 底部 5 槽栏。中央槽位留给浮钮，不承载页面。
+class _HomeBar extends StatelessWidget {
+  const _HomeBar({required this.current, required this.onSelect});
+
+  final int current;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette pal = context.pal;
+    return Container(
+      decoration: BoxDecoration(
+        color: pal.surface,
+        border: Border(top: BorderSide(color: pal.line)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            children: <Widget>[
+              _BarSlot(
+                tab: ShellStore.tabDetail,
+                icon: Icons.receipt_long_outlined,
+                label: '明细',
+                selected: current == ShellStore.tabDetail,
+                onSelect: onSelect,
+              ),
+              _BarSlot(
+                tab: ShellStore.tabStats,
+                icon: Icons.pie_chart_outline,
+                label: '图表',
+                selected: current == ShellStore.tabStats,
+                onSelect: onSelect,
+              ),
+              // 中央浮钮的位置。宽度与浮钮直径同量级，让两侧 tab 不被挤在一起。
+              const SizedBox(width: 72),
+              _BarSlot(
+                tab: ShellStore.tabPlan,
+                icon: Icons.event_note_outlined,
+                label: '计划',
+                selected: current == ShellStore.tabPlan,
+                onSelect: onSelect,
+              ),
+              _BarSlot(
+                tab: ShellStore.tabMine,
+                icon: Icons.person_outline,
+                label: '我的',
+                selected: current == ShellStore.tabMine,
+                onSelect: onSelect,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BarSlot extends StatelessWidget {
+  const _BarSlot({
+    required this.tab,
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final int tab;
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette pal = context.pal;
+    final Color color = selected ? pal.navActive : pal.ink3;
+    return Expanded(
+      child: InkWell(
+        key: ValueKey<String>('nav-$label'),
+        // 点击区撑满整个槽位（最小 44×44）
+        onTap: () => onSelect(tab),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(icon, size: 24, color: color),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: Ts.badge.copyWith(
+                color: color,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 中央「记一笔」浮钮（M01-F02）。
+///
+/// 视觉规范（架构设计 §6.4）：`accent` 底 + 3px `bg` 描边 + `Elev.fab` 阴影。
+/// 阶段 0 只占位不记账 —— 点一下给一句 toast，面板本身在 T02-1 落地。
+class _RecordFab extends StatelessWidget {
+  const _RecordFab({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette pal = context.pal;
+    return Semantics(
+      button: true,
+      label: '记一笔',
+      child: GestureDetector(
+        key: const ValueKey<String>('fab-record'),
+        onTap: onTap,
+        child: Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: Elev.fab(pal),
+          ),
+          child: Material(
+            color: pal.accent,
+            shape: CircleBorder(side: BorderSide(color: pal.bg, width: 3)),
+            child: Icon(Icons.add, size: 26, color: pal.onInverse),
+          ),
+        ),
+      ),
+    );
+  }
+}

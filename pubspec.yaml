@@ -1,0 +1,54 @@
+name: heita_ledger
+description: "黑塔账本 —— 本地单机记账应用。一个包、两套配色运行时切换、零网络依赖。"
+publish_to: 'none'
+
+# 版本号真源。`kAppVersion` 必须与前三段一致（阶段 6 有断言钉住）。
+version: 2.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # 日期选择器要中文（DatePicker 的月份 / 星期文案）
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  # 本地库：手写 SQL，不上 ORM（见架构设计 §1.3）
+  sqflite: ^2.4.4+2
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  # 只用于数字千分位格式化，不做日期解析
+  intl: ^0.20.3
+  share_plus: ^13.3.1
+  file_picker: ^13.1.0
+  excel: ^4.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  # 桌面端跑真 SQLite（内存库），数据层不需要 mock
+  sqflite_common_ffi: ^2.4.4
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+# 原生 SQLite 来源配置。
+#
+# 只有 `flutter test` 会用到：sqflite_common_ffi 依赖 package:sqlite3，它默认从
+# GitHub Releases 下载预编译 dll，国内网络会超时。Windows 系统自带 winsqlite3.dll，
+# 指向它即可跳过下载。Android 走 default，不影响正式构建产物。
+hooks:
+  user_defines:
+    sqlite3:
+      source:
+        default: sqlite3
+        windows: system
+      name:
+        default: sqlite3
+        windows: winsqlite3

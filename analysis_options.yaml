@@ -1,0 +1,37 @@
+# 静态检查基线。
+#
+# 四条硬约束（review 必须逐条过，见架构设计 §2.1），其中三条由门禁脚本强制：
+#   1. lib/data/repo/ 下每个文件 ≤ 250 行；repo.dart 门面 ≤ 130 行且无 SELECT
+#   2. lib/ui/ 下禁止 Color(0x / Colors. / const TextStyle(color: —— 颜色只能来自
+#      context.pal.*，由 tools/check_theme_hardcode.sh 强制
+#   3. lib/ui/widgets/*.dart 必须有 ≥1 个调用点（tools/check_dead_public.sh）
+#   4. 数据层写接口必须在 lib/ui/ 有入口（阶段 6 的 dead_write_api_test）
+#
+# 另两条纪律（见架构设计 §1.2）：
+#   - notifyListeners() 只允许在 Store 内、batchNotify() 体内，或用户显式操作入口
+#   - 叶子组件（AmountText/TxnRow/ProgressBar）不订阅任何 Store，只吃构造参数
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+  errors:
+    todo: ignore
+  exclude:
+    - build/**
+    - android/**
+
+linter:
+  rules:
+    always_declare_return_types: true
+    avoid_print: true
+    unawaited_futures: true
+    prefer_const_constructors: true
+    prefer_const_literals_to_create_immutables: true
+    prefer_final_locals: true
+    directives_ordering: true
+    unnecessary_parenthesis: true
+    use_super_parameters: true
+    sort_child_properties_last: true
+    avoid_unnecessary_containers: true
+    sized_box_for_whitespace: true

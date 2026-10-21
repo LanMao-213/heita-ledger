@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  与 res/drawable/launch_background.xml **完全一致**（两处都要改）。
+  v21 起可以吃 shape/gradient，且原来这里写的是 ?android:colorBackground —— 那会让
+  开屏跟着系统深色模式变黑，而 Flutter 侧开屏恒为浅色，冷启动会闪一下黑。
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#FAFAFB"
+                android:endColor="#FFFFFF" />
+        </shape>
+    </item>
+</layer-list>
