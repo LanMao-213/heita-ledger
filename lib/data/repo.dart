@@ -80,8 +80,10 @@ class Repo {
   static Future<int> insertLedger(Ledger l) async {
     final db = await Db.open();
     final id = await db.insert('ledger', l.toMap());
-    // 新账本要带上默认分类，否则记一笔时没分类可选
-    await _seedCategoriesFor(db, id);
+    // 新账本要带上默认分类，否则记一笔时没分类可选。
+    // 走 `Db.seedCategories` 而不是在这儿再列一份分类表 —— 两处各写一份，
+    // 迟早出现「首启账本有正餐、新建账本只有餐饮」这种只在新建账本上复现的怪事。
+    await Db.seedCategories(db, id);
     return id;
   }
 
@@ -94,51 +96,6 @@ class Repo {
   static Future<void> deleteLedger(int id) async {
     final db = await Db.open();
     await db.delete('ledger', where: 'id = ?', whereArgs: [id]);
-  }
-
-  static Future<void> _seedCategoriesFor(Database db, int ledgerId) async {
-    const expense = [
-      ('餐饮', 'food'),
-      ('交通', 'transport'),
-      ('购物', 'shopping'),
-      ('居住', 'home'),
-      ('娱乐', 'fun'),
-      ('医疗', 'medical'),
-      ('学习', 'study'),
-      ('通讯', 'comm'),
-      ('人情', 'gift'),
-      ('其他', 'more'),
-    ];
-    const income = [
-      ('工资', 'salary'),
-      ('奖金', 'bonus'),
-      ('兼职', 'parttime'),
-      ('理财', 'invest'),
-      ('红包', 'redpacket'),
-      ('其他', 'more'),
-    ];
-    var order = 0;
-    for (final (name, icon) in expense) {
-      await db.insert('category', {
-        'ledger_id': ledgerId,
-        'type': 'expense',
-        'name': name,
-        'icon': icon,
-        'sort_order': order++,
-        'archived': 0,
-      });
-    }
-    order = 0;
-    for (final (name, icon) in income) {
-      await db.insert('category', {
-        'ledger_id': ledgerId,
-        'type': 'income',
-        'name': name,
-        'icon': icon,
-        'sort_order': order++,
-        'archived': 0,
-      });
-    }
   }
 
   // ------------------------------------------------------------------- 账户
@@ -639,6 +596,20 @@ class Repo {
 
   static Future<void> deleteDebt(int debtId) =>
       WriteGateway.run(_DeleteDebt(debtId));
+
+  /// 删掉这笔往来时会被连带删掉的流水笔数（本金 + 每次还款）。
+  ///
+  /// 确认弹窗里的「还会删掉 N 笔流水」只能来自这里。写死一个数字、或者
+  /// 按「本金 + 已还笔数」自己算，用户点下去删掉的东西就和提示对不上 ——
+  /// 而这一步是不可撤销的，提示必须和 `_DeleteDebt` 的实际行为一致。
+  static Future<int> debtTxnCount(int debtId) async {
+    final db = await Db.open();
+    final r = await db.rawQuery(
+      'SELECT COUNT(*) AS n FROM txn WHERE debt_id = ?',
+      [debtId],
+    );
+    return (r.first['n'] as int?) ?? 0;
+  }
 
   /// 往来摘要：应收合计、应付合计、这段日期内到期且未结清的笔数。
   ///

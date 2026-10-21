@@ -460,7 +460,7 @@ class Db {
       });
     }
 
-    await _seedCategories(db, ledgerId);
+    await seedCategories(db, ledgerId);
 
     for (final (k, v) in [
       ('current_ledger_id', '$ledgerId'),
@@ -479,7 +479,13 @@ class Db {
   /// 两级结构：先插一级（`parent_id` 为空），再挂子分类。
   /// `sort_order` 在每一层内部各自从 0 开始 —— 查询时按父级分组取，
   /// 一级与子级的编号互不干扰。
-  static Future<void> _seedCategories(DatabaseExecutor db, int ledgerId) async {
+  ///
+  /// **公开**给 `Repo.insertLedger` 用：新建账本必须和首启账本长得一模一样，
+  /// 抄第二份分类表的下场就是「新建账本只有一级、选不到正餐/地铁」。
+  static Future<void> seedCategories(
+    DatabaseExecutor db,
+    int ledgerId,
+  ) async {
     await _seedGroup(db, ledgerId, 'expense', kExpenseSeed);
     await _seedGroup(db, ledgerId, 'income', kIncomeSeed);
   }

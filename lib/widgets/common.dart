@@ -306,64 +306,6 @@ class _SwipeFlipState extends State<SwipeFlip> {
   }
 }
 
-/// 「当前是哪一期」的标签：「10-15 → 11-14」，点它开日历挑日期。
-///
-/// 不加外框、不带日历图标 —— 它就在概览卡里，外面再套一层胶囊会把
-/// 「一张卡里的一个数字」变成「卡里又长出来一个控件」。日历入口靠可点性
-/// 本身表达，不必再画一遍。
-///
-/// ⚠️ 这个标签**自己不管翻期**：明细页的横滑挂在外层的概览卡上
-/// （见 `DetailPage` 里的 `SwipeFlip`，方案 B —— 只热上部，列表正文
-/// 仍然横滑切 Tab）。所以这里只有 onTap。
-class PeriodChip extends StatelessWidget {
-  const PeriodChip({
-    super.key,
-    required this.from,
-    required this.to,
-    required this.onTap,
-    this.onDark = false,
-  });
-
-  final String from;
-  final String to;
-  final VoidCallback onTap;
-
-  /// 放在深色卡里时用
-  final bool onDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = onDark ? C.bg : C.ink;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  cycleLabel(from, to),
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: fg,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class MonthBar extends StatelessWidget {
   const MonthBar({
     super.key,

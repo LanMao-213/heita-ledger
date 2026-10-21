@@ -500,6 +500,22 @@ Future<void> showDebtDetail(BuildContext context, Debt debt) {
                     child: Text(d.isClosed ? '撤销结清' : '标记已结清'),
                   ),
                 ),
+                const SizedBox(height: S.sm),
+                // 记错一笔往来之后唯一的退路。次要动作，压在最下面、
+                // 只用红字表达危险，不加红底 —— 它不是这一屏的主按钮。
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: C.over,
+                      minimumSize: const Size(0, 44),
+                    ),
+                    onPressed: () {
+                      _confirmDeleteDebt(context, ctx, d);
+                    },
+                    child: const Text('删除这笔往来'),
+                  ),
+                ),
               ],
             ),
           ),
@@ -507,6 +523,54 @@ Future<void> showDebtDetail(BuildContext context, Debt debt) {
       },
     ),
   );
+}
+
+/// 删除一笔往来：先查清会连带删掉几笔流水 → 二次确认 → 删 → 关面板 → 提示。
+///
+/// 文案里的笔数是**当场 `COUNT(*)` 出来的**，不是按「本金 + 已还笔数」估的：
+/// `_DeleteDebt` 的实际行为是「把 `debt_id` 命中的流水全部反向回滚余额后删掉，
+/// 再删 debt 行」，提示里写几笔，用户点下去就必须删几笔 —— 这一步不可撤销。
+Future<void> _confirmDeleteDebt(
+  BuildContext pageContext,
+  BuildContext sheetContext,
+  Debt d,
+) async {
+  final txnCount = await Repo.debtTxnCount(d.id);
+  if (!sheetContext.mounted) return;
+
+  final ok = await showDialog<bool>(
+    context: sheetContext,
+    builder: (ctx) => AlertDialog(
+      title: Text(
+        '删除「${d.counterparty} · ${d.direction.label}」？',
+        style: T.section,
+      ),
+      content: Text(
+        '${Fmt.money(d.amountCents)} 这笔往来会一起删掉'
+        '${txnCount > 0 ? '，还有挂在上面的 $txnCount 笔流水'
+              '${txnCount > 1 ? '（本金和各次还款）' : '（本金）'}，'
+              '账户余额跟着回滚' : ''}。'
+        '\n删掉之后没法撤销。',
+        style: T.body2,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('取消', style: TextStyle(color: C.ink2)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('删除', style: TextStyle(color: C.over)),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+
+  await Repo.deleteDebt(d.id);
+  await Store.i.afterTxnChange();
+  if (sheetContext.mounted) Navigator.pop(sheetContext);
+  if (pageContext.mounted) showToast(pageContext, '已删除');
 }
 
 Widget _kv(String k, String v) => Padding(

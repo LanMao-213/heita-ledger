@@ -76,6 +76,23 @@ Txn _principal({
 );
 
 
+/// 账户流水合计。用来验 `余额 == 期初 + 流水合计` 这条恒等式：
+/// 借贷只产生 income / expense 两种流水，方向就是余额的增减方向。
+Future<int> _flowSum(int accountId) async {
+  final db = await Db.open();
+  final rows = await db.query(
+    'txn',
+    where: 'account_id = ?',
+    whereArgs: [accountId],
+  );
+  var sum = 0;
+  for (final r in rows) {
+    final t = Txn.fromMap(r);
+    sum += t.type == TxnType.income ? t.amountCents : -t.amountCents;
+  }
+  return sum;
+}
+
 /// 等 UI 里触发的那次写入真正落库。
 ///
 /// 1.4.5 起写入走 `WriteGateway`，测试环境里它会在事务内跑一次不变量校验
@@ -320,6 +337,152 @@ void main() {
       month: Fmt.month(DateTime.now()),
     );
     expect(txns.where((t) => t.debtId == debtId), isEmpty);
+  });
+
+  // 界面上的「删除这笔往来」只走 `Repo.deleteDebt`，所以这里钉的是它的**真实语义**：
+  // 不是只删 debt 一行，而是把 `debt_id` 命中的流水（本金 + 每次还款）全部删掉、
+  // 逐条反向回滚账户余额。确认弹窗里写的笔数就是按这个口径 `COUNT(*)` 出来的。
+  test('删除往来：debt 查不到、连带流水清空、余额回到 opening + Σ流水', () async {
+    await _freshDb();
+    final c = await _ctx();
+    final baseline = c.account.balanceCents; // 这笔往来存在之前的余额
+    final debtId = await Repo.createDebt(
+      _debt(ledgerId: c.ledgerId, accountId: c.account.id),
+      _principal(ledgerId: c.ledgerId, accountId: c.account.id),
+    );
+    // 再记一笔部分还款：这样这笔往来上挂着 2 笔流水（本金 + 还款）
+    final d0 = (await Repo.listDebts(
+      ledgerId: c.ledgerId,
+    )).firstWhere((e) => e.id == debtId);
+    await Repo.repayDebt(
+      debt: d0,
+      amountCents: 200000,
+      accountId: c.account.id,
+      date: Fmt.today(),
+    );
+
+    expect(
+      await Repo.debtTxnCount(debtId),
+      2,
+      reason: '弹窗要报的笔数：本金 1 笔 + 还款 1 笔',
+    );
+
+    // 删除前的恒等式先成立，否则后面的「回到删除前」没有意义
+    final before = (await Repo.listAccounts()).firstWhere(
+      (a) => a.id == c.account.id,
+    );
+    expect(
+      before.balanceCents,
+      before.openingCents + await _flowSum(c.account.id),
+      reason: '删除前余额就该等于 期初 + 流水',
+    );
+
+    await Repo.deleteDebt(debtId);
+
+    final debts = await Repo.listDebts(ledgerId: c.ledgerId);
+    expect(debts.where((e) => e.id == debtId), isEmpty, reason: 'debt 行要没');
+    expect(await Repo.debtTxnCount(debtId), 0, reason: '连带流水要一起没');
+
+    final after = (await Repo.listAccounts()).firstWhere(
+      (a) => a.id == c.account.id,
+    );
+    expect(
+      after.balanceCents,
+      baseline,
+      reason: '借出 5000、还回 2000 两笔流水都回滚掉，余额回到这笔往来出现之前',
+    );
+    expect(
+      after.balanceCents,
+      after.openingCents + await _flowSum(c.account.id),
+      reason: '删除后仍要满足 余额 = 期初 + 流水（不许留下孤零零的余额修正）',
+    );
+  });
+
+  testWidgets('往来详情：删除入口在还款下方，弹窗报清连带笔数，删完闭面板并提示', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.runAsync(() => _freshDb());
+    await tester.runAsync(() => Store.i.boot());
+    final c = (await tester.runAsync(() => _ctx()))!;
+    final debtId = (await tester.runAsync(
+      () => Repo.createDebt(
+        _debt(ledgerId: c.ledgerId, accountId: c.account.id),
+        _principal(ledgerId: c.ledgerId, accountId: c.account.id),
+      ),
+    ))!;
+    final d0 = (await tester.runAsync(
+      () => Repo.listDebts(ledgerId: c.ledgerId),
+    ))!.firstWhere((e) => e.id == debtId);
+    await tester.runAsync(
+      () => Repo.repayDebt(
+        debt: d0,
+        amountCents: 200000,
+        accountId: c.account.id,
+        date: Fmt.today(),
+      ),
+    );
+    await tester.runAsync(() => Store.i.afterTxnChange());
+
+    await tester.pumpWidget(const MaterialApp(home: DebtsPage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('张三'));
+    await tester.pumpAndSettle();
+
+    // 主按钮仍是「记一笔还款」，删除是它下面的次要动作
+    expect(find.text('记一笔还款'), findsOneWidget);
+    expect(find.text('删除这笔往来'), findsOneWidget);
+
+    await tester.tap(find.text('删除这笔往来'));
+    // 弹窗要等一次真实的 `COUNT(*)`（假时钟下不会自己走完），
+    // 先让真实 I/O 跑完再 settle，否则断言时弹窗还没建出来。
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pumpAndSettle();
+
+    // 弹窗必须写清对方/方向/金额，以及**实际**会连带删掉几笔流水
+    final dialog = find.byType(AlertDialog);
+    expect(
+      find.descendant(of: dialog, matching: find.textContaining('张三')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.textContaining('5,000.00')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.textContaining('2 笔流水')),
+      findsOneWidget,
+      reason: '本金 + 还款 = 2 笔，数字要与库里的 COUNT(*) 一致',
+    );
+
+    await tester.tap(find.text('删除'));
+    await tester.pumpAndSettle();
+
+    // 删 → 刷新 store → 关面板是一串真实 I/O，假时钟下不会自己走完：
+    // 先交替跑真实时间和带时长的 pump（让退场动画也推进），再 settle。
+    await _waitUntil(tester, () async => await Repo.debtTxnCount(debtId) == 0);
+    for (var i = 0; i < 20; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pumpAndSettle();
+
+    final debts = (await tester.runAsync(
+      () => Repo.listDebts(ledgerId: c.ledgerId),
+    ))!;
+    expect(debts.where((e) => e.id == debtId), isEmpty);
+
+    // 面板关掉（还款按钮不再在屏上），并给了提示
+    expect(find.text('记一笔还款'), findsNothing);
+    expect(find.text('已删除'), findsOneWidget);
   });
 
   test('借出不算支出：月度合计与分类统计都不变', () async {
