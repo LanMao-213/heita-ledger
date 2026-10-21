@@ -102,6 +102,14 @@ class ShellStore extends StoreBase {
     return slot < 2 ? slot : slot - 1;
   }
 
+  String? _bootSummary;
+
+  /// 启动一次性提示（「已补记 N 笔；分类已升级」这种合并句）。
+  ///
+  /// 放 Store 而不是页面里：出提示的是启动序列，弹出来的却是 `HomeShell`，
+  /// 中间隔着 `BootGate`。**两个模块之间只该传一句话**。
+  String? get bootSummary => _bootSummary;
+
   int _tabIndex = tabDetail;
   AppPalette _palette = paletteInk();
   bool _hapticsEnabled = true;
@@ -168,6 +176,11 @@ class ShellStore extends StoreBase {
       _palette = AppPalette.byId(paletteId);
       notifyListeners();
     });
+  }
+
+  /// 记下启动提示（由启动序列写、`HomeShell` 首帧后读一次）。
+  void setBootSummary(String? summary) {
+    _bootSummary = summary;
   }
 
   /// 启动完成。

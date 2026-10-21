@@ -18,6 +18,7 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/pickers/calendar_sheet.dart';
 import '../../widgets/swipe_flip.dart';
 import '../../widgets/toast.dart';
+import '../debt/debt_detail_sheet.dart';
 import '../record/record_sheet.dart';
 import 'day_group_list.dart';
 import 'filter_sheet.dart';
@@ -117,12 +118,15 @@ class _DetailPageState extends State<DetailPage>
 
   Future<void> _onTapTxn(Txn t) async {
     if (t.debtId != null) {
-      // 借贷行：进往来详情（用户点它想看「还欠多少」，不是改金额）
-      await showDebtQuickSheet(
-        context,
-        txn: t,
-        repaid: PlanScope.of(context).repaidIndex,
-      );
+      // 借贷行：进往来详情（用户点它想看「还欠多少」，不是改金额）。
+      // 还款流水也走这条路 —— **没有「编辑还款」**：还款金额录错了要删掉重记，
+      // 允许改会让「已还」在别的页面算出不同的数（M05-F07）。
+      final PlanStore plan = PlanScope.of(context);
+      await showDebtDetailSheet(context, debtId: t.debtId!);
+      if (!mounted) return;
+      await BookScope.of(context).afterTxnChange();
+      await plan.reload();
+      if (mounted) await CatalogScope.of(context).reloadMoney();
       return;
     }
     final RecordOutcome? outcome = await showRecordSheet(context, editing: t);
@@ -290,54 +294,6 @@ String debtRowTitle(Txn t) {
   final String dir = t.type.isIncome ? '借入' : '借出';
   final String who = (t.person ?? '').trim();
   return who.isEmpty ? dir : '$dir · $who';
-}
-
-/// 借贷行点开的只读详情（**不是编辑面板**）。
-Future<void> showDebtQuickSheet(
-  BuildContext context, {
-  required Txn txn,
-  required RepaidIndex repaid,
-}) async {
-  final AppPalette pal = context.pal;
-  final bool receivable = !txn.type.isIncome;
-  final int repaidCents = repaid.repaidForId(
-    txn.debtId!,
-    receivable: receivable,
-  );
-  await showModalBottomSheet<void>(
-    context: context,
-    builder: (BuildContext ctx) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(S.page),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              '往来详情',
-              key: const ValueKey<String>('debt-detail-title'),
-              style: Ts.caption.copyWith(color: pal.ink3),
-            ),
-            const SizedBox(height: S.xs),
-            Text(debtRowTitle(txn), style: Ts.section.copyWith(color: pal.ink)),
-            const SizedBox(height: S.sm),
-            Text(
-              '本金 ¥${txn.amountCents ~/ 100} · 已还 ¥${repaidCents ~/ 100}',
-              style: Ts.body2.copyWith(color: pal.ink2),
-            ),
-            const SizedBox(height: S.lg),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('关闭'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
 
 /// 筛选条件条：第一枚 chip **明写「全部历史」**（口径 3.7）。

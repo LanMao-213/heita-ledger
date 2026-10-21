@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/scope.dart';
+import '../../stores/plan_store.dart';
 import '../../stores/shell_store.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/palette.dart';
@@ -30,10 +31,57 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   final PageController _controller = PageController();
 
+  /// 回前台补记（M01-F05）。`AppLifecycleListener` 比自己记
+  /// `didChangeAppLifecycleState` 好：它只在真正 resume 时回调，切后台过程中的
+  /// inactive/paused 不会各触发一次。
+  AppLifecycleListener? _lifecycle;
+
+  /// 启动提示只弹一次：热重载会重建 `HomeShell`，不加这个标志会重复提示。
+  bool _startupNotified = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _onResume);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (Duration _) => _notifyStartup(),
+    );
+  }
+
   @override
   void dispose() {
+    _lifecycle?.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  /// 启动一次性提示：**只弹一条**（把「分类升级」与「已补记 N 笔」拼起来）。
+  void _notifyStartup() {
+    if (!mounted || _startupNotified) return;
+    _startupNotified = true;
+    final String? summary = ShellScope.of(context).bootSummary;
+    if (summary == null || summary.isEmpty) return;
+    showToast(context, summary);
+  }
+
+  /// 回前台：补记到期账单。
+  ///
+  /// 三件事的次序不能反：
+  /// 1. `catchUp` —— 日期与账本都没变时它**0 次查询**直接返回（闸一）；
+  /// 2. 补记 > 0 才重查 —— 空转时不用刷新整棵树；
+  /// 3. **不动 `BookStore` 的期游标** —— 用户可能正翻旧账，被拽回本期很恼人。
+  Future<void> _onResume() async {
+    if (!mounted) return;
+    final PlanStore plan = PlanScope.of(context);
+    final int added = await plan.catchUpOnResume();
+    if (!mounted || added <= 0) return;
+    // afterTxnChange 只重查当前期，**不搬游标** —— 正是这里要的
+    await BookScope.of(context).afterTxnChange();
+    if (!mounted) return;
+    await CatalogScope.of(context).reloadMoney();
+    if (!mounted) return;
+    plan.markStatsStale();
+    showToast(context, '已补记 $added 笔周期账单');
   }
 
   /// 把 `PageView` 拉回 Store 说的那一页。

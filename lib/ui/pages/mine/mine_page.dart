@@ -5,8 +5,12 @@ import '../../../stores/shell_store.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/palette.dart';
 import '../../../theme/typography.dart';
+import '../../widgets/list_tile_row.dart';
 import '../../widgets/roadmap_list.dart';
+import '../../widgets/section_header.dart';
 import '../../widgets/toast.dart';
+import '../category/cats_page.dart';
+import '../template/templates_page.dart';
 
 /// 我的页（tab 3 / 底栏槽位 4）。
 ///
@@ -33,11 +37,54 @@ class _MinePageState extends State<MinePage>
       color: pal.bg,
       child: SafeArea(
         bottom: false,
+        // RoadmapList 自己就是个 ListView：外面**不能再套一个竖向滚动**，
+        // 所以两个真入口挂在它的 leading 槽里（那是唯一能塞东西的位置）。
         child: RoadmapList(
           icon: Icons.person_outline,
           title: '这里还没有内容',
           hint: '这一页将来是净资产、账户、账本、账单日与数据安全。',
-          leading: PaletteSwitcher(shell: shell),
+          leading: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              PaletteSwitcher(shell: shell),
+              const SectionHeader(title: '管理'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: S.page),
+                child: ListTileRow(
+                  key: const ValueKey<String>('mine-cats'),
+                  leadingIcon: Icons.category_outlined,
+                  title: Text(
+                    '分类管理',
+                    style: Ts.body.copyWith(color: pal.ink),
+                  ),
+                  subtitle: Text(
+                    '两级分类、停用、拖拽排序',
+                    style: Ts.caption.copyWith(color: pal.ink3),
+                  ),
+                  showDivider: true,
+                  onTap: () => openCatsPage(context),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: S.page),
+                child: ListTileRow(
+                  key: const ValueKey<String>('mine-templates'),
+                  leadingIcon: Icons.bolt_outlined,
+                  title: Text(
+                    '记账模板',
+                    style: Ts.body.copyWith(color: pal.ink),
+                  ),
+                  subtitle: Text(
+                    '常记的几笔，点一下就填好',
+                    style: Ts.caption.copyWith(color: pal.ink3),
+                  ),
+                  showDivider: true,
+                  onTap: () => openTemplatesPage(context),
+                ),
+              ),
+              const SizedBox(height: S.sm),
+            ],
+          ),
           items: const <RoadmapItem>[
             RoadmapItem(
               stage: 'T05-1',

@@ -65,6 +65,7 @@ class CatalogStore extends StoreBase {
   /// 一次查全（账户 / 分类树 / 模板 / 目标 / 往来与净资产）。
   Future<void> loadCatalog(int ledgerId) async {
     await batchNotifyAsync<void>(() async {
+      _ledgerIdForWrites = ledgerId;
       _ledgerName = (await const LedgerRepo().current())?.name ?? '';
       _accountList = await _accounts.list();
       _tree = CategoryTree(await _categories.all(ledgerId));
@@ -97,6 +98,28 @@ class CatalogStore extends StoreBase {
       notifyListeners();
     });
   }
+
+  /// 只重查模板（模板页拖拽/删除后不必重查分类与账户）。
+  Future<void> reloadTemplates() async {
+    await batchNotifyAsync<void>(() async {
+      _templateList = await _templates.all(_ledgerIdForWrites);
+      notifyListeners();
+    });
+  }
+
+  /// 只重查分类树（分类管理页改完/停用后调；预算候选与录入选择器都跟着变）。
+  Future<void> reloadCategories() async {
+    await batchNotifyAsync<void>(() async {
+      _tree = CategoryTree(await _categories.all(_ledgerIdForWrites));
+      notifyListeners();
+    });
+  }
+
+  /// 当前账本 id（分类/模板写入要用）。
+  int _ledgerIdForWrites = 0;
+
+  /// 记住当前账本（`loadCatalog` 时写入，供页面层写库时取）。
+  int get ledgerId => _ledgerIdForWrites;
 
   /// 新建 / 编辑储蓄目标（`id == null` 即新建）。写完立刻重查列表，1 次通知。
   Future<void> saveGoal(SavingGoal goal) async {

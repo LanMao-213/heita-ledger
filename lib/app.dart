@@ -8,7 +8,6 @@ import 'stores/plan_store.dart';
 import 'stores/shell_store.dart';
 import 'theme/app_theme.dart';
 import 'ui/boot/boot_gate.dart';
-
 /// `MaterialApp` 骨架 + 四层 Store 作用域。
 ///
 /// 三件事这里定死：
@@ -49,16 +48,17 @@ class _HeitaAppState extends State<HeitaApp> {
 
   /// 真实启动序列：把四个 Store 交给 `BootSequence`（12 步）。
   ///
-  /// `BootSequence.run` 会返回 `BootOutcome`（补记笔数 / 分类升级），首帧后的
-  /// 「；」拼接 toast 在阶段 2 与 `HomeShell` 一起接 —— 这里把返回值丢掉是
-  /// 有意的（现在没有 toast 可弹），不是漏了。
+  /// 启动结果**只借道 `ShellStore` 传一句话**给 `HomeShell`（中间隔着 `BootGate`）：
+  /// 补记笔数与分类升级用「；」拼成一条 toast —— 连弹两条会被 `clearSnackBars`
+  /// 吃掉前一条，用户只看到最后那句，等于白提示。
   Future<void> _runBoot(ShellStore shell) async {
-    await BootSequence.run(
+    final BootOutcome outcome = await BootSequence.run(
       shell,
       book: _book,
       catalog: _catalog,
       plan: _plan,
     );
+    shell.setBootSummary(outcome.isEmpty ? null : outcome.message);
   }
 
   @override

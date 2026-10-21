@@ -186,6 +186,7 @@ class PlanStore extends StoreBase {
   List<CategoryBudgetRow> _categoryRows = <CategoryBudgetRow>[];
   Map<int, int> _spentByCategory = <int, int>{};
   List<Debt> _debtList = <Debt>[];
+  List<Debt> _closedDebts = <Debt>[];
   RepaidIndex _repaidIndex = RepaidIndex.empty;
   List<Recurring> _recurringList = <Recurring>[];
 
@@ -214,7 +215,11 @@ class PlanStore extends StoreBase {
   List<CategoryBudgetRow> get categoryBudgetRows => _categoryRows;
 
   Map<int, int> get spentByCategory => _spentByCategory;
+  /// **未结清**的往来（计划页摘要、往来页「未结清」段用）。
   List<Debt> get debts => _debtList;
+
+  /// 已结清的往来（往来页末尾那段；单独一份，免得每个调用方自己过滤）。
+  List<Debt> get closedDebts => _closedDebts;
   RepaidIndex get repaidIndex => _repaidIndex;
   List<Recurring> get recurring => _recurringList;
 
@@ -369,7 +374,16 @@ class PlanStore extends StoreBase {
   Future<void> _loadWithoutNotify() async {
     _budget = await _budgets.stats(ledgerId: _ledgerId, period: _period);
     _categoryBudgets = await _budgets.categoryBudgets(_ledgerId, _period.from);
-    _debtList = await _debts.all(_ledgerId, includeClosed: false);
+    // 一条查询拿全，再在内存里分两桶（避免两次 IO）
+    final List<Debt> allDebts = await _debts.all(_ledgerId);
+    _debtList = <Debt>[
+      for (final Debt d in allDebts)
+        if (!d.isClosed) d,
+    ];
+    _closedDebts = <Debt>[
+      for (final Debt d in allDebts)
+        if (d.isClosed) d,
+    ];
     _repaidIndex = await _debts.repaidIndex(_ledgerId);
     _recurringList = await _recurring.all(_ledgerId);
 
@@ -411,7 +425,7 @@ class PlanStore extends StoreBase {
   /// 借贷行的「应还 11-30」文案（没约定应还日返回 null）。
   String? dueLabelOf(int? debtId) {
     if (debtId == null) return null;
-    for (final Debt d in _debtList) {
+    for (final Debt d in <Debt>[..._debtList, ..._closedDebts]) {
       if (d.id != debtId) continue;
       final LocalDate? due = d.dueDate;
       if (due == null) return null;
@@ -520,14 +534,38 @@ class PlanStore extends StoreBase {
     }
   }
 
-  Future<int> _runCatchUp(LocalDate now) async {
+  /// **手动补记**：绕过闸一、只走闸二。
+  ///
+  /// 为什么必须绕闸一：闸一是「这本账今天扫过了」的内存标记，自动补记用它挡重复；
+  /// 但用户点「立刻补记」是**明确的指令**，被这个标记静默挡掉的表现就是
+  /// 「按了没反应」—— 用户会以为功能坏了，然后再点三次。
+  /// 闸二（在飞 Future 复用）和闸三（物理唯一索引）仍然在，不会重复记。
+  Future<int> manualCatchUp({LocalDate? today}) async {
+    final Future<int>? running = _inFlight;
+    if (running != null) return running;
+    final Future<int> future = _runCatchUp(
+      today ?? LocalDate.today(),
+      markScanned: false,
+    );
+    _inFlight = future;
+    try {
+      return await future;
+    } finally {
+      _inFlight = null;
+    }
+  }
+
+  /// 回前台补记：与自动补记同一条路（走闸一，日期没变就是 0 次查询）。
+  Future<int> catchUpOnResume({LocalDate? today}) => catchUp(today: today);
+
+  Future<int> _runCatchUp(LocalDate now, {bool markScanned = true}) async {
     final int cycleStartDay = await _settings.cycleStartDay();
     final int added = await _recurring.runDueRecurring(
       ledgerId: _ledgerId,
       cycleStartDay: cycleStartDay,
       today: now,
     );
-    _scannedOn[_ledgerId] = now;
+    if (markScanned) _scannedOn[_ledgerId] = now;
     if (added > 0) {
       await batchNotifyAsync<void>(() async {
         await _loadWithoutNotify();

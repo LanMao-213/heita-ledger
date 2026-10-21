@@ -254,3 +254,72 @@ class _WheelRow extends StatelessWidget {
     );
   }
 }
+
+/// 双轮盘选择器（**唯一**的「先选一级再选细分」入口）。
+///
+/// 记录面板、周期账单编辑器、模板编辑器都走这里：同一个交互三处各写一遍，
+/// 迟早出现「这里能选细分、那里不能」的不一致。
+///
+/// 返回 `null` = 取消；返回 `topId` 必有值（左轮必选），`subId` 为 `null`
+/// 表示「不细分」（`category_id` 指向一级）。
+Future<({int topId, int? subId})?> showCategoryPicker(
+  BuildContext context, {
+  required CategoryTree tree,
+  required TxnType type,
+  int? topId,
+  int? subId,
+  String title = '选择分类',
+}) {
+  return showModalBottomSheet<({int topId, int? subId})>(
+    context: context,
+    isScrollControlled: true,
+    builder: (BuildContext ctx) {
+      int? top = topId;
+      int? sub = subId;
+      return Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: Material(
+          color: ctx.pal.bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.lg)),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(S.page),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(title, style: Ts.section.copyWith(color: ctx.pal.ink)),
+                  const SizedBox(height: S.sm),
+                  CategoryWheels(
+                    tree: tree,
+                    type: type,
+                    initialTopId: topId,
+                    initialSubId: subId,
+                    onChanged: (int? t, int? s) {
+                      top = t;
+                      sub = s;
+                    },
+                  ),
+                  const SizedBox(height: S.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      key: const ValueKey<String>('wheel-confirm'),
+                      onPressed: () {
+                        final int? t = top;
+                        if (t == null) return;
+                        Navigator.of(ctx).pop((topId: t, subId: sub));
+                      },
+                      child: const Text('确定'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}

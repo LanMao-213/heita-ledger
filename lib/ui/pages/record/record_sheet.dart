@@ -10,6 +10,7 @@ import '../../../data/db/seeds.dart';
 import '../../../data/models/models.dart';
 import '../../../data/repo/repo.dart';
 import '../../../data/services/calc_service.dart';
+import '../../../stores/catalog_store.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/palette.dart';
 import '../../../theme/typography.dart';
@@ -18,10 +19,12 @@ import '../../widgets/pickers/account_sheet.dart';
 import '../../widgets/pickers/picker_wheels.dart';
 import '../../widgets/sheet_frame.dart';
 import '../../widgets/toast.dart';
+import '../template/template_editor.dart';
 import 'category_row.dart';
 import 'debt_fields.dart';
 import 'detail_block.dart';
 import 'record_keypad.dart';
+import 'template_strip.dart';
 
 /// 四种记账模式。**借贷不是新的 `TxnType`**：落库仍是 `expense`/`income`
 /// + 非空 `debt_id`（口径 3.5）。做成独立枚举要改遍明细分组、筛选、Excel、
@@ -104,6 +107,10 @@ class _RecordSheetState extends State<RecordSheet> {
 
   bool _detailExpanded = false;
   bool _saving = false;
+
+  /// 当前套用的是哪个模板（保存成功后给它 `touch` 一次）。
+  /// 手敲也可能会命中某个模板 —— 那时由 `matchTemplateFor` 现算。
+  int? _templateId;
 
   @override
   void initState() {
@@ -195,6 +202,7 @@ class _RecordSheetState extends State<RecordSheet> {
   }
 
   void _onModeChanged(RecordMode mode) {
+    _templateId = null;
     setState(() {
       _mode = mode;
       _liftManual = false;
@@ -306,11 +314,57 @@ class _RecordSheetState extends State<RecordSheet> {
     return true;
   }
 
+  /// 点一下模板 chip：把类型 / 分类 / 账户 / 金额 / 备注一次填好。
+  ///
+  /// 金额为 0 的模板**不碰金额**（那种模板的意思是「分类和账户固定，金额现输」）。
+  void _applyTemplate(TxnTemplate t) {
+    setState(() {
+      _templateId = t.id;
+      _mode = t.type.isIncome ? RecordMode.income : RecordMode.expense;
+      _topId = t.categoryId;
+      _subId = null;
+      if (t.accountId != null) _accountId = t.accountId;
+      if (t.amountCents > 0) {
+        _calc.expr = t.amountCents % 100 == 0
+            ? '${t.amountCents ~/ 100}'
+            : (t.amountCents / 100).toStringAsFixed(2);
+      }
+      if (t.note.trim().isNotEmpty) _note = t.note.trim();
+    });
+  }
+
+  /// 存为模板：名称留空就用分类名（判据 7.6）。
+  Future<void> _saveAsTemplate() async {
+    if ((_subId ?? _topId) == null) {
+      showToast(context, '先选一个分类，再存模板', error: true);
+      return;
+    }
+    final TxnTemplate? tpl = await showTemplateEditor(context);
+    if (tpl == null || !mounted) return;
+    // 编辑器里没填名字 → 回落分类名；金额取当前面板里的（没有就是 0）
+    final int cents = _cents ?? 0;
+    final TxnTemplate draft = tpl.copyWith(
+      type: _mode.txnType,
+      categoryId: _subId ?? _topId,
+      accountId: _accountId,
+      amountCents: tpl.amountCents > 0 ? tpl.amountCents : cents,
+      note: tpl.note.trim().isEmpty ? _note : tpl.note,
+    );
+    await Repo.template.insert(
+      draft.copyWith(ledgerId: BookScope.of(context).ledgerId),
+    );
+    if (!mounted) return;
+    await CatalogScope.of(context).reloadTemplates();
+    if (mounted) showToast(context, '已存为模板');
+  }
+
   Future<void> _save() async {
     if (_saving || !canSave) return;
     setState(() => _saving = true);
     final int cents = _cents!;
     final int startDay = _cycleStartDay;
+    // 跨 await 之后还要用，先抓在手里（别在 await 之后摸 context）
+    final CatalogStore catalog = CatalogScope.of(context);
     final LocalDate periodStart = Period.periodStartOf(
       _date,
       startDay,
@@ -358,6 +412,14 @@ class _RecordSheetState extends State<RecordSheet> {
         );
         if (editing == null) {
           final Txn saved = await Repo.saveTxn(draft, cycleStartDay: startDay);
+          // 用过就记一笔：套模板保存算那个模板的；手敲的同类型+同分类+同金额
+          // 也算（否则「我其实每天都在用这个模板」永远统计不到）
+          final int? touchedId =
+              _templateId ?? matchTemplateFor(catalog.templates, saved)?.id;
+          if (touchedId != null) {
+            await Repo.template.touch(touchedId);
+            await catalog.reloadTemplates();
+          }
           if (!mounted) return;
           Navigator.of(context).pop(
             RecordOutcome(
@@ -429,6 +491,15 @@ class _RecordSheetState extends State<RecordSheet> {
               selected: _mode,
               onChanged: _onModeChanged,
             ),
+            // 模板条：只在「记一笔」时出现（改一笔时套模板会冲掉用户改的东西）
+            if (widget.editing == null) ...<Widget>[
+              const SizedBox(height: S.xs),
+              TemplateStrip(
+                templates: recentTemplates(CatalogScope.watch(context).templates),
+                selectedId: _templateId,
+                onPick: _applyTemplate,
+              ),
+            ],
             const SizedBox(height: S.sm),
             Expanded(
               child: SingleChildScrollView(
@@ -486,6 +557,18 @@ class _RecordSheetState extends State<RecordSheet> {
                       onChanged: (String v) => _note = v,
                     ),
                     const SizedBox(height: S.sm),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        key: const ValueKey<String>('record-save-template'),
+                        onPressed: _saving ? null : _saveAsTemplate,
+                        icon: Icon(Icons.bolt_outlined, size: 14, color: pal.ink3),
+                        label: Text(
+                          '存为模板',
+                          style: Ts.caption.copyWith(color: pal.ink3),
+                        ),
+                      ),
+                    ),
                     _MetaRow(
                       dateLabel: dateChipLabel(_date),
                       onDate: _pickDate,

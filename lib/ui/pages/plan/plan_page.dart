@@ -14,10 +14,13 @@ import '../../../theme/typography.dart';
 import '../../widgets/amount_text.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/list_tile_row.dart';
 import '../../widgets/pickers/calendar_sheet.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/swipe_flip.dart';
 import '../../widgets/toast.dart';
+import '../debt/debts_page.dart';
+import '../recurring/recurring_page.dart';
 import 'budget_card.dart';
 import 'category_budget_list.dart';
 import 'goal_card.dart';
@@ -182,9 +185,13 @@ class _PlanPageState extends State<PlanPage>
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(S.page, S.sm, S.page, 0),
-                child: sums.isEmpty
-                    ? const _DebtGuide()
-                    : _DebtSummaryCard(sums: sums),
+                child: GestureDetector(
+                  key: const ValueKey<String>('debts-entry'),
+                  onTap: () => openDebtsPage(context),
+                  child: sums.isEmpty
+                      ? const _DebtGuide()
+                      : _DebtSummaryCard(sums: sums),
+                ),
               ),
             ),
             SliverToBoxAdapter(
@@ -210,6 +217,24 @@ class _PlanPageState extends State<PlanPage>
               child: CategoryBudgetList(
                 rows: rows,
                 onEdit: _editCategoryBudget,
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(S.page, S.md, S.page, 0),
+                child: ListTileRow(
+                  key: const ValueKey<String>('recurring-entry'),
+                  leadingIcon: Icons.event_repeat_outlined,
+                  title: Text(
+                    '周期账单',
+                    style: Ts.body.copyWith(color: pal.ink),
+                  ),
+                  subtitle: Text(
+                    recurringEntrySubtitle(plan.recurring),
+                    style: Ts.caption.copyWith(color: pal.ink3),
+                  ),
+                  onTap: () => openRecurringPage(context),
+                ),
               ),
             ),
             SliverToBoxAdapter(
