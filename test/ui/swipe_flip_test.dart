@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heita_ledger/ui/widgets/swipe_flip.dart';
@@ -116,7 +118,22 @@ void main() {
     );
   });
 
-  test('⑪ SwipeFlip 目前至少 1 处调用点（阶段 3/4 会涨到 4）', () {
-    expect(SwipeFlip.callSites, greaterThanOrEqualTo(1));
+  test('⑪ SwipeFlip.callSites == 源码里真实的调用点数（不许填假数字）', () {
+    // 数法子：扫 lib/ 下所有非声明文件里 `SwipeFlip(` 的出现次数。
+    // 这是**唯一**能防住「原版 PeriodChip 零调用活到 1.4.5」的门禁 ——
+    // 常量填假数字等于把门禁自己废掉，所以这里不是断言 `>= 1`。
+    int real = 0;
+    for (final FileSystemEntity e in Directory('lib').listSync(recursive: true)) {
+      if (e is! File || !e.path.endsWith('.dart')) continue;
+      final String path = e.path.replaceAll('\\', '/');
+      if (path.endsWith('ui/widgets/swipe_flip.dart')) continue;
+      real += RegExp(r'\bSwipeFlip\(').allMatches(e.readAsStringSync()).length;
+    }
+    expect(
+      SwipeFlip.callSites,
+      real,
+      reason: '加了/删了调用点就要同步 callSites（当前源码 $real 处）',
+    );
+    expect(SwipeFlip.callSites, greaterThanOrEqualTo(3));
   });
 }

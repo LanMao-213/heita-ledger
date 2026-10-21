@@ -83,7 +83,11 @@ class BootSequence {
       final int cycleStartDay = await _ensureCycleStartDay();
       final Period cycle = Period.cycleRange(LocalDate.today(), cycleStartDay);
       await book?.bind(ledgerId: ledgerId, cycleStartDay: cycleStartDay);
-      await plan?.bind(ledgerId: ledgerId, period: cycle);
+      await plan?.bind(
+        ledgerId: ledgerId,
+        period: cycle,
+        cycleStartDay: cycleStartDay,
+      );
 
       // ⑧ 周期账单补记（闸一按 ledgerId 判、闸二复用在飞 Future、闸三物理唯一）。
       final int added = await plan?.catchUp() ?? 0;
@@ -130,7 +134,11 @@ class BootSequence {
       final int cycleStartDay = await Repo.setting.cycleStartDay();
       final Period cycle = Period.cycleRange(LocalDate.today(), cycleStartDay);
       await book.bind(ledgerId: ledgerId, cycleStartDay: cycleStartDay);
-      await plan.bind(ledgerId: ledgerId, period: cycle);
+      await plan.bind(
+        ledgerId: ledgerId,
+        period: cycle,
+        cycleStartDay: cycleStartDay,
+      );
       await catalog.loadCatalog(ledgerId);
       await book.reloadCycle();
       await plan.reload();

@@ -4,6 +4,14 @@ import '../../core/money.dart';
 import '../../theme/palette.dart';
 import '../../theme/typography.dart';
 
+/// 金额的字号档位。**金额只有这几档**，不许各处 `fontSize:`。
+///
+/// - [hero]：页面主数字（净资产、可用额度）
+/// - [heroSm]：卡片主数字（预算卡大数字、目标已存）
+/// - [normal]：列表行金额
+/// - [small]：副行/图例金额
+enum AmountTier { hero, heroSm, normal, small }
+
 /// 金额文本：**唯一的金额渲染入口**。
 ///
 /// 三条规矩：
@@ -17,6 +25,7 @@ class AmountText extends StatelessWidget {
     this.sign = false,
     this.color,
     this.style,
+    this.tier = AmountTier.normal,
     this.yuan = false,
     this.trimZero = false,
   });
@@ -29,11 +38,28 @@ class AmountText extends StatelessWidget {
   final Color? color;
   final TextStyle? style;
 
+  /// 字号档（见 [AmountTier]）。给了 [style] 时以 [style] 为准。
+  final AmountTier tier;
+
   /// 前面带 `¥`。
   final bool yuan;
 
   /// 整数不带 `.00`（副行金额用）。
   final bool trimZero;
+
+  /// 档位 → 字体（等宽数字都在 [Ts] 里定义）。
+  static TextStyle styleOf(AmountTier tier) {
+    switch (tier) {
+      case AmountTier.hero:
+        return Ts.hero;
+      case AmountTier.heroSm:
+        return Ts.heroSm;
+      case AmountTier.normal:
+        return Ts.amount;
+      case AmountTier.small:
+        return Ts.amountSm;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +71,7 @@ class AmountText extends StatelessWidget {
       text,
       maxLines: 1,
       softWrap: false,
-      style: (style ?? Ts.amount).copyWith(color: color ?? pal.ink),
+      style: (style ?? styleOf(tier)).copyWith(color: color ?? pal.ink),
     );
   }
 }

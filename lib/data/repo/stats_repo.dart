@@ -32,6 +32,44 @@ class DailyTotal {
   final int incomeCents;
 }
 
+/// 近 6 段双柱里的一段（一段 = 一个归属期）。
+class TrendSegment {
+  const TrendSegment({
+    required this.period,
+    required this.expenseCents,
+    required this.incomeCents,
+  });
+
+  final Period period;
+  final int expenseCents;
+  final int incomeCents;
+
+  /// 轴上那一格的字：`9月`（期首月，账单日 15 时 10-15 期写「10月」）。
+  String get label => '${period.from.month}月';
+}
+
+/// 把「有数据的那几天」补成「区间内每一天一格」。
+///
+/// 每日柱的判据是「无数据的那天也占一格」——直接拿 SQL 结果画图会让
+/// 1 号下一个柱子跳到 8 号，看着像那几天被吞了。补齐是纯函数，不碰数据库。
+List<DailyTotal> fillDailyRange({
+  required Period period,
+  required List<DailyTotal> rows,
+}) {
+  final Map<String, DailyTotal> byDate = <String, DailyTotal>{
+    for (final DailyTotal r in rows) r.date: r,
+  };
+  final List<DailyTotal> out = <DailyTotal>[];
+  for (int i = 0; i < period.dayCount; i++) {
+    final String iso = period.from.addDays(i).iso;
+    out.add(
+      byDate[iso] ??
+          DailyTotal(date: iso, expenseCents: 0, incomeCents: 0),
+    );
+  }
+  return out;
+}
+
 /// 只读聚合。**交叉归集 / 借贷排除全部复用 [SqlFragments]**，不另写一套。
 class StatsRepo {
   const StatsRepo();
@@ -137,9 +175,57 @@ class StatsRepo {
     ];
   }
 
-  /// 账户资产合计（只算 `include_in_total = 1`）。
-  Future<int> accountAssets() async {
+  /// 近 6 段双柱：**1 条合并查询**（按 `period_start` 分组，回来再分桶）。
+  ///
+  /// 为什么强调一条：一天一段地查就是 6 次 IO，6 张图叠在首屏就是肉眼可见的
+  /// 卡顿；而且 6 次查询之间数据可能已经变了，同屏两个数字对不上。
+  ///
+  /// [periods] 必须**按时间升序**且连续。没数据的段补 0（零值不画柱）。
+  /// 「查了几条 SQL」由 [lastTrendQueryCount] 自报，测试拿它做上限断言。
+  Future<List<TrendSegment>> trendTotals({
+    required int ledgerId,
+    required List<Period> periods,
+  }) async {
+    lastTrendQueryCount = 0;
+    if (periods.isEmpty) return <TrendSegment>[];
     final Database db = await Db.open();
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      'SELECT t.period_start AS ps, ${SqlFragments.expSum} AS exp, '
+      '${SqlFragments.incSum} AS inc FROM ${Tables.txn} t '
+      'WHERE t.ledger_id = ? AND t.period_start >= ? AND t.period_start <= ? '
+      'GROUP BY t.period_start ORDER BY ps ASC',
+      <Object?>[ledgerId, periods.first.fromIso, periods.last.toIso],
+    );
+    lastTrendQueryCount = 1;
+
+    final Map<String, ({int exp, int inc})> byPeriod =
+        <String, ({int exp, int inc})>{};
+    for (final Map<String, Object?> r in rows) {
+      byPeriod[asString(r['ps'])] = (
+        exp: asInt(r['exp']),
+        inc: asInt(r['inc']),
+      );
+    }
+
+    return <TrendSegment>[
+      for (final Period p in periods)
+        TrendSegment(
+          period: p,
+          expenseCents: byPeriod[p.fromIso]?.exp ?? 0,
+          incomeCents: byPeriod[p.fromIso]?.inc ?? 0,
+        ),
+    ];
+  }
+
+  /// 上一次 [trendTotals] 发了几条 SQL（判据「逐段数据由 1 条合并查询取得」）。
+  ///
+  /// 说明：这是**自报**的计数（sqflite 没有全局钩子可以拦截），只挡得住
+  /// 「有人把合并查询改回 per-period 循环并且顺手加了自己的计数」以外的场景；
+  /// 真正的护栏是 [trendTotals] 只有一条 `rawQuery`，改回循环时这个数字会变。
+  static int lastTrendQueryCount = 0;
+
+  /// 账户资产合计（只算 `include_in_total = 1`）。
+  Future<int> accountAssets() async {    final Database db = await Db.open();
     final List<Map<String, Object?>> rows = await db.rawQuery(
       'SELECT COALESCE(SUM(${AccountCols.balanceCents}), 0) AS s '
       'FROM ${Tables.account} WHERE ${AccountCols.includeInTotal} = 1',

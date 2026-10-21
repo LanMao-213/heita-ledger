@@ -34,7 +34,7 @@ class UiHarness {
     final int startDay = await Repo.setting.cycleStartDay();
     await book.bind(ledgerId: id, cycleStartDay: startDay);
     final period = book.cycle;
-    await plan.bind(ledgerId: id, period: period);
+    await plan.bind(ledgerId: id, period: period, cycleStartDay: startDay);
     await catalog.loadCatalog(id);
     await book.reloadCycle();
     await plan.reload();

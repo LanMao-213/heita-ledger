@@ -97,4 +97,38 @@ class CatalogStore extends StoreBase {
       notifyListeners();
     });
   }
+
+  /// 新建 / 编辑储蓄目标（`id == null` 即新建）。写完立刻重查列表，1 次通知。
+  Future<void> saveGoal(SavingGoal goal) async {
+    await batchNotifyAsync<void>(() async {
+      if (goal.id == null) {
+        await _goals.insert(goal);
+      } else {
+        await _goals.update(goal);
+      }
+      _goalList = await _goals.all();
+      notifyListeners();
+    });
+  }
+
+  Future<void> deleteGoal(int id) async {
+    await batchNotifyAsync<void>(() async {
+      await _goals.delete(id);
+      _goalList = await _goals.all();
+      notifyListeners();
+    });
+  }
+
+  /// 存钱（正数）/ 取钱（负数）。返回兜底后的已存金额。
+  ///
+  /// **不生成流水**：存钱不是支出，进了流水会把预算与统计一起污染。
+  Future<int> addGoalFunds(int id, int deltaCents) async {
+    late int saved;
+    await batchNotifyAsync<void>(() async {
+      saved = await _goals.addFunds(id, deltaCents);
+      _goalList = await _goals.all();
+      notifyListeners();
+    });
+    return saved;
+  }
 }

@@ -213,11 +213,17 @@ void main() {
     });
 
     testWidgets('四页各自独立滚动位置，互不串台', (WidgetTester tester) async {
+      // 计划页在空库上内容不多，默认 800×600 放得下（不会溢出就不产生滚动）。
+      // 把屏幕压矮，让它真的可滚 —— 否则这条用例测的是「能不能滚」，不是「各滚各的」。
+      tester.view.physicalSize = const Size(400, 320);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
       await _pumpApp(tester);
 
       await tester.tap(find.byKey(const ValueKey<String>('nav-计划')));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(PlanPage), const Offset(0, -180));
+      await tester.drag(find.byType(PlanPage), const Offset(0, -120));
       await tester.pumpAndSettle();
       final double planOffset = _offsetOf(tester, find.byType(PlanPage));
       expect(planOffset, greaterThan(0));

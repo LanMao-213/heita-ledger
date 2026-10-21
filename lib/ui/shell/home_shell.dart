@@ -36,6 +36,23 @@ class _HomeShellState extends State<HomeShell> {
     super.dispose();
   }
 
+  /// 把 `PageView` 拉回 Store 说的那一页。
+  ///
+  /// 为什么需要它：**切 tab 不止底栏一个入口** —— 图表页点一行要跳明细、
+  /// 记事之后要回明细，这些都是页面直接改 `ShellStore.tabIndex`。
+  /// 只靠底栏点按去动画，Store 被别处改了之后底栏高亮和页面就会分家。
+  ///
+  /// 帧后执行：`build` 阶段驱动 `PageController` 会撞「build 期间 setState」。
+  void _syncPageToStore(int tab) {
+    WidgetsBinding.instance.addPostFrameCallback((Duration _) {
+      if (!mounted || !_controller.hasClients) return;
+      final double? page = _controller.page;
+      if (page == null) return;
+      if (page.round() == tab) return;
+      _controller.animateToPage(tab, duration: Dur.page, curve: Ease.enter);
+    });
+  }
+
   /// 中央「记一笔」：开面板 → 回执 → 搬游标 → toast。
   ///
   /// 「搬游标」**只在 Store 里做一次**（`afterTxnInserted` 会清筛选 + 对齐期 +
@@ -46,6 +63,8 @@ class _HomeShellState extends State<HomeShell> {
     if (outcome == null || !mounted) return;
     await BookScope.of(context).afterTxnInserted(outcome.periodStart);
     if (!mounted) return;
+    // 记完一笔，统计一定变了：打脏标记（只打标记 + 1 次通知，不在这查统计）
+    PlanScope.of(context).markStatsStale();
     _goTo(ShellStore.tabDetail);
     showToast(context, '已记账 · ${outcome.label}');
   }
@@ -57,19 +76,24 @@ class _HomeShellState extends State<HomeShell> {
   void _onBarSelect(int tab) => _goTo(tab);
 
   /// 切 tab（底栏点、或记完一笔之后回来都用它，保证底栏与页面同步）。
+  ///
+  /// 只改 Store，**翻页交给 [_syncPageToStore]**：两个入口（底栏点、页面内跳转）
+  /// 走同一条路，才不会出现「底栏亮了但页面没翻」。
   void _goTo(int tab) {
     final ShellStore shell = ShellScope.of(context);
     if (shell.tabIndex == tab) {
       return;
     }
     shell.switchTab(tab);
-    _controller.animateToPage(tab, duration: Dur.page, curve: Ease.enter);
   }
 
   @override
   Widget build(BuildContext context) {
     final ShellStore shell = ShellScope.watch(context);
     final AppPalette pal = context.pal;
+
+    // Store 被别处改了（图表页下钻、记完一笔）时，页面跟着走
+    _syncPageToStore(shell.tabIndex);
 
     return Scaffold(
       backgroundColor: pal.bg,

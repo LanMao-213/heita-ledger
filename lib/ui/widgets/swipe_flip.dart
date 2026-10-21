@@ -45,8 +45,12 @@ class SwipeFlip extends StatefulWidget {
   final double flipDistance;
   final double flipVelocity;
 
-  /// 目前有多少处调用点（测试断言 ≥1，阶段 3/4 会涨到 4）。
-  static int callSites = 1;
+  /// 目前有多少处调用点（测试断言「这个数 == 源码里的真实调用点数」）。
+  ///
+  /// 阶段 3 起：明细概览卡 / 图表区间条 / 计划周期条 = 3 处。
+  /// 阶段 4 还会涨（月度条）。**改调用点必须同步改这里** ——
+  /// 它是防「原版 `PeriodChip` 零调用活到 1.4.5」重演的唯一门禁。
+  static int callSites = 3;
 
   @override
   State<SwipeFlip> createState() => _SwipeFlipState();
