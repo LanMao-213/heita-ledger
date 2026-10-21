@@ -38,6 +38,14 @@ android {
 
     defaultConfig {
         applicationId = "com.heita.ledger"
+        // 日常构建包名恒为 com.heita.ledger（生产唯一包名）。
+        // 仅供预览/联调时出「可共存」的测试包，例如：
+        //   HEITA_APP_ID_SUFFIX=.v2test flutter build apk --release --target-platform android-arm64
+        // 得到 com.heita.ledger.v2test，可与旧版 1.4.x 同时安装、互不覆盖。
+        // 读环境变量而不是 Gradle 属性：flutter 调 gradlew 时 -P 不方便传，环境变量最稳。
+        // 不设该变量时为空串，生产包名不变。
+        val previewSuffix = System.getenv("HEITA_APP_ID_SUFFIX")?.trim().orEmpty()
+        if (previewSuffix.isNotEmpty()) applicationIdSuffix = previewSuffix
         // minSdk 24（Android 7.0）＝ SQLite 3.9.2，部分唯一索引 / 表达式索引都支持。
         // 显式写死而不是用 flutter.minSdkVersion，避免 Flutter 升级时被动漂移。
         minSdk = 24
