@@ -171,3 +171,11 @@ git push -u origin feat/budget-by-category
 - `index.html` 高保真可交互原型（改界面前对着看）
 - `启动页.html` / `启动页定稿.png` 开屏方案
 - `黑塔图标.svg` / `app-icon.svg` / `brand-mark.svg` 标志与图标
+
+---
+
+## 许可
+
+[MIT](LICENSE)。可以随便用、改、再发布，保留版权声明即可。
+
+数据全在本机 SQLite 里，不联网、不上传；仓库里**不含**签名密钥（`android/key.properties` 与 `*.jks` 已被 `.gitignore` 挡住，且从未进过提交历史）。
