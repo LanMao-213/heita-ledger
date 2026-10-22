@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黑塔消费日记 · 开发环境搭建指南</title>
+<style>
+:root{
+  --ink:#14161A; --ink-2:#5C626B; --ink-3:#9AA0A8; --ink-4:#C4C9CF;
+  --bg:#FFFFFF; --bg-2:#F4F5F6; --line:#E8EAEC; --red:#D93A2C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-size:14px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto;padding:56px 28px 100px}
+
+.cover{display:flex;align-items:center;gap:22px;padding-bottom:26px;border-bottom:2px solid var(--ink)}
+.cover h1{font-size:28px;font-weight:500;margin:0 0 6px;letter-spacing:-.4px}
+.cover p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.7}
+
+h2{font-size:19px;font-weight:500;margin:52px 0 6px;padding-top:26px;border-top:1px solid var(--line)}
+h2:first-of-type{border-top:0;padding-top:0}
+h3{font-size:15px;font-weight:500;margin:30px 0 8px}
+h4{font-size:13.5px;font-weight:500;margin:20px 0 6px;color:var(--ink-2)}
+.lead{font-size:13.5px;color:var(--ink-2);margin:0 0 20px}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 14px;padding-left:22px}
+li{margin:5px 0}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;background:var(--bg-2);padding:1.5px 5px;border-radius:4px}
+a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-4);text-underline-offset:3px}
+a:hover{text-decoration-color:var(--ink)}
+
+table{border-collapse:collapse;width:100%;font-size:12.5px;margin:14px 0 18px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:500;color:var(--ink-2);font-size:11.5px;background:var(--bg-2);white-space:nowrap}
+td code{font-size:11.5px;background:none;padding:0}
+.ok{color:#12A66A;font-weight:500}
+.no{color:var(--red);font-weight:500}
+
+.step{display:flex;gap:16px;margin:0 0 6px;align-items:baseline}
+.step .n{flex:none;width:30px;height:30px;border-radius:9px;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;font-variant-numeric:tabular-nums}
+.step h3{margin:0;font-size:16px}
+
+pre{background:#FAFAFB;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;
+  font-size:12px;line-height:1.8;font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--ink-2);margin:10px 0 14px}
+pre b{color:var(--ink);font-weight:500}
+pre i{color:var(--ink-3);font-style:normal}
+
+.box{background:var(--bg-2);border-radius:12px;padding:15px 17px;margin:16px 0;font-size:13px;color:var(--ink-2)}
+.box b{font-weight:500;color:var(--ink)}
+.warn{border-left:3px solid var(--red);background:#FDF3F2}
+.warn b{color:var(--red)}
+.tip{border-left:3px solid var(--ink);background:var(--bg-2)}
+
+.pathline{display:flex;gap:10px;align-items:baseline;font-size:13px;margin:4px 0}
+.pathline span{flex:none;width:150px;color:var(--ink-2)}
+
+.token{display:inline-block;font-size:11px;padding:1.5px 7px;border-radius:5px;background:var(--ink);color:#fff;font-weight:500;margin-right:6px}
+.token.g{background:#E4E7EA;color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="cover">
+    <div id="mk"></div>
+    <div>
+      <h1>开发环境搭建指南</h1>
+      <p>Windows 10 · Flutter + Android Studio · Android 真机调试<br>路径与镜像均已按你的机器配好</p>
+    </div>
+  </div>
+
+  <h2>一、你的机器现状（已实测）</h2>
+  <table>
+    <tr><th>检测项</th><th>结果</th><th>结论</th></tr>
+    <tr><td>操作系统</td><td>Windows 10 专业版 19045（64 位）</td><td class="ok">满足要求</td></tr>
+    <tr><td>处理器</td><td>Intel i7-7700HQ · 4 核 8 线程</td><td class="ok">够用（编译会偏慢，属正常）</td></tr>
+    <tr><td>内存</td><td>23.9 GB</td><td class="ok">非常宽裕</td></tr>
+    <tr><td>C 盘空间</td><td>可用 386.8 GB</td><td class="ok">非常宽裕</td></tr>
+    <tr><td>CPU 虚拟化</td><td>已启用</td><td class="ok">将来想装模拟器也可以</td></tr>
+    <tr><td>Git</td><td><code>C:\Program Files\Git</code></td><td class="ok">已装 —— Flutter 依赖它，省一步</td></tr>
+    <tr><td>Flutter SDK</td><td>未安装</td><td class="no">需安装</td></tr>
+    <tr><td>Android Studio</td><td>未安装</td><td class="no">需安装</td></tr>
+    <tr><td>Android SDK</td><td>未安装</td><td class="no">随 Android Studio 一起装</td></tr>
+    <tr><td>JDK</td><td>未安装</td><td class="ok">不用装 —— Android Studio 自带</td></tr>
+  </table>
+
+  <h2>二、要装什么 / 不用装什么</h2>
+  <p class="lead">我把可以省掉的都省掉了，实际需要下载的只有两样。</p>
+
+  <table>
+    <tr><th>组件</th><th>是否安装</th><th>说明</th></tr>
+    <tr><td><b>Flutter SDK</b></td><td class="no">必须</td><td>约 1 GB，解压即用，不用安装程序</td></tr>
+    <tr><td><b>Android Studio</b></td><td class="no">必须</td><td>约 1.2 GB。它是安装 Android SDK 最省事的方式</td></tr>
+    <tr><td>Android SDK 组件</td><td class="no">必须</td><td>Platform 36 + Build-Tools + Platform-Tools + Command-line Tools</td></tr>
+    <tr><td>JDK</td><td class="ok">不用装</td><td>Android Studio 自带 JDK，单独装反而容易版本冲突</td></tr>
+    <tr><td><b>Visual Studio</b></td><td class="ok">不用装</td><td>只有做 Windows 桌面应用才需要，我们是纯 Android。<b>省下约 10 GB</b></td></tr>
+    <tr><td><b>Android 模拟器</b></td><td class="ok">不用装</td><td>你有真机，模拟器只会拖慢机器。<b>省下约 3 GB</b></td></tr>
+    <tr><td>Git</td><td class="ok">已装</td><td>—</td></tr>
+  </table>
+
+  <h2>三、安装流程（共 8 步）</h2>
+
+  <div class="step"><div class="n">1</div><h3>先配国内镜像（重要，先做这步）</h3></div>
+  <p>镜像配在前面，后面所有下载都会走国内节点。打开 <b>PowerShell</b>（不是 cmd），逐行执行：</p>
+  <pre>[Environment]::SetEnvironmentVariable("PUB_HOSTED_URL", "https://pub.flutter-io.cn", "User")
+[Environment]::SetEnvironmentVariable("FLUTTER_STORAGE_BASE_URL", "https://storage.flutter-io.cn", "User")</pre>
+  <div class="box tip">
+    <b>为什么用 PowerShell 而不是 <code>setx</code>：</b><code>setx</code> 有 1024 字符的长度限制，
+    写 PATH 时可能把已有内容截断。上面的写法更安全，且只影响当前用户、不需要管理员权限。
+  </div>
+  <p>验证（应回显两个地址）：</p>
+  <pre>$env:PUB_HOSTED_URL
+$env:FLUTTER_STORAGE_BASE_URL</pre>
+  <div class="box warn">
+    <b>注意：</b>环境变量设好后<b>必须新开一个终端窗口</b>才会生效，当前窗口读不到。
+  </div>
+
+  <div class="step"><div class="n">2</div><h3>下载并解压 Flutter SDK</h3></div>
+  <p>用国内镜像直接下载（原版地址太慢）：</p>
+  <pre>https://storage.flutter-io.cn/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip</pre>
+  <p>想确认有没有更新的版本，可以打开版本清单查 <code>current_release.stable</code> 字段：</p>
+  <pre>https://storage.flutter-io.cn/flutter_infra_release/releases/releases_windows.json</pre>
+
+  <h4>解压位置有讲究</h4>
+  <div class="box warn">
+    <b>必须放在没有空格、没有中文的路径下，且不要放 <code>C:\Program Files</code>。</b><br>
+    原因：Flutter 的构建脚本和 Gradle 处理带空格的路径会出错；<code>Program Files</code> 还有写入权限问题。
+  </div>
+  <p>推荐解压到：<code>C:\src\flutter</code>，最终结构应该是：</p>
+  <pre>C:\src\flutter\
+├── bin\          <i>← 里面是 flutter.bat</i>
+├── packages\
+├── dev\
+└── ...</pre>
+  <p>在 PowerShell 里一条命令搞定下载 + 解压：</p>
+  <pre>New-Item -Path "C:\src" -ItemType Directory -Force
+cd C:\src
+Invoke-WebRequest -Uri "https://storage.flutter-io.cn/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip" -OutFile "flutter.zip"
+Expand-Archive .\flutter.zip -DestinationPath .
+Remove-Item .\flutter.zip</pre>
+
+  <div class="step"><div class="n">3</div><h3>把 Flutter 加进 PATH</h3></div>
+  <pre>$p = [Environment]::GetEnvironmentVariable("Path","User")
+[Environment]::SetEnvironmentVariable("Path", "$p;C:\src\flutter\bin", "User")</pre>
+  <p>然后<b>关掉 PowerShell 重新打开</b>，验证：</p>
+  <pre>flutter --version</pre>
+  <p>看到类似 <code>Flutter 3.47.7 · channel stable</code> 就成功了。</p>
+
+  <div class="step"><div class="n">4</div><h3>安装 Android Studio</h3></div>
+  <p>国内镜像地址（比官网快很多）：</p>
+  <pre>https://developer.android.google.cn/studio</pre>
+  <p>安装时保持默认选项即可。装完后首次启动会走一遍设置向导，选择 <b>Standard（标准）</b>，
+  SDK 会自动下载到默认位置：</p>
+  <pre>C:\Users\&lt;用户名&gt;\AppData\Local\Android\Sdk</pre>
+  <p>这一步会下载 Android SDK 主体，是全程最耗时的一步，让它自己跑完。</p>
+
+  <div class="step"><div class="n">5</div><h3>补齐 SDK 组件</h3></div>
+  <p>Android Studio → 右上角 <b>More Actions → SDK Manager</b>，确认这几项已勾选并安装：</p>
+  <table>
+    <tr><th>标签页</th><th>组件</th></tr>
+    <tr><td>SDK Platforms</td><td><b>Android 16 (API 36)</b> 或 <b>Android 15 (API 35)</b></td></tr>
+    <tr><td>SDK Tools</td><td>Android SDK Build-Tools</td></tr>
+    <tr><td>SDK Tools</td><td>Android SDK Platform-Tools</td></tr>
+    <tr><td>SDK Tools</td><td><b>Android SDK Command-line Tools</b> ← 这个最容易被漏，漏了 Flutter 会报错</td></tr>
+  </table>
+  <p>勾完点 <b>Apply</b> 等下载完成。</p>
+
+  <div class="step"><div class="n">6</div><h3>接受 Android 许可协议</h3></div>
+  <p>新开 PowerShell，执行：</p>
+  <pre>flutter doctor --android-licenses</pre>
+  <p>会连续问很多条，一路按 <code>y</code> 加回车接受即可。</p>
+
+  <div class="step"><div class="n">7</div><h3>给 Android Studio 装 Flutter 插件</h3></div>
+  <p>Android Studio → <b>File → Settings → Plugins → Marketplace</b>，搜索 <code>Flutter</code>，
+  点 Install（会连带自动装 Dart 插件），装完重启 Android Studio。</p>
+
+  <div class="step"><div class="n">8</div><h3>总检</h3></div>
+  <pre>flutter doctor -v</pre>
+  <p>理想结果是这样，每一项前面都是 <code>[✓]</code>：</p>
+  <pre>[✓] Flutter (Channel stable, 3.47.7, on Microsoft Windows 10)
+[✓] Windows version (Windows 10 or higher)
+[✓] Android toolchain - develop for Android devices (Android SDK 36.0.0)
+[✓] Android Studio (version 2025.x)
+[✓] Connected device (1 available)</pre>
+  <p>下面这些<b>出现也正常</b>，不影响我们做 Android：</p>
+  <ul>
+    <li><code>[✗] Visual Studio</code> — 不做 Windows 桌面应用，忽略</li>
+    <li><code>[!] Android Studio (not installed)</code> — 说明 Flutter 没找到 Android Studio 路径，
+      执行 <code>flutter config --android-studio-dir="C:\Program Files\Android\Android Studio"</code> 指定一下</li>
+  </ul>
+
+  <h2>四、连接真机</h2>
+  <h3>手机上</h3>
+  <ol>
+    <li>设置 → 关于手机 → 连续点击「版本号」<b>7 次</b>，提示「您已进入开发者模式」</li>
+    <li>返回设置 → 系统 → 开发者选项 → 打开 <b>USB 调试</b></li>
+    <li>用数据线连电脑 —— <b>注意必须是数据线，很多充电线只能供电、传不了数据</b></li>
+    <li>手机上会弹出「允许 USB 调试吗」，勾选「始终允许」并确定</li>
+  </ol>
+  <h3>电脑上验证</h3>
+  <pre>adb devices
+<i># 应看到一行设备号 + device，例如：</i>
+<i># 8A3KX19B2000xxxx    device</i>
+
+flutter devices
+<i># 应列出你的手机</i></pre>
+
+  <h2>五、创建工程验证（最后一步）</h2>
+  <p>全部装完后，跑一个空白工程确认整条链路通了：</p>
+  <pre>cd &lt;项目根目录&gt;
+flutter create --platforms=android --org com.example ledger_smoke_test
+cd ledger_smoke_test
+flutter run</pre>
+  <div class="box warn">
+    <b>这里只是验证环境用的临时工程，包名用 <code>com.example</code> 占位就行，验证完可以删掉。</b><br>
+    正式项目的包名会用中性命名（不绑定品牌名，这样以后改 App 名字不用动包名），
+    具体叫什么在正式建工程时我会给你，不用现在操心。
+  </div>
+  <p>如果应用能在你手机上跑起来，环境就算通了。</p>
+
+  <h2>六、常见问题排查</h2>
+  <table>
+    <tr><th>症状</th><th>原因与处理</th></tr>
+    <tr><td><code>flutter</code> 命令找不到</td><td>环境变量没生效。关掉终端重新开一个。还不行就检查 <code>C:\src\flutter\bin</code> 是否真的在 PATH 里</td></tr>
+    <tr><td><code>flutter pub get</code> 卡住不动</td><td>镜像没生效。新开终端执行 <code>echo $env:PUB_HOSTED_URL</code> 确认有值</td></tr>
+    <tr><td>Gradle 下载极慢</td><td>见下方「Gradle 加速」</td></tr>
+    <tr><td><code>flutter doctor</code> 报 Android license 未接受</td><td>执行 <code>flutter doctor --android-licenses</code>，一路 y</td></tr>
+    <tr><td>报 <code>cmdline-tools component is missing</code></td><td>第 5 步漏了 Command-line Tools，回 SDK Manager 补装</td></tr>
+    <tr><td>构建报路径过长错误</td><td>执行 <code>git config --system core.longpaths true</code>（需管理员权限的终端）</td></tr>
+    <tr><td>真机连不上、<code>adb devices</code> 为空</td><td>依次排查：USB 调试开了吗 → 是不是充电线 → 手机上有没有点「允许」→ 换一个 USB 口</td></tr>
+    <tr><td>在 Android Studio 里跑不了 Flutter 项目</td><td>第 7 步的 Flutter 插件没装或没重启 IDE</td></tr>
+  </table>
+
+  <h3>Gradle 加速（建议做，能省很多等待）</h3>
+  <p>Flutter 项目的 Android 侧依赖 Gradle，默认从国外下载会很慢。等我们建好正式工程后，我会在
+  <code>android/build.gradle</code> 里加上阿里云镜像仓库、并在 <code>gradle-wrapper.properties</code> 里
+  把 Gradle 发行包换成腾讯镜像 —— 这两处<b>建工程时我会直接配好，你不用管</b>。</p>
+
+  <h2>七、装完后的自查清单</h2>
+  <table>
+    <tr><th>检查项</th><th>命令</th><th>期望</th></tr>
+    <tr><td>镜像变量</td><td><code>echo $env:PUB_HOSTED_URL</code></td><td><code>https://pub.flutter-io.cn</code></td></tr>
+    <tr><td>Flutter</td><td><code>flutter --version</code></td><td>显示版本号，无报错</td></tr>
+    <tr><td>Android SDK</td><td><code>flutter doctor</code></td><td>Android toolchain 前面是 <code>[✓]</code></td></tr>
+    <tr><td>许可</td><td><code>flutter doctor</code></td><td>无 license 相关红字</td></tr>
+    <tr><td>真机</td><td><code>flutter devices</code></td><td>列出你的手机型号</td></tr>
+    <tr><td>端到端</td><td><code>flutter run</code></td><td>App 能在手机上启动</td></tr>
+  </table>
+
+  <div class="box tip">
+    <b>做完之后：</b>把 <code>flutter doctor -v</code> 的完整输出发给我，我帮你逐行核对有没有坑。
+    确认没问题，我就开始建正式工程 —— 那一步我会把包名、目录结构、Gradle 镜像、设计系统全部一次性配好。
+  </div>
+
+</div>
+
+<script>
+document.getElementById('mk').innerHTML =
+  `<svg width="46" height="95" viewBox="9 5 437 932">
+     <path d="M 225 9.741 C 225 21.678, 218.573 39.955, 209.461 53.932 C 202.944 63.930, 200.588 82.094, 204.648 91.051 C 209.596 101.966, 217.435 107.342, 228.500 107.409 C 237.288 107.463, 242.592 104.896, 247.476 98.226 C 252.094 91.919, 254.003 86.009, 253.985 78.072 C 253.965 69.288, 252.052 61.685, 246.568 48.602 C 244.056 42.609, 241.955 36.534, 241.900 35.102 C 241.845 33.671, 241.474 31.375, 241.076 30 L 240.351 27.500 238.275 30.851 C 235.899 34.686, 236.158 35.135, 233.469 22.500 C 231.688 14.125, 229.229 8.265, 226.573 6.061 C 225.178 4.903, 225 5.320, 225 9.741 M 225.500 110.572 C 221.650 111.314, 214.726 111.854, 210.113 111.772 C 201.860 111.626, 201.680 111.675, 198.863 114.827 C 195.684 118.385, 195.267 121.682, 197.460 125.923 C 198.810 128.533, 199.284 141.831, 199.041 170.250 L 199 175 128.500 175 L 58 175 58 187.500 L 58 200 61.750 200.014 C 63.813 200.021, 66.512 200.299, 67.750 200.630 L 70 201.233 70 260.700 C 70 293.407, 70.338 320.017, 70.750 319.833 C 71.162 319.650, 76.563 316.146, 82.750 312.046 L 94 304.592 94.010 291.546 C 94.076 208.700, 94.172 202.106, 95.313 201.245 C 95.979 200.743, 118.893 200.383, 147.500 200.425 L 198.500 200.500 198.762 238.738 C 199.008 274.701, 198.914 277.086, 197.188 278.812 C 195.852 280.148, 192.513 280.984, 184.926 281.882 C 160.371 284.788, 137.773 291.725, 111.345 304.471 C 93.538 313.059, 85.069 318.364, 71.642 329.342 C 56.643 341.606, 46.587 354.367, 38.639 371.225 C 34.260 380.513, 32.418 381.701, 20.266 383.082 C 15.515 383.622, 11.037 384.555, 10.314 385.154 C 8.875 386.348, 8.400 407.536, 9.765 409.624 C 10.169 410.242, 15.212 411.292, 20.970 411.957 C 26.729 412.621, 32.187 413.565, 33.100 414.054 C 34.014 414.542, 36.656 418.768, 38.972 423.443 C 47.683 441.027, 62.981 457.697, 83.868 472.363 C 95.360 480.432, 116.233 491.764, 129.016 496.875 C 143.388 502.620, 168.937 508.403, 193.757 511.528 L 199.015 512.190 198.757 574.845 L 198.500 637.500 146.500 637.500 L 94.500 637.500 94.244 563.840 L 93.987 490.179 84.049 483.084 C 78.583 479.182, 73.749 475.429, 73.306 474.744 C 72.862 474.060, 72.275 510.400, 72 555.500 L 71.500 637.500 64.750 637.796 L 58 638.091 58 648.932 L 58 659.773 61.250 660.306 C 63.037 660.599, 70.800 660.841, 78.500 660.844 C 86.200 660.847, 116.389 660.883, 145.588 660.925 L 198.676 661 199.287 779.408 L 199.899 897.816 212.069 916.658 C 218.763 927.021, 224.792 936.089, 225.466 936.810 C 226.454 937.866, 227.850 936.319, 232.680 928.810 C 235.973 923.689, 241.900 914.501, 245.850 908.390 L 253.033 897.281 253.073 790.890 C 253.094 732.376, 253.370 679.212, 253.685 672.750 L 254.257 661 324.128 661 L 394 661 394 650 L 394 639 389.250 638.985 C 386.637 638.976, 383.872 638.572, 383.105 638.086 C 381.921 637.337, 381.822 624.960, 382.450 556.102 C 382.976 498.318, 382.879 475, 382.111 475 C 381.518 475, 377.538 477.515, 373.266 480.589 C 368.995 483.664, 364.262 486.825, 362.750 487.615 L 360 489.051 360 563.526 L 360 638 306.992 638 L 253.985 638 254.242 575.294 L 254.500 512.588 265.500 510.945 C 309.413 504.384, 343.199 491.771, 371.725 471.289 C 381.046 464.596, 385.665 460.421, 395.832 449.498 C 404.822 439.841, 408.161 435.073, 414.015 423.538 C 419.773 412.190, 421.701 410.928, 434.314 410.243 C 439.366 409.969, 444.063 409.297, 444.750 408.750 C 445.611 408.065, 446 404.407, 446 397 C 446 389.589, 445.611 385.938, 444.750 385.259 C 444.063 384.716, 440.350 383.992, 436.500 383.649 C 432.650 383.306, 427.475 382.444, 425 381.733 C 420.664 380.488, 420.311 380.083, 415.341 370.651 C 404.280 349.664, 388.752 332.934, 366.635 318.174 C 338.014 299.073, 315.806 290.571, 274.560 282.925 C 260.300 280.281, 258.502 279.009, 257.540 270.884 C 257.189 267.923, 257.037 250.875, 257.201 233 L 257.500 200.500 308.750 200.241 L 360 199.982 360 252.424 C 360 303.876, 360.038 304.877, 361.987 305.496 C 363.080 305.843, 368.008 309.023, 372.939 312.563 C 377.869 316.104, 382.146 319, 382.443 319 C 382.741 319, 383.100 292.337, 383.242 259.750 L 383.500 200.500 389 200 L 394.500 199.500 394.500 188 L 394.500 176.500 326.407 176.728 L 258.313 176.956 257.633 154.140 C 256.992 132.641, 257.068 131.069, 258.954 126.912 C 262.362 119.400, 261.415 114.175, 256.288 112.201 C 247.692 108.891, 237.130 108.333, 225.500 110.572 M 214.238 321.110 C 196.418 324.079, 177.365 335.273, 166.419 349.207 C 160.112 357.234, 152.757 372.006, 150.025 382.132 C 148.133 389.144, 147.839 392.279, 148.208 401.499 C 148.593 411.113, 149.160 413.973, 152.701 424.184 C 157.653 438.461, 162.113 446.602, 169.362 454.597 C 176.631 462.613, 185.246 468.097, 198.294 473.014 C 217.885 480.397, 235.868 480.541, 254.268 473.465 C 279.391 463.802, 296.029 445.080, 303.112 418.500 C 305.836 408.277, 306.095 389.795, 303.656 379.719 C 296.840 351.566, 271.164 326.901, 243.140 321.586 C 234.167 319.884, 222.729 319.696, 214.238 321.110 M 314.644 327.149 C 315.115 327.892, 317.843 332.015, 320.707 336.312 C 327.660 346.745, 330.352 352.672, 333.939 365.445 C 342.721 396.720, 339.036 431.147, 324.210 456.335 C 321.406 461.101, 319.386 465, 319.723 465 C 321.221 465, 338.291 455.201, 346.150 449.830 C 358.399 441.459, 366.952 433.271, 373.404 423.742 C 379.147 415.260, 386 399.928, 386 395.563 C 386 392.075, 379.429 377.526, 374.905 371 C 364.180 355.526, 347.385 341.609, 327.500 331.719 C 316.758 326.376, 313.397 325.181, 314.644 327.149 M 127.869 331.903 C 113.372 339.257, 100.473 348.344, 90.951 357.911 C 80.910 367.999, 75.994 375.173, 70.685 387.487 L 66.810 396.474 69.941 403.987 C 80.429 429.153, 95.316 444.350, 125.299 460.496 C 130.139 463.102, 134.334 464.999, 134.621 464.712 C 134.909 464.424, 134.034 462.429, 132.676 460.279 C 119.737 439.782, 114.314 418.847, 115.292 393.166 C 116.252 367.978, 122.751 348.856, 136.132 331.856 C 141.113 325.528, 140.428 325.532, 127.869 331.903" fill="#14161A" fill-rule="evenodd"/>
+     <path d="M 225 9.741 C 225 21.678, 218.573 39.955, 209.461 53.932 C 202.944 63.930, 200.588 82.094, 204.648 91.051 C 209.596 101.966, 217.435 107.342, 228.500 107.409 C 237.288 107.463, 242.592 104.896, 247.476 98.226 C 252.094 91.919, 254.003 86.009, 253.985 78.072 C 253.965 69.288, 252.052 61.685, 246.568 48.602 C 244.056 42.609, 241.955 36.534, 241.900 35.102 C 241.845 33.671, 241.474 31.375, 241.076 30 L 240.351 27.500 238.275 30.851 C 235.899 34.686, 236.158 35.135, 233.469 22.500 C 231.688 14.125, 229.229 8.265, 226.573 6.061 C 225.178 4.903, 225 5.320, 225 9.741 M 226 110.500 C 219.769 111.704, 220.244 111.757, 237.500 111.775 C 254.902 111.794, 255.301 111.750, 249.500 110.441 C 242.237 108.802, 234.689 108.821, 226 110.500" fill="#D93A2C" fill-rule="evenodd"/>
+   </svg>`;
+</script>
+</body>
+</html>

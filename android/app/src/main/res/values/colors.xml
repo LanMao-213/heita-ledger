@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 自适应图标背景层：与深色启动页同色，保证「桌面图标 → 启动页」视觉连贯 -->
+    <color name="ic_launcher_background">#14161A</color>
+
+    <!-- Android 12+ 系统闪屏背景。必须是纯色（系统不支持渐变 drawable），
+         取渐变中心色，与 Flutter 启动页的渐变过渡自然。 -->
+    <color name="splash_background">#14161A</color>
+</resources>

@@ -1,0 +1,10 @@
+# 统一换行，避免 Windows / macOS 互相提交时整文件 diff
+* text=auto
+
+# 二进制资产，不做换行转换
+*.png binary
+*.jpg binary
+*.ttf binary
+*.otf binary
+*.xlsx binary
+*.apk binary

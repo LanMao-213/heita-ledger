@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>记账 App · 可交互原型 v2</title>
+<style>
+:root{
+  /* ---- 黑白灰三级主色 ---- */
+  --ink:#14161A;      /* 主文字 / 强调 / 黑 */
+  --ink-2:#5C626B;    /* 次要文字 */
+  --ink-3:#9AA0A8;    /* 辅助文字 */
+  --ink-4:#C4C9CF;    /* 占位 / 弱分割 */
+  --bg:#FFFFFF;
+  --bg-2:#F4F5F6;     /* 卡片 / 输入底色 */
+  --bg-3:#FAFAFB;
+  --line:#E8EAEC;
+  --line-2:#DFE2E5;
+  --over:#A3231A;     /* 超支警示 · 深红（浅色底） */
+  --over-d:#E8493A;   /* 超支警示 · 亮红（深色底） */
+  --r:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{
+  font-family:"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  background:#E8EAEF;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:24px;gap:14px;overflow:auto;
+  -webkit-font-smoothing:antialiased;
+}
+.stage{transform-origin:center center}
+.phone{
+  position:relative;width:390px;height:844px;background:var(--bg);
+  border-radius:46px;display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 0 0 11px #16181C, 0 0 0 12.5px #3B4048, 0 26px 50px rgba(12,18,30,.34);
+}
+.caption{font-size:12.5px;color:#69707C;text-align:center;line-height:1.7;max-width:440px}
+.caption b{font-weight:500;color:#3D434D}
+.namebar{
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:center;
+  background:#fff;border:1px solid #E1E5EB;border-radius:13px;padding:6px 14px;
+  font-size:12.5px;color:#6C737E;box-shadow:0 2px 10px rgba(12,18,30,.07);
+}
+.namebar b{font-weight:500;color:#15181C;margin-right:3px}
+.namebar button{
+  border:0;background:#F5F6F8;font-family:inherit;font-size:12.5px;color:#3D434D;
+  padding:7px 15px;border-radius:9px;cursor:pointer;transition:.15s;
+}
+.namebar button:hover{background:#ECEEF2}
+.namebar button.on{background:#14161A;color:#fff;font-weight:500}
+.namebar .hint{font-size:11.5px;color:#A3A9B3;margin-left:4px}
+
+/* 线性图标基类 —— 全部一笔简笔，统一线宽 */
+.li{stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+/* ---------- status bar ---------- */
+.statusbar{
+  height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:0 26px 0 30px;font-size:13.5px;font-weight:500;letter-spacing:.2px;
+}
+.sb-right{display:flex;align-items:center;gap:5px}
+.sb-right i{display:block;background:#15181C;border-radius:1px}
+
+/* ---------- screen ---------- */
+.screen{flex:1;position:relative;overflow:hidden}
+.page{
+  position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
+  padding-bottom:26px;opacity:0;visibility:hidden;transform:translateX(10px);
+  transition:opacity .18s ease,transform .18s ease,visibility .18s;
+  scrollbar-width:none;
+}
+.page::-webkit-scrollbar{display:none}
+.page.on{opacity:1;visibility:visible;transform:none}
+
+/* ---------- page head ---------- */
+.ph{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 20px 14px;position:sticky;top:0;background:var(--bg);z-index:5;
+}
+.ph h1{font-size:19px;font-weight:500;margin:0;letter-spacing:.2px;display:flex;align-items:center;gap:4px}
+.ph .sub{font-size:12px;color:var(--ink-3);margin-top:2px}
+.iconbtn{
+  width:34px;height:34px;border:0;background:transparent;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink);padding:0;
+}
+.iconbtn:active{background:var(--bg-2)}
+.chev{width:11px;height:11px;border-right:1.6px solid var(--ink-3);border-bottom:1.6px solid var(--ink-3);transform:rotate(45deg) translateY(-2px)}
+
+/* ---------- 概览卡：纯黑底，全页唯一强对比 ---------- */
+.ov{margin:0 20px 18px;padding:19px 18px 17px;background:var(--ink);border-radius:20px;color:#fff}
+.ov-label{font-size:12.5px;color:#9AA0A8;letter-spacing:.3px}
+.ov-bal{font-size:31px;font-weight:500;letter-spacing:-.5px;margin-top:5px;font-variant-numeric:tabular-nums}
+.ov-bal s{font-size:16px;font-weight:400;text-decoration:none;color:#9AA0A8;margin-right:3px}
+.ov-bal.danger{color:var(--over-d)}
+.ov-bal.danger s{color:var(--over-d);opacity:.7}
+.ov-top{display:flex;align-items:flex-end;justify-content:space-between}
+.ov-chips{display:flex;gap:8px}
+.chip{padding:5px 10px;border-radius:9px;font-size:11.5px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#9AA0A8}
+.chip b{font-weight:500;font-variant-numeric:tabular-nums;margin-left:5px;color:#fff}
+.chip.inc b{color:#C4C9CF}
+.ov-sep{height:1px;background:rgba(255,255,255,.13);margin:16px 0 13px}
+.bg-head{display:flex;justify-content:space-between;font-size:11.5px;color:#9AA0A8;margin-bottom:7px}
+.bg-head r{color:#fff;font-variant-numeric:tabular-nums;font-weight:500}
+.track{height:6px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden}
+.track i{display:block;height:100%;border-radius:3px;background:#fff;transition:width .4s ease}
+.track.warn i{background:#9AA0A8}
+.track.over i{background:var(--over-d)}
+
+/* ---------- 列表 ---------- */
+.day{margin-top:6px}
+.day-h{display:flex;justify-content:space-between;align-items:baseline;padding:0 20px;height:34px;line-height:34px}
+.day-h span{font-size:12.5px;color:var(--ink-2)}
+.day-h em{font-style:normal;font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.row{display:flex;align-items:center;gap:12px;padding:11px 20px;cursor:pointer;transition:background .12s}
+.row:active{background:var(--bg-2)}
+.ico{
+  width:38px;height:38px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:var(--bg-2);color:var(--ink);
+}
+.row-mid{flex:1;min-width:0}
+.row-t{font-size:14.5px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-s{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+.row-a{font-size:15px;font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap}
+.row-a.e{color:var(--ink)}
+.row-a.i{color:var(--ink-2)}
+.empty{padding:70px 20px;text-align:center;color:var(--ink-3);font-size:13px;line-height:2}
+.empty b{display:block;font-size:15px;color:var(--ink-2);font-weight:500;margin-bottom:6px}
+
+/* ---------- tab bar ---------- */
+.tabbar{
+  flex:none;height:76px;display:grid;grid-template-columns:repeat(5,1fr);
+  border-top:1px solid var(--line);background:rgba(255,255,255,.95);
+  backdrop-filter:blur(12px);padding-bottom:14px;position:relative;
+}
+.tab{
+  border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;font-size:10.5px;color:var(--ink-3);cursor:pointer;padding:0;font-family:inherit;
+}
+.tab.on{color:var(--ink);font-weight:500}
+.tab svg{width:22px;height:22px}
+.fabs{display:flex;align-items:center;justify-content:center}
+.fab{
+  width:54px;height:54px;border:0;border-radius:50%;background:var(--ink);color:#fff;
+  cursor:pointer;margin-top:-24px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 16px rgba(20,22,26,.28);transition:transform .14s;
+}
+.fab:active{transform:scale(.92)}
+
+/* ---------- add sheet ---------- */
+.sheet{
+  position:absolute;inset:0;background:var(--bg);z-index:40;display:flex;flex-direction:column;
+  transform:translateY(100%);transition:transform .26s cubic-bezier(.3,.8,.3,1);
+}
+.sheet.on{transform:none}
+.sh-head{flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.sh-head .save{
+  border:0;background:var(--ink);color:#fff;font-family:inherit;
+  font-size:13.5px;font-weight:500;padding:9px 18px;border-radius:10px;cursor:pointer;
+}
+.sh-head .save:active{opacity:.78}
+.seg{display:flex;background:var(--bg-2);border-radius:10px;padding:3px}
+.seg button{
+  border:0;background:transparent;font-family:inherit;font-size:13px;color:var(--ink-2);
+  padding:6px 18px;border-radius:8px;cursor:pointer;transition:.15s;
+}
+.seg button.on{background:var(--ink);color:#fff;font-weight:500}
+
+.amt-row{flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 20px 14px;border-bottom:1px solid var(--line)}
+.cat-pick{display:flex;align-items:center;gap:10px}
+.cat-pick .ico{width:36px;height:36px;border-radius:11px}
+.cat-pick span{font-size:15px;font-weight:500}
+.amt-disp{font-size:29px;font-weight:500;letter-spacing:-.5px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.amt-disp.zero{color:var(--ink-4)}
+
+.cat-grid{
+  flex:1;overflow-y:auto;padding:14px 14px 6px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:6px;align-content:start;scrollbar-width:none;
+}
+.cat-grid::-webkit-scrollbar{display:none}
+.cat-cell{
+  border:0;background:transparent;font-family:inherit;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:9px 2px;border-radius:12px;
+  transition:background .12s;
+}
+.cat-cell:active{background:var(--bg-2)}
+.cat-cell .ico{width:42px;height:42px;border-radius:14px;transition:.15s}
+.cat-cell span{font-size:11.5px;color:var(--ink-2)}
+.cat-cell.on span{color:var(--ink);font-weight:500}
+.cat-cell.on .ico{box-shadow:inset 0 0 0 1.5px var(--ink);background:#fff}
+
+.meta-row{flex:none;display:flex;gap:8px;padding:8px 16px;border-top:1px solid var(--line)}
+.meta{flex:1;display:flex;align-items:center;gap:7px;background:var(--bg-2);border-radius:11px;padding:9px 12px;font-size:12.5px;color:var(--ink-2)}
+.meta input{border:0;background:transparent;font-family:inherit;font-size:12.5px;color:var(--ink);width:100%;outline:none;padding:0}
+.meta input::placeholder{color:var(--ink-3)}
+.meta.date{flex:none;width:118px;justify-content:center}
+.meta input[type=date]{border:0;background:transparent;font-family:inherit;font-size:12.5px;color:var(--ink);outline:none;width:100%;text-align:center;padding:0}
+
+.keypad{
+  flex:none;display:grid;grid-template-columns:1fr 1fr 1fr 92px;grid-template-rows:repeat(4,56px);
+  gap:1px;background:var(--line);border-top:1px solid var(--line);padding-bottom:16px;
+}
+.key{
+  border:0;background:#fff;font-family:inherit;font-size:21px;color:var(--ink);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .1s;
+  font-variant-numeric:tabular-nums;
+}
+.key:active{background:var(--bg-2)}
+.key.act{font-size:15px;color:var(--ink-2)}
+.key.done{grid-row:2/5;grid-column:4;background:var(--ink);color:#fff;font-size:16px;font-weight:500}
+.key.done:active{background:#33383F}
+
+/* ---------- stats ---------- */
+.card{margin:0 20px 16px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px}
+.donut-wrap{display:flex;flex-direction:column;align-items:center;padding:6px 0 14px}
+.donut{position:relative;width:196px;height:196px}
+.donut svg{width:100%;height:100%;transform:rotate(-90deg)}
+.donut-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.donut-c span{font-size:11.5px;color:var(--ink-2)}
+.donut-c b{font-size:22px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.donut-c em{font-style:normal;font-size:11.5px;color:var(--ink-3)}
+
+.rank-h{font-size:13px;font-weight:500;margin:0 0 12px;color:var(--ink)}
+.rank{display:flex;align-items:center;gap:10px;padding:8px 0}
+.rank .ico{width:32px;height:32px;border-radius:10px}
+.rank-mid{flex:1;min-width:0}
+.rank-t{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.rank-t span{font-size:13px}
+.rank-t span s{font-size:11px;color:var(--ink-3);text-decoration:none;margin-left:6px}
+.rank-t em{font-style:normal;font-size:12.5px;font-variant-numeric:tabular-nums}
+.rank-t em s{text-decoration:none;color:var(--ink-3);font-size:11px;margin-left:6px}
+.rbar{height:5px;border-radius:3px;background:#EEF0F2;overflow:hidden}
+.rbar i{display:block;height:100%;border-radius:3px;background:var(--ink)}
+
+.trend{display:flex;align-items:flex-end;justify-content:space-between;height:130px;gap:8px;padding-top:8px}
+.tcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end}
+.tbar{width:100%;max-width:26px;border-radius:6px 6px 3px 3px;background:#E4E7EA;transition:height .4s}
+.tbar.on{background:var(--ink)}
+.tcol span{font-size:10.5px;color:var(--ink-3)}
+.tcol.on span{color:var(--ink);font-weight:500}
+
+/* ---------- 计划页 ---------- */
+.grp2{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 8px}
+.grp2 h2{font-size:13px;font-weight:500;margin:0;color:var(--ink-2)}
+.grp2 b{font-size:12px;font-weight:500;color:var(--ink);cursor:pointer}
+.brow{display:flex;align-items:center;gap:12px;padding:9px 20px}
+.brow .ico{width:34px;height:34px;border-radius:11px}
+.bmid{flex:1;min-width:0}
+.btop{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.btop span{font-size:13.5px}
+.btop em{font-style:normal;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.btop em s{text-decoration:none;color:var(--ink-3);font-size:11px;margin-left:5px}
+.bar{height:5px;border-radius:3px;background:#EEF0F2;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;background:var(--ink);transition:width .45s ease}
+.bar.over i{background:var(--over)}
+.btop span s.ovtag{text-decoration:none;font-size:11px;color:var(--over)}
+.btop em.ovtxt{color:var(--over)}
+.btop em.ovtxt s{color:var(--over);opacity:.7}
+.bnone{display:flex;align-items:center;gap:12px;padding:9px 20px;cursor:pointer}
+.bnone .ico{width:34px;height:34px;border-radius:11px;background:var(--bg-2);color:var(--ink-3)}
+.bnone span{flex:1;font-size:13.5px;color:var(--ink-2)}
+.bnone i{font-style:normal;font-size:11.5px;color:var(--ink-3)}
+.goals{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 4px}
+.goal{border:1px solid var(--line);border-radius:16px;padding:14px 14px 13px;cursor:pointer;background:#fff}
+.goal:active{background:var(--bg-2)}
+.goal .gt{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.goal .gt .ico{width:28px;height:28px;border-radius:9px;background:var(--bg-2);color:var(--ink)}
+.goal .gt b{font-size:12.5px;font-weight:500}
+.goal .gn{font-size:17px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.goal .gd{font-size:11px;color:var(--ink-3);margin:1px 0 10px;font-variant-numeric:tabular-nums}
+.goal .gp{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);margin-top:7px}
+
+/* ---------- 设置分组 ---------- */
+.sec{margin:0 20px 10px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}
+.sec .mrow{padding:12px 16px}
+.sec .mrow+.mrow{border-top:1px solid var(--line)}
+.sec .mrow:active{background:var(--bg-2)}
+.sec .mrow .ico{width:30px;height:30px;border-radius:9px;background:var(--bg-2)}
+.sec .mrow span{font-size:14px}
+.back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);cursor:pointer;padding:4px 0}
+
+/* ---------- categories page ---------- */
+.grp-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px}
+.grp-h h2{font-size:13px;font-weight:500;margin:0;color:var(--ink-2)}
+.grp-h b{font-size:12px;font-weight:500;color:var(--ink);cursor:pointer}
+.crow{display:flex;align-items:center;gap:12px;padding:11px 20px;cursor:pointer}
+.crow:active{background:var(--bg-2)}
+.crow .grip{width:14px;color:var(--ink-4);font-size:13px;letter-spacing:-2px;user-select:none}
+.crow .ico{width:32px;height:32px;border-radius:10px}
+.crow span.nm{flex:1;font-size:14.5px}
+.crow em{font-style:normal;font-size:11.5px;color:var(--ink-3)}
+
+/* ---------- mine page ---------- */
+.hero{display:flex;align-items:center;gap:14px;padding:4px 20px 22px}
+.avat{
+  width:54px;height:54px;border-radius:18px;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;flex:none;
+}
+.hero b{display:block;font-size:16.5px;font-weight:500}
+.hero span{font-size:12px;color:var(--ink-3)}
+.mrow{display:flex;align-items:center;gap:12px;padding:12.5px 20px;cursor:pointer}
+.mrow:active{background:var(--bg-2)}
+.mrow .ico{width:32px;height:32px;border-radius:10px}
+.mrow span{flex:1;font-size:14.5px}
+.mrow i{font-style:normal;font-size:12.5px;color:var(--ink-3)}
+.mrow .arw{width:8px;height:8px;border-right:1.5px solid var(--ink-4);border-bottom:1.5px solid var(--ink-4);transform:rotate(-45deg);flex:none}
+.sw{width:44px;height:26px;border-radius:13px;background:#DFE3E9;position:relative;flex:none;transition:.2s;cursor:pointer}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.16);transition:.2s}
+.sw.on{background:var(--ink)} .sw.on::after{left:21px}
+.note{margin:6px 20px 0;padding:12px 14px;background:var(--bg-2);border-radius:12px;font-size:11.5px;color:var(--ink-2);line-height:1.75}
+
+/* ---------- toast / modal ---------- */
+.toast{
+  position:absolute;left:50%;bottom:118px;transform:translate(-50%,14px);
+  background:rgba(20,22,26,.92);color:#fff;font-size:12.5px;padding:10px 18px;border-radius:11px;
+  opacity:0;pointer-events:none;transition:.22s;z-index:60;white-space:nowrap;max-width:320px;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.mask{
+  position:absolute;inset:0;background:rgba(16,20,28,.44);z-index:50;opacity:0;visibility:hidden;
+  transition:.2s;display:flex;align-items:center;justify-content:center;padding:34px;
+}
+.mask.on{opacity:1;visibility:visible}
+.modal{background:#fff;border-radius:20px;padding:22px 20px 18px;width:100%;max-width:300px;transform:scale(.94);transition:.2s}
+.mask.on .modal{transform:none}
+.modal h3{margin:0 0 12px;font-size:15.5px;font-weight:500}
+.modal p{margin:0 0 8px;font-size:12.5px;color:var(--ink-2);line-height:1.85}
+.modal code{background:var(--bg-2);padding:1px 5px;border-radius:4px;font-size:11.5px;font-family:ui-monospace,Menlo,monospace}
+.modal .mbtns{display:flex;gap:9px;margin-top:16px}
+.modal button{flex:1;border:0;font-family:inherit;font-size:13.5px;font-weight:500;padding:11px;border-radius:11px;cursor:pointer}
+.modal .ghost{background:var(--bg-2);color:var(--ink)}
+.modal .pri{background:var(--ink);color:#fff}
+
+@media (max-height:940px){ .stage{transform:scale(.86)} }
+@media (max-height:820px){ .stage{transform:scale(.74)} }
+@media (max-width:560px){
+  body{padding:0;background:#fff}
+  .stage{transform:none!important;width:100%}
+  .phone{width:100vw;height:100vh;border-radius:0;box-shadow:none}
+  .caption{display:none}
+  .namebar{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="phone" id="phone">
+    <div class="statusbar">
+      <span id="clock">09:41</span>
+      <div class="sb-right">
+        <i style="width:3px;height:6px"></i><i style="width:3px;height:8px"></i><i style="width:3px;height:10px"></i><i style="width:3px;height:12px"></i>
+        <svg width="15" height="11" viewBox="0 0 15 11" style="margin:0 3px"><path d="M1 4a9 9 0 0113 0M3.4 6.6a5.6 5.6 0 018.2 0" stroke="#15181C" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="7.5" cy="9.3" r="1.1" fill="#15181C"/></svg>
+        <svg width="24" height="12" viewBox="0 0 24 12"><rect x="0.5" y="0.5" width="19" height="11" rx="3.2" stroke="#15181C" stroke-opacity=".35" fill="none"/><rect x="2.5" y="2.5" width="14" height="7" rx="1.6" fill="#15181C"/><path d="M21.5 4v4a2.2 2.2 0 000-4z" fill="#15181C" fill-opacity=".4"/></svg>
+      </div>
+    </div>
+
+    <div class="screen">
+      <!-- ============ 明细 ============ -->
+      <section class="page on" id="p-detail">
+        <div class="ph">
+          <div>
+            <h1 id="mLabel">2026年10月 <span class="chev"></span></h1>
+            <div class="sub" id="mSub">共 0 笔记录</div>
+          </div>
+          <div style="display:flex;gap:2px">
+            <button class="iconbtn" onclick="stepMonth(-1)" title="上个月">
+              <svg class="li" width="18" height="18" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+            </button>
+            <button class="iconbtn" onclick="stepMonth(1)" title="下个月">
+              <svg class="li" width="18" height="18" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="ov">
+          <div class="ov-top">
+            <div>
+              <div class="ov-label">本月结余</div>
+              <div class="ov-bal" id="ovBal"><s>¥</s>0.00</div>
+            </div>
+            <div class="ov-chips">
+              <div class="chip exp">支出<b id="ovExp">¥0</b></div>
+              <div class="chip inc">收入<b id="ovInc">¥0</b></div>
+            </div>
+          </div>
+          <div class="ov-sep"></div>
+          <div class="bg-head"><span>本月预算</span><r id="bgTxt">0 / 6,000.00</r></div>
+          <div class="track" id="bgTrack"><i id="bgBar" style="width:0%"></i></div>
+        </div>
+
+        <div id="dayList"></div>
+      </section>
+
+      <!-- ============ 图表 ============ -->
+      <section class="page" id="p-stats">
+        <div class="ph">
+          <div>
+            <h1 id="sLabel">2026年10月 <span class="chev"></span></h1>
+            <div class="sub">收支分析与趋势</div>
+          </div>
+          <div class="seg" id="segStat">
+            <button class="on" data-t="expense">支出</button>
+            <button data-t="income">收入</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="donut-wrap">
+            <div class="donut">
+              <svg viewBox="0 0 200 200" id="donutSvg"></svg>
+              <div class="donut-c">
+                <span id="dcLabel">总支出</span>
+                <b id="dcTotal">¥0.00</b>
+                <em id="dcCount">0 笔</em>
+              </div>
+            </div>
+          </div>
+          <div class="rank-h">分类排行</div>
+          <div id="rankList"></div>
+        </div>
+
+        <div class="card">
+          <div class="rank-h">近 6 个月趋势</div>
+          <div class="trend" id="trend"></div>
+        </div>
+      </section>
+
+      <!-- ============ 计划 ============ -->
+      <section class="page" id="p-plan">
+        <div class="ph">
+          <div>
+            <h1 id="plLabel">2026年10月 <span class="chev"></span></h1>
+            <div class="sub">预算与储蓄目标</div>
+          </div>
+          <button class="iconbtn" onclick="toast('新建计划（原型示意）')">
+            <svg class="li" width="20" height="20" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+
+        <div class="ov">
+          <div class="ov-label" id="bdLabel">本月预算剩余</div>
+          <div class="ov-bal" id="bdLeftBig"><s>¥</s>0.00</div>
+          <div style="font-size:11.5px;color:#9AA0A8;margin-top:3px">总预算 <span id="bdTotal">¥0.00</span></div>
+          <div class="ov-sep"></div>
+          <div class="bg-head"><span>已用 <r id="bdPct">0%</r></span><r id="bdUsedR">¥0.00</r></div>
+          <div class="track" id="bdTrack"><i id="bdBar" style="width:0%"></i></div>
+          <div style="font-size:11.5px;color:#9AA0A8;margin-top:10px" id="bdTip">—</div>
+        </div>
+
+        <div class="grp2"><h2>分类预算</h2><b onclick="toast('编辑分类预算（原型示意）')">管理</b></div>
+        <div id="budgetList"></div>
+
+        <div class="grp2"><h2>储蓄目标</h2><b onclick="toast('新建储蓄目标（原型示意）')">＋ 新建</b></div>
+        <div class="goals" id="goalList"></div>
+
+        <div class="note" style="margin-top:16px">储蓄目标是独立的「虚拟存钱罐」，与账户余额互不影响。可以随时存入或取出，用来盯住某个具体目标——旅行、换电脑、应急金。</div>
+      </section>
+
+      <!-- ============ 分类 ============ -->
+      <section class="page" id="p-cats">
+        <div class="ph" style="flex-direction:column;align-items:stretch;gap:0">
+          <div class="back" onclick="go('mine')">
+            <svg class="li" width="16" height="16" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg> 设置
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding-top:6px">
+            <div>
+              <h1>分类管理</h1>
+              <div class="sub">长按拖动排序 · 点击可改名换图标</div>
+            </div>
+            <button class="iconbtn" onclick="toast('新增分类（原型示意）')">
+              <svg class="li" width="20" height="20" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="grp-h"><h2>支出分类</h2><b onclick="toast('按住右侧手柄可拖动排序')">排序</b></div>
+        <div id="catExpList"></div>
+        <div class="grp-h"><h2>收入分类</h2></div>
+        <div id="catIncList"></div>
+        <div class="note">从 Excel 导入时，若账单里的分类名不在上表内，系统会自动归入「其他」，并提示你手动映射。建议导入前先在这里把常用分类建好。</div>
+      </section>
+
+      <!-- ============ 我的 ============ -->
+      <section class="page" id="p-mine">
+        <div class="ph"><h1>我的</h1></div>
+        <div class="hero">
+          <div class="avat">
+            <svg width="17" height="36" viewBox="0 0 455 944" id="avatMark"></svg>
+          </div>
+          <div>
+            <b id="heroName">黑塔消费日记</b>
+            <span id="heroSub">已记录 0 笔 · 数据仅存本机</span>
+          </div>
+        </div>
+
+        <div class="grp-h"><h2>数据</h2></div>
+        <div class="mrow" onclick="openExport()">
+          <div class="ico" id="icExport"></div><span>导出为 Excel</span><i>.xlsx</i><div class="arw"></div>
+        </div>
+        <div class="mrow" onclick="openImport()">
+          <div class="ico" id="icImport"></div><span>从 Excel 导入</span><i>支持 .xlsx</i><div class="arw"></div>
+        </div>
+        <div class="mrow" onclick="tog(this)">
+          <div class="ico" id="icBackup"></div><span>本机自动备份</span><div class="sw on"></div>
+        </div>
+
+        <div class="grp-h"><h2>设置</h2></div>
+        <div class="sec">
+          <div class="mrow" onclick="toast('账本管理（原型示意）')">
+            <div class="ico" id="icLedger"></div><span>账本管理</span><i>3 个</i><div class="arw"></div>
+          </div>
+          <div class="mrow" onclick="toast('账户管理（原型示意）')">
+            <div class="ico" id="icAccount"></div><span>账户管理</span><i>5 个</i><div class="arw"></div>
+          </div>
+          <div class="mrow" onclick="go('cats')">
+            <div class="ico" id="icTag"></div><span>分类管理</span><i>16 个</i><div class="arw"></div>
+          </div>
+          <div class="mrow" onclick="toast('记账模板（原型示意）')">
+            <div class="ico" id="icTpl"></div><span>记账模板</span><i>4 个</i><div class="arw"></div>
+          </div>
+          <div class="mrow" onclick="toast('周期账单（原型示意）')">
+            <div class="ico" id="icRec"></div><span>周期账单</span><i>3 条生效</i><div class="arw"></div>
+          </div>
+        </div>
+
+        <div class="grp-h"><h2>偏好</h2></div>
+        <div class="mrow" onclick="tog(this)">
+          <div class="ico" id="icBell"></div><span>每日记账提醒</span><div class="sw"></div>
+        </div>
+        <div class="mrow" onclick="toast('记账币种：人民币 CNY（原型示意）')">
+          <div class="ico" id="icCoin"></div><span>记账币种</span><i>CNY ¥</i><div class="arw"></div>
+        </div>
+        <div class="mrow" onclick="tog(this)">
+          <div class="ico" id="icMoon"></div><span>深色模式</span><div class="sw"></div>
+        </div>
+
+        <div class="grp-h"><h2>关于</h2></div>
+        <div class="mrow" onclick="toast('隐私政策（正式版由我们一并生成）')">
+          <div class="ico" id="icDoc"></div><span>隐私政策</span><div class="arw"></div>
+        </div>
+        <div class="mrow" onclick="toast(APP_NAME + ' v1.0.0 · 原型版')">
+          <div class="ico" id="icInfo"></div><span id="aboutName">关于</span><i>v1.0.0</i><div class="arw"></div>
+        </div>
+
+        <div class="note">本应用不联网、不注册、不上传。所有账目保存在设备本地数据库中，卸载即清除，请定期使用「导出为 Excel」做备份。</div>
+      </section>
+
+      <!-- ============ 记一笔 ============ -->
+      <div class="sheet" id="sheet">
+        <div class="sh-head">
+          <button class="iconbtn" onclick="closeSheet()">
+            <svg class="li" width="19" height="19" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+          <div class="seg" id="segType">
+            <button class="on" data-t="expense">支出</button>
+            <button data-t="income">收入</button>
+          </div>
+          <button class="save" onclick="saveTxn()">保存</button>
+        </div>
+
+        <div class="amt-row">
+          <div class="cat-pick">
+            <div class="ico" id="pickIco"></div>
+            <span id="pickName">餐饮</span>
+          </div>
+          <div class="amt-disp zero" id="amtDisp">0.00</div>
+        </div>
+
+        <div class="cat-grid" id="catGrid"></div>
+
+        <div class="meta-row">
+          <div class="meta" style="cursor:text">
+            <svg class="li" width="15" height="15" viewBox="0 0 24 24" style="color:var(--ink-3)"><path d="M4 7h16M4 12h10M4 17h7"/></svg>
+            <input id="noteInput" placeholder="添加备注…" maxlength="24">
+          </div>
+          <div class="meta date">
+            <input type="date" id="dateInput">
+          </div>
+        </div>
+
+        <div class="keypad">
+          <button class="key" data-k="1">1</button>
+          <button class="key" data-k="2">2</button>
+          <button class="key" data-k="3">3</button>
+          <button class="key act" data-k="del">⌫</button>
+          <button class="key" data-k="4">4</button>
+          <button class="key" data-k="5">5</button>
+          <button class="key" data-k="6">6</button>
+          <button class="key done" data-k="ok">完成</button>
+          <button class="key" data-k="7">7</button>
+          <button class="key" data-k="8">8</button>
+          <button class="key" data-k="9">9</button>
+          <button class="key" data-k=".">.</button>
+          <button class="key" data-k="0">0</button>
+          <button class="key act" data-k="clear">清空</button>
+        </div>
+      </div>
+
+      <!-- ============ 弹窗 ============ -->
+      <div class="mask" id="mask" onclick="if(event.target===this)closeModal()">
+        <div class="modal">
+          <h3 id="mdTitle">标题</h3>
+          <div id="mdBody"></div>
+          <div class="mbtns">
+            <button class="ghost" onclick="closeModal()">取消</button>
+            <button class="pri" id="mdOk">确定</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast" id="toast"></div>
+    </div>
+
+    <nav class="tabbar">
+      <button class="tab on" data-p="detail">
+        <svg class="li" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>明细</span>
+      </button>
+      <button class="tab" data-p="stats">
+        <svg class="li" viewBox="0 0 24 24"><path d="M12 3.2a8.8 8.8 0 108.8 8.8H12z"/><path d="M14.3 3.6a8.4 8.4 0 016.4 6.4h-6.4z"/></svg><span>图表</span>
+      </button>
+      <div class="fabs">
+        <button class="fab" id="fab">
+          <svg class="li" width="24" height="24" viewBox="0 0 24 24" style="stroke-width:1.8"><path d="M12 5.5v13M5.5 12h13"/></svg>
+        </button>
+      </div>
+      <button class="tab" data-p="plan">
+        <svg class="li" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r=".9"/></svg><span>计划</span>
+      </button>
+      <button class="tab" data-p="mine">
+        <svg class="li" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0114.4 0"/></svg><span>我的</span>
+      </button>
+    </nav>
+  </div>
+</div>
+
+<p class="caption">
+  <b>操作提示：</b>底部「明细 / 图表 / 计划 / 我的」切换页面 · 中间黑色「＋」录一笔 · 明细页右上角箭头切换月份。<br>
+  「计划」页 = 预算 + 储蓄目标；分类管理已移入「我的 → 设置」。全站黑白灰 + 一笔线稿图标，支出用纯黑、收入用次级灰。
+</p>
+
+<div class="namebar">
+  <b>名称预览</b>
+  <button data-name="黑塔消费日记" class="on">黑塔消费日记</button>
+  <button data-name="黑塔">黑塔</button>
+  <button data-name="黑塔日记">黑塔日记</button>
+  <span class="hint">点一下看名字在界面里的实际长度</span>
+</div>
+
+<script>
+/* =====================================================================
+   App 名称 —— 全应用唯一来源。改名字只改这一行。
+   ===================================================================== */
+let APP_NAME = '黑塔消费日记';
+
+/* =====================================================================
+   一笔线稿图标库 —— 统一 linecap/linejoin、无填充、1.5 线宽
+   ===================================================================== */
+const ICONS = {
+  food:      '<path d="M5 13h14a7 7 0 0 1-14 0z"/><path d="M9.5 9.6V6.4M12 9.6V5.4M14.5 9.6V6.4"/>',
+  transport: '<rect x="5" y="3.6" width="14" height="13" rx="3"/><path d="M5 11h14"/><circle cx="9" cy="13.6" r="1"/><circle cx="15" cy="13.6" r="1"/><path d="M8.6 16.6L7 20.2M15.4 16.6L17 20.2"/>',
+  shopping:  '<path d="M5.6 8h12.8l-1.1 11.4a1.5 1.5 0 0 1-1.5 1.4H8.2a1.5 1.5 0 0 1-1.5-1.4z"/><path d="M9 8V6.3a3 3 0 0 1 6 0V8"/>',
+  home:      '<path d="M4 10.8L12 4.4l8 6.4"/><path d="M6.4 9.7V20h11.2V9.7"/><path d="M10.2 20v-5.2h3.6V20"/>',
+  fun:       '<path d="M9.5 17.2V5.9l8.5-1.9v10.8"/><circle cx="7" cy="17.2" r="2.5"/><circle cx="15.5" cy="14.8" r="2.5"/>',
+  medical:   '<rect x="3.5" y="7.5" width="17" height="12" rx="2.5"/><path d="M9 7.5V6a1.8 1.8 0 0 1 1.8-1.8h2.4A1.8 1.8 0 0 1 15 6v1.5"/><path d="M12 11.2v5.4M9.3 13.9h5.4"/>',
+  study:     '<path d="M12 7.4S9.8 5.2 5 5.2v11.2c4.8 0 7 2.2 7 2.2s2.2-2.2 7-2.2V5.2c-4.8 0-7 2.2-7 2.2z"/><path d="M12 7.4v11.2"/>',
+  comm:      '<rect x="7" y="2.9" width="10" height="18.2" rx="2.6"/><path d="M10.8 18.1h2.4"/>',
+  gift:      '<rect x="4" y="8.6" width="16" height="11.9" rx="1.6"/><path d="M3 8.6h18M12 8.6v11.9"/><path d="M12 8.6C11 5.9 9.3 4.4 7.8 5.3 6.3 6.2 7.6 8.6 12 8.6zM12 8.6c1-2.7 2.7-4.2 4.2-3.3 1.5.9.2 3.3-4.2 3.3z"/>',
+  more:      '<circle cx="6" cy="12" r="1.25"/><circle cx="12" cy="12" r="1.25"/><circle cx="18" cy="12" r="1.25"/>',
+  salary:    '<rect x="2.8" y="6.6" width="18.4" height="10.8" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.4 9.9v.01M17.6 14.1v.01"/>',
+  bonus:     '<circle cx="12" cy="9.3" r="5.5"/><path d="M8.6 13.8L7 20.5l5-2.6 5 2.6-1.6-6.7"/>',
+  parttime:  '<rect x="3" y="7.2" width="18" height="12.3" rx="2"/><path d="M9 7.2V5.8a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.4"/><path d="M3 12.3h18"/>',
+  invest:    '<path d="M3.5 16.6l5-5 3.5 3.5 8-8"/><path d="M15 7.1h5v5"/>',
+  redpacket: '<rect x="5" y="3.6" width="14" height="16.8" rx="2.4"/><path d="M5 3.6a7 7 0 0 1 14 0"/><circle cx="12" cy="11.2" r="1.8"/>',
+  /* 设置类 */
+  upload:    '<path d="M12 15.5V4.6"/><path d="M7.6 8.6L12 4.2l4.4 4.4"/><path d="M4.4 15.4v2.8a2 2 0 0 0 2 2h11.2a2 2 0 0 0 2-2v-2.8"/>',
+  download:  '<path d="M12 4.5v10.9"/><path d="M7.6 11.2L12 15.6l4.4-4.4"/><path d="M4.4 15.4v2.8a2 2 0 0 0 2 2h11.2a2 2 0 0 0 2-2v-2.8"/>',
+  lock:      '<rect x="4.6" y="10.4" width="14.8" height="9.8" rx="2.2"/><path d="M8.2 10.4V7.6a3.8 3.8 0 0 1 7.6 0v2.8"/>',
+  tag:       '<path d="M11.4 3.6H20v8.6l-8.6 8.6-8.6-8.6z"/><circle cx="16" cy="7.6" r="1.4"/>',
+  bell:      '<path d="M6.4 10.2a5.6 5.6 0 1 1 11.2 0c0 4 1.6 5.4 1.6 5.4H4.8s1.6-1.4 1.6-5.4z"/><path d="M10.2 18.6a2 2 0 0 0 3.6 0"/>',
+  coin:      '<circle cx="12" cy="12" r="8.4"/><path d="M12 7.4v9.2M14.6 9.4H10.3a1.9 1.9 0 0 0 0 3.8h3.4a1.9 1.9 0 0 1 0 3.8H9.4"/>',
+  moon:      '<path d="M20.2 14.2A8.6 8.6 0 0 1 9.8 3.8a8.8 8.8 0 1 0 10.4 10.4z"/>',
+  doc:       '<path d="M6.4 4.6a2 2 0 0 1 2-2h5.4l4.8 4.8v11.6a2 2 0 0 1-2 2H8.4a2 2 0 0 1-2-2z"/><path d="M13.6 2.6v5h5"/><path d="M9.6 12.6h6M9.6 16h4"/>',
+  info:      '<circle cx="12" cy="12" r="8.6"/><path d="M12 11.2v5.2M12 7.9v.01"/>',
+  /* 计划页与储蓄目标 */
+  target:    '<circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r=".9"/>',
+  plane:     '<path d="M20.8 3.2L2.8 10.9l6.6 2.6 2.6 6.6z"/><path d="M20.8 3.2l-11.4 10.3"/>',
+  laptop:    '<rect x="4.2" y="5.2" width="15.6" height="10.6" rx="2"/><path d="M2.6 19h18.8"/>',
+  flag:      '<path d="M6 20.6V3.6"/><path d="M6 4.3h11.4l-2.2 4 2.2 4H6"/>',
+  car:       '<rect x="3.6" y="9.6" width="16.8" height="6.8" rx="2.4"/><path d="M6.2 9.6l1.5-3a1.5 1.5 0 011.3-.8h6a1.5 1.5 0 011.3.8l1.5 3"/><circle cx="7.6" cy="16.4" r="1.2"/><circle cx="16.4" cy="16.4" r="1.2"/>',
+  wallet:    '<path d="M3.6 8.4a2 2 0 012-2h11.4a2 2 0 012 2v8.2a2 2 0 01-2 2H5.6a2 2 0 01-2-2z"/><path d="M3.6 11.6h16.8"/><circle cx="15.6" cy="15" r="1"/>',
+  /* 设置区图标 */
+  book:      '<rect x="4.5" y="3" width="15" height="18" rx="2"/><path d="M8.5 3v18"/><path d="M12 8h4M12 12h4"/>',
+  card:      '<rect x="2.8" y="5.5" width="18.4" height="13" rx="2.5"/><path d="M2.8 10h18.4"/><path d="M6.5 14.5h3"/>',
+  tpl:       '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M9.5 9.5v10"/>',
+  rec:       '<path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 3.4v5.2h-5.2"/><path d="M12 7.6V12l3 1.9"/>'
+};
+
+/* 品牌标志 —— 按用户参考图 1:1 矢量化描摹（455×944 视图框），像素不一致率 1.83%。
+   evenodd 填充规则必须保留：眼睛处嵌套了 4 层轮廓（外杏仁 → 白区 → 眼环 → 环内白区）。 */
+const MARK_PATH  = "M 225 9.741 C 225 21.678, 218.573 39.955, 209.461 53.932 C 202.944 63.930, 200.588 82.094, 204.648 91.051 C 209.596 101.966, 217.435 107.342, 228.500 107.409 C 237.288 107.463, 242.592 104.896, 247.476 98.226 C 252.094 91.919, 254.003 86.009, 253.985 78.072 C 253.965 69.288, 252.052 61.685, 246.568 48.602 C 244.056 42.609, 241.955 36.534, 241.900 35.102 C 241.845 33.671, 241.474 31.375, 241.076 30 L 240.351 27.500 238.275 30.851 C 235.899 34.686, 236.158 35.135, 233.469 22.500 C 231.688 14.125, 229.229 8.265, 226.573 6.061 C 225.178 4.903, 225 5.320, 225 9.741 M 225.500 110.572 C 221.650 111.314, 214.726 111.854, 210.113 111.772 C 201.860 111.626, 201.680 111.675, 198.863 114.827 C 195.684 118.385, 195.267 121.682, 197.460 125.923 C 198.810 128.533, 199.284 141.831, 199.041 170.250 L 199 175 128.500 175 L 58 175 58 187.500 L 58 200 61.750 200.014 C 63.813 200.021, 66.512 200.299, 67.750 200.630 L 70 201.233 70 260.700 C 70 293.407, 70.338 320.017, 70.750 319.833 C 71.162 319.650, 76.563 316.146, 82.750 312.046 L 94 304.592 94.010 291.546 C 94.076 208.700, 94.172 202.106, 95.313 201.245 C 95.979 200.743, 118.893 200.383, 147.500 200.425 L 198.500 200.500 198.762 238.738 C 199.008 274.701, 198.914 277.086, 197.188 278.812 C 195.852 280.148, 192.513 280.984, 184.926 281.882 C 160.371 284.788, 137.773 291.725, 111.345 304.471 C 93.538 313.059, 85.069 318.364, 71.642 329.342 C 56.643 341.606, 46.587 354.367, 38.639 371.225 C 34.260 380.513, 32.418 381.701, 20.266 383.082 C 15.515 383.622, 11.037 384.555, 10.314 385.154 C 8.875 386.348, 8.400 407.536, 9.765 409.624 C 10.169 410.242, 15.212 411.292, 20.970 411.957 C 26.729 412.621, 32.187 413.565, 33.100 414.054 C 34.014 414.542, 36.656 418.768, 38.972 423.443 C 47.683 441.027, 62.981 457.697, 83.868 472.363 C 95.360 480.432, 116.233 491.764, 129.016 496.875 C 143.388 502.620, 168.937 508.403, 193.757 511.528 L 199.015 512.190 198.757 574.845 L 198.500 637.500 146.500 637.500 L 94.500 637.500 94.244 563.840 L 93.987 490.179 84.049 483.084 C 78.583 479.182, 73.749 475.429, 73.306 474.744 C 72.862 474.060, 72.275 510.400, 72 555.500 L 71.500 637.500 64.750 637.796 L 58 638.091 58 648.932 L 58 659.773 61.250 660.306 C 63.037 660.599, 70.800 660.841, 78.500 660.844 C 86.200 660.847, 116.389 660.883, 145.588 660.925 L 198.676 661 199.287 779.408 L 199.899 897.816 212.069 916.658 C 218.763 927.021, 224.792 936.089, 225.466 936.810 C 226.454 937.866, 227.850 936.319, 232.680 928.810 C 235.973 923.689, 241.900 914.501, 245.850 908.390 L 253.033 897.281 253.073 790.890 C 253.094 732.376, 253.370 679.212, 253.685 672.750 L 254.257 661 324.128 661 L 394 661 394 650 L 394 639 389.250 638.985 C 386.637 638.976, 383.872 638.572, 383.105 638.086 C 381.921 637.337, 381.822 624.960, 382.450 556.102 C 382.976 498.318, 382.879 475, 382.111 475 C 381.518 475, 377.538 477.515, 373.266 480.589 C 368.995 483.664, 364.262 486.825, 362.750 487.615 L 360 489.051 360 563.526 L 360 638 306.992 638 L 253.985 638 254.242 575.294 L 254.500 512.588 265.500 510.945 C 309.413 504.384, 343.199 491.771, 371.725 471.289 C 381.046 464.596, 385.665 460.421, 395.832 449.498 C 404.822 439.841, 408.161 435.073, 414.015 423.538 C 419.773 412.190, 421.701 410.928, 434.314 410.243 C 439.366 409.969, 444.063 409.297, 444.750 408.750 C 445.611 408.065, 446 404.407, 446 397 C 446 389.589, 445.611 385.938, 444.750 385.259 C 444.063 384.716, 440.350 383.992, 436.500 383.649 C 432.650 383.306, 427.475 382.444, 425 381.733 C 420.664 380.488, 420.311 380.083, 415.341 370.651 C 404.280 349.664, 388.752 332.934, 366.635 318.174 C 338.014 299.073, 315.806 290.571, 274.560 282.925 C 260.300 280.281, 258.502 279.009, 257.540 270.884 C 257.189 267.923, 257.037 250.875, 257.201 233 L 257.500 200.500 308.750 200.241 L 360 199.982 360 252.424 C 360 303.876, 360.038 304.877, 361.987 305.496 C 363.080 305.843, 368.008 309.023, 372.939 312.563 C 377.869 316.104, 382.146 319, 382.443 319 C 382.741 319, 383.100 292.337, 383.242 259.750 L 383.500 200.500 389 200 L 394.500 199.500 394.500 188 L 394.500 176.500 326.407 176.728 L 258.313 176.956 257.633 154.140 C 256.992 132.641, 257.068 131.069, 258.954 126.912 C 262.362 119.400, 261.415 114.175, 256.288 112.201 C 247.692 108.891, 237.130 108.333, 225.500 110.572 M 214.238 321.110 C 196.418 324.079, 177.365 335.273, 166.419 349.207 C 160.112 357.234, 152.757 372.006, 150.025 382.132 C 148.133 389.144, 147.839 392.279, 148.208 401.499 C 148.593 411.113, 149.160 413.973, 152.701 424.184 C 157.653 438.461, 162.113 446.602, 169.362 454.597 C 176.631 462.613, 185.246 468.097, 198.294 473.014 C 217.885 480.397, 235.868 480.541, 254.268 473.465 C 279.391 463.802, 296.029 445.080, 303.112 418.500 C 305.836 408.277, 306.095 389.795, 303.656 379.719 C 296.840 351.566, 271.164 326.901, 243.140 321.586 C 234.167 319.884, 222.729 319.696, 214.238 321.110 M 314.644 327.149 C 315.115 327.892, 317.843 332.015, 320.707 336.312 C 327.660 346.745, 330.352 352.672, 333.939 365.445 C 342.721 396.720, 339.036 431.147, 324.210 456.335 C 321.406 461.101, 319.386 465, 319.723 465 C 321.221 465, 338.291 455.201, 346.150 449.830 C 358.399 441.459, 366.952 433.271, 373.404 423.742 C 379.147 415.260, 386 399.928, 386 395.563 C 386 392.075, 379.429 377.526, 374.905 371 C 364.180 355.526, 347.385 341.609, 327.500 331.719 C 316.758 326.376, 313.397 325.181, 314.644 327.149 M 127.869 331.903 C 113.372 339.257, 100.473 348.344, 90.951 357.911 C 80.910 367.999, 75.994 375.173, 70.685 387.487 L 66.810 396.474 69.941 403.987 C 80.429 429.153, 95.316 444.350, 125.299 460.496 C 130.139 463.102, 134.334 464.999, 134.621 464.712 C 134.909 464.424, 134.034 462.429, 132.676 460.279 C 119.737 439.782, 114.314 418.847, 115.292 393.166 C 116.252 367.978, 122.751 348.856, 136.132 331.856 C 141.113 325.528, 140.428 325.532, 127.869 331.903";
+const FLAME_PATH = "M 225 9.741 C 225 21.678, 218.573 39.955, 209.461 53.932 C 202.944 63.930, 200.588 82.094, 204.648 91.051 C 209.596 101.966, 217.435 107.342, 228.500 107.409 C 237.288 107.463, 242.592 104.896, 247.476 98.226 C 252.094 91.919, 254.003 86.009, 253.985 78.072 C 253.965 69.288, 252.052 61.685, 246.568 48.602 C 244.056 42.609, 241.955 36.534, 241.900 35.102 C 241.845 33.671, 241.474 31.375, 241.076 30 L 240.351 27.500 238.275 30.851 C 235.899 34.686, 236.158 35.135, 233.469 22.500 C 231.688 14.125, 229.229 8.265, 226.573 6.061 C 225.178 4.903, 225 5.320, 225 9.741 M 226 110.500 C 219.769 111.704, 220.244 111.757, 237.500 111.775 C 254.902 111.794, 255.301 111.750, 249.500 110.441 C 242.237 108.802, 234.689 108.821, 226 110.500";
+function markInner(fg, red){
+  return `<path d="${MARK_PATH}" fill="${fg}" fill-rule="evenodd"/>`
+       + `<path d="${FLAME_PATH}" fill="${red}" fill-rule="evenodd"/>`;
+}
+
+const svgIcon = (key, size = 20) =>
+  `<svg class="li" width="${size}" height="${size}" viewBox="0 0 24 24">${ICONS[key] || ICONS.more}</svg>`;
+
+/* ================= 数据层（正式版会换成 SQLite） ================= */
+/* 黑白灰阶：图表按重要度从深到浅，越次要越淡 */
+const MONO = ['#14161A','#2E343C','#474E58','#616874','#7B8390','#949CA8','#AAB1BC','#BCC2CC','#CDD2D8','#DCE0E4'];
+
+const CATS = {
+  expense: [
+    {n:'餐饮',k:'food'},{n:'交通',k:'transport'},{n:'购物',k:'shopping'},{n:'居住',k:'home'},
+    {n:'娱乐',k:'fun'},{n:'医疗',k:'medical'},{n:'学习',k:'study'},{n:'通讯',k:'comm'},
+    {n:'人情',k:'gift'},{n:'其他',k:'more'}
+  ],
+  income: [
+    {n:'工资',k:'salary'},{n:'奖金',k:'bonus'},{n:'兼职',k:'parttime'},
+    {n:'理财',k:'invest'},{n:'红包',k:'redpacket'},{n:'其他',k:'more'}
+  ]
+};
+const catOf = (t,n) => CATS[t].find(c=>c.n===n) || CATS[t][CATS[t].length-1];
+
+let txns = [
+  {id:1, d:'2026-10-15', t:'expense', c:'餐饮', n:'午餐', a:28},
+  {id:2, d:'2026-10-15', t:'expense', c:'交通', n:'地铁', a:6},
+  {id:3, d:'2026-10-15', t:'expense', c:'购物', n:'日用品', a:94},
+  {id:4, d:'2026-10-14', t:'expense', c:'餐饮', n:'晚餐 · 火锅', a:186},
+  {id:5, d:'2026-10-14', t:'expense', c:'娱乐', n:'电影票', a:80},
+  {id:6, d:'2026-10-14', t:'expense', c:'交通', n:'打车', a:90},
+  {id:7, d:'2026-10-13', t:'expense', c:'居住', n:'水电燃气费', a:246.5},
+  {id:8, d:'2026-10-13', t:'expense', c:'餐饮', n:'早餐', a:12},
+  {id:9, d:'2026-10-12', t:'expense', c:'学习', n:'技术书籍', a:138},
+  {id:10,d:'2026-10-12', t:'expense', c:'餐饮', n:'外卖', a:35},
+  {id:11,d:'2026-10-11', t:'expense', c:'购物', n:'秋装', a:699},
+  {id:12,d:'2026-10-11', t:'expense', c:'医疗', n:'药品', a:78},
+  {id:13,d:'2026-10-10', t:'income',  c:'工资', n:'10 月工资', a:12000},
+  {id:14,d:'2026-10-10', t:'expense', c:'通讯', n:'手机话费', a:59},
+  {id:15,d:'2026-10-09', t:'expense', c:'人情', n:'同事生日红包', a:200},
+  {id:16,d:'2026-10-08', t:'expense', c:'餐饮', n:'聚餐 AA', a:220},
+  {id:17,d:'2026-10-07', t:'expense', c:'娱乐', n:'健身月卡', a:299},
+  {id:18,d:'2026-10-06', t:'income',  c:'红包', n:'家人红包', a:800},
+  {id:19,d:'2026-10-05', t:'expense', c:'交通', n:'高铁票', a:553},
+  {id:20,d:'2026-10-03', t:'expense', c:'餐饮', n:'朋友聚餐', a:328},
+  {id:21,d:'2026-09-28', t:'expense', c:'餐饮', n:'晚餐', a:168},
+  {id:22,d:'2026-09-25', t:'expense', c:'居住', n:'房租', a:2800},
+  {id:23,d:'2026-09-20', t:'income',  c:'工资', n:'9 月工资', a:12000},
+  {id:24,d:'2026-09-16', t:'expense', c:'购物', n:'键盘', a:459},
+  {id:25,d:'2026-08-25', t:'expense', c:'居住', n:'房租', a:2800},
+  {id:26,d:'2026-08-20', t:'income',  c:'工资', n:'8 月工资', a:11800},
+  {id:27,d:'2026-08-12', t:'expense', c:'交通', n:'机票', a:1280},
+  {id:28,d:'2026-07-25', t:'expense', c:'居住', n:'房租', a:2800},
+  {id:29,d:'2026-07-20', t:'income',  c:'工资', n:'7 月工资', a:11800},
+  {id:30,d:'2026-06-25', t:'expense', c:'居住', n:'房租', a:2800},
+  {id:31,d:'2026-06-20', t:'income',  c:'工资', n:'6 月工资', a:11500},
+  {id:32,d:'2026-05-25', t:'expense', c:'居住', n:'房租', a:2800},
+  {id:33,d:'2026-05-20', t:'income',  c:'工资', n:'5 月工资', a:11500}
+];
+const BUDGET = 6000;
+
+/* ================= 工具 ================= */
+const pad = n => String(n).padStart(2,'0');
+const fmt = n => n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const todayISO = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const WD = ['周日','周一','周二','周三','周四','周五','周六'];
+function dayLabel(iso){
+  const [y,m,D] = iso.split('-').map(Number);
+  const w = WD[new Date(y,m-1,D).getDay()];
+  const t = todayISO();
+  const yest = (()=>{const d=new Date();d.setDate(d.getDate()-1);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;})();
+  const pre = iso===t ? '今天 · ' : (iso===yest ? '昨天 · ' : '');
+  return `${pre}${m}月${D}日 ${w}`;
+}
+let toastTimer;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('on'), 1900);
+}
+function setAppName(n){
+  APP_NAME = n;
+  document.title = n + ' · 可交互原型 v2';
+  const h = document.getElementById('heroName'); if(h) h.textContent = n;
+  const a = document.getElementById('aboutName'); if(a) a.textContent = '关于' + n;
+  document.querySelectorAll('.namebar button').forEach(b => b.classList.toggle('on', b.dataset.name === n));
+  renderAll();
+}
+
+/* ================= 月份 ================= */
+let cur = {y:2026, m:10};
+function stepMonth(step){
+  let m = cur.m + step, y = cur.y;
+  if(m<1){m=12;y--;} if(m>12){m=1;y++;}
+  cur = {y,m}; renderAll();
+}
+
+/* ================= 明细页 ================= */
+const monthTxns = () => txns.filter(t => t.d.startsWith(`${cur.y}-${pad(cur.m)}`));
+
+function renderDetail(){
+  const list = monthTxns();
+  const exp = list.filter(t=>t.t==='expense').reduce((s,t)=>s+t.a,0);
+  const inc = list.filter(t=>t.t==='income').reduce((s,t)=>s+t.a,0);
+  const bal = inc - exp;
+
+  document.getElementById('mLabel').innerHTML = `${cur.y}年${cur.m}月 <span class="chev"></span>`;
+  document.getElementById('mSub').textContent = `共 ${list.length} 笔记录`;
+  document.getElementById('ovBal').innerHTML = `<s>¥</s>${fmt(Math.abs(bal))}`;
+  document.getElementById('ovExp').textContent = '¥'+fmt(exp);
+  document.getElementById('ovInc').textContent = '¥'+fmt(inc);
+
+  const pct = Math.min(100, exp/BUDGET*100);
+  document.getElementById('bgBar').style.width = pct+'%';
+  document.getElementById('bgTxt').textContent = `${fmt(exp)} / ${fmt(BUDGET)}`;
+  document.getElementById('bgTrack').className = 'track' + (pct>=100?' over' : pct>=80?' warn':'');
+
+  const box = document.getElementById('dayList');
+  if(!list.length){
+    box.innerHTML = `<div class="empty"><b>这个月还没有记录</b>点击下方「＋」开始记第一笔</div>`;
+    return;
+  }
+  const days = {};
+  list.forEach(t => (days[t.d] = days[t.d] || []).push(t));
+  box.innerHTML = Object.keys(days).sort().reverse().map(d=>{
+    const arr = days[d];
+    const dExp = arr.filter(t=>t.t==='expense').reduce((s,t)=>s+t.a,0);
+    const dInc = arr.filter(t=>t.t==='income').reduce((s,t)=>s+t.a,0);
+    let sum = '';
+    if(dExp) sum += `支出 ${fmt(dExp)}`;
+    if(dInc) sum += (sum?'  ·  ':'') + `收入 ${fmt(dInc)}`;
+    return `<div class="day">
+      <div class="day-h"><span>${dayLabel(d)}</span><em>${sum}</em></div>
+      ${arr.map(t=>{
+        const c = catOf(t.t, t.c);
+        const sign = t.t==='expense' ? '-' : '+';
+        return `<div class="row" onclick="toast('正式版：点击可编辑或删除这笔记录')">
+          <div class="ico">${svgIcon(c.k, 20)}</div>
+          <div class="row-mid">
+            <div class="row-t">${t.c}${t.n?' · '+t.n:''}</div>
+            <div class="row-s">${t.n?'':'无备注'}</div>
+          </div>
+          <div class="row-a ${t.t==='expense'?'e':'i'}">${sign}¥${fmt(t.a)}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+/* ================= 图表页 ================= */
+let statType = 'expense';
+function renderStats(){
+  document.getElementById('sLabel').innerHTML = `${cur.y}年${cur.m}月 <span class="chev"></span>`;
+  const list = monthTxns().filter(t=>t.t===statType);
+  const total = list.reduce((s,t)=>s+t.a,0);
+  const isExp = statType==='expense';
+
+  document.getElementById('dcLabel').textContent = isExp ? '总支出' : '总收入';
+  document.getElementById('dcTotal').textContent = '¥'+fmt(total);
+  document.getElementById('dcCount').textContent = list.length + ' 笔';
+
+  const agg = CATS[statType].map(c=>({...c, v:0, cnt:0}));
+  list.forEach(t=>{ const it = agg.find(a=>a.n===t.c); if(it){ it.v += t.a; it.cnt++; } });
+  const parts = agg.filter(a=>a.v>0).sort((a,b)=>b.v-a.v);
+  parts.forEach((p,i)=> p.color = MONO[i] || MONO[MONO.length-1]);
+
+  const R=72, C=2*Math.PI*R, svg = document.getElementById('donutSvg');
+  if(!parts.length){
+    svg.innerHTML = `<circle cx="100" cy="100" r="${R}" fill="none" stroke="#F1F3F5" stroke-width="26"/>`;
+  } else {
+    let acc = 0;
+    svg.innerHTML = `<circle cx="100" cy="100" r="${R}" fill="none" stroke="#F1F3F5" stroke-width="26"/>` +
+      parts.map(p=>{
+        const len = Math.max(1.5, p.v/total*C - 2.5), off = -acc;
+        acc += p.v/total*C;
+        return `<circle cx="100" cy="100" r="${R}" fill="none" stroke="${p.color}" stroke-width="26"
+          stroke-dasharray="${len} ${C}" stroke-dashoffset="${off}"
+          style="transition:stroke-dasharray .45s ease,stroke-dashoffset .45s ease"/>`;
+      }).join('');
+  }
+
+  const rl = document.getElementById('rankList');
+  rl.innerHTML = parts.length ? parts.map(p=>{
+    const pct = p.v/total*100;
+    return `<div class="rank">
+      <div class="ico">${svgIcon(p.k, 18)}</div>
+      <div class="rank-mid">
+        <div class="rank-t">
+          <span>${p.n}<s>${p.cnt} 笔</s></span>
+          <em>¥${fmt(p.v)}<s>${pct.toFixed(1)}%</s></em>
+        </div>
+        <div class="rbar"><i style="width:${pct}%;background:${p.color}"></i></div>
+      </div>
+    </div>`;
+  }).join('') : `<div style="padding:26px 0;text-align:center;color:var(--ink-3);font-size:12.5px">本月暂无${isExp?'支出':'收入'}记录</div>`;
+
+  const months = [];
+  for(let k=5;k>=0;k--){
+    let m = cur.m - k, y = cur.y;
+    while(m<1){m+=12;y--;}
+    const arr = txns.filter(t=>t.d.startsWith(`${y}-${pad(m)}`) && t.t===statType);
+    months.push({ m, v: arr.reduce((s,t)=>s+t.a,0), on: m===cur.m && y===cur.y });
+  }
+  const max = Math.max(...months.map(x=>x.v), 1);
+  document.getElementById('trend').innerHTML = months.map(x=>
+    `<div class="tcol ${x.on?'on':''}">
+      <div class="tbar ${x.on?'on':''}" style="height:${Math.max(4, x.v/max*100)}%" title="¥${fmt(x.v)}"></div>
+      <span>${x.m}月</span>
+    </div>`).join('');
+}
+
+/* ================= 计划页 ================= */
+const TOTAL_BUDGET = 6000;
+const CAT_BUDGET = { 餐饮:1200, 交通:1000, 购物:700, 居住:1500, 娱乐:600, 学习:400 };
+const GOALS = [
+  {n:'旅行基金', k:'plane',  t:20000,  s:8500,  due:'2027-06'},
+  {n:'换电脑',   k:'laptop', t:8000,   s:2300,  due:'2027-02'},
+  {n:'应急金',   k:'wallet', t:30000,  s:12600, due:'2027-12'},
+  {n:'买车',     k:'car',    t:120000, s:8000,  due:'2028-06'}
+];
+
+function renderPlan(){
+  document.getElementById('plLabel').innerHTML = `${cur.y}年${cur.m}月 <span class="chev"></span>`;
+
+  const list = monthTxns().filter(t=>t.t==='expense');
+  const used = list.reduce((s,t)=>s+t.a,0);
+  const left = TOTAL_BUDGET - used;
+  const pct  = Math.min(100, used/TOTAL_BUDGET*100);
+  const over = left < 0;
+
+  const daysInMonth = new Date(cur.y, cur.m, 0).getDate();
+  const now = new Date();
+  const isThisMonth = now.getFullYear()===cur.y && now.getMonth()+1===cur.m;
+  const leftDays = isThisMonth ? Math.max(1, daysInMonth - now.getDate() + 1) : daysInMonth;
+
+  document.getElementById('bdLabel').textContent = over ? '本月已超支' : '本月预算剩余';
+  const big = document.getElementById('bdLeftBig');
+  big.innerHTML = `<s>¥</s>${fmt(Math.abs(left))}`;
+  big.classList.toggle('danger', over);
+  document.getElementById('bdTotal').textContent = '¥'+fmt(TOTAL_BUDGET);
+  document.getElementById('bdUsedR').textContent = '¥'+fmt(used);
+  document.getElementById('bdPct').textContent = pct.toFixed(1)+'%';
+  document.getElementById('bdBar').style.width = pct+'%';
+  document.getElementById('bdTrack').className = 'track' + (pct>=100?' over' : pct>=80?' warn' : '');
+  document.getElementById('bdTip').textContent = over
+    ? `已用 ¥${fmt(used)}，超出 ¥${fmt(-left)}`
+    : `本月还剩 ${leftDays} 天 · 日均可用 ¥${fmt(left/leftDays)}`;
+
+  /* 分类预算：按「使用率」从高到低排，最接近超支的排最前 */
+  const spent = {};
+  list.forEach(t => spent[t.c] = (spent[t.c]||0) + t.a);
+  const rows = CATS.expense.map(c => ({...c, s: spent[c.n]||0, b: CAT_BUDGET[c.n]||0}));
+  const withB = rows.filter(r => r.b>0).sort((a,b) => (b.s/b.b) - (a.s/a.b));
+  const noB   = rows.filter(r => r.b===0 && r.s>0);
+
+  document.getElementById('budgetList').innerHTML =
+    withB.map(r=>{
+      const p = Math.min(100, r.s/r.b*100);
+      const o = r.s > r.b;
+      return `<div class="brow" onclick="toast('调整「${r.n}」的预算（原型示意）')">
+        <div class="ico">${svgIcon(r.k,18)}</div>
+        <div class="bmid">
+          <div class="btop">
+            <span>${r.n}${o?' <s class="ovtag">已超支</s>':''}</span>
+            <em class="${o?'ovtxt':''}">¥${fmt(r.s)}<s>/ ¥${fmt(r.b)}</s></em>
+          </div>
+          <div class="bar ${o?'over':''}"><i style="width:${p}%"></i></div>
+        </div>
+      </div>`;
+    }).join('')
+    + noB.map(r=>`<div class="bnone" onclick="toast('为「${r.n}」设置预算（原型示意）')">
+        <div class="ico">${svgIcon(r.k,18)}</div><span>${r.n}</span><i>未设预算 · 已花 ¥${fmt(r.s)}</i>
+      </div>`).join('');
+
+  /* 储蓄目标 */
+  document.getElementById('goalList').innerHTML = GOALS.map(g=>{
+    const p = Math.min(100, g.s/g.t*100);
+    return `<div class="goal" onclick="toast('${g.n}：存入 / 取出 / 修改目标（原型示意）')">
+      <div class="gt"><div class="ico">${svgIcon(g.k,16)}</div><b>${g.n}</b></div>
+      <div class="gn">¥${fmt(g.s)}</div>
+      <div class="gd">目标 ¥${fmt(g.t)}</div>
+      <div class="bar"><i style="width:${p}%"></i></div>
+      <div class="gp"><span>${p.toFixed(0)}%</span><span>${g.due} 达成</span></div>
+    </div>`;
+  }).join('');
+}
+
+/* ================= 分类页 ================= */
+function renderCatPage(){
+  const row = c => `<div class="crow" onclick="toast('正式版：可修改「${c.n}」的名称与图标')">
+      <div class="grip">⋮⋮</div>
+      <div class="ico">${svgIcon(c.k, 18)}</div>
+      <span class="nm">${c.n}</span>
+      <em>${txns.filter(t=>t.c===c.n).length} 笔</em>
+    </div>`;
+  document.getElementById('catExpList').innerHTML = CATS.expense.map(row).join('');
+  document.getElementById('catIncList').innerHTML = CATS.income.map(row).join('');
+}
+
+/* ================= 记一笔 ================= */
+let curType='expense', curCat='餐饮', amtStr='';
+const sheet = document.getElementById('sheet');
+
+function renderCatGrid(){
+  document.getElementById('catGrid').innerHTML = CATS[curType].map(c=>
+    `<button class="cat-cell ${c.n===curCat?'on':''}" data-c="${c.n}">
+      <div class="ico">${svgIcon(c.k, 21)}</div><span>${c.n}</span>
+    </button>`).join('');
+}
+function renderPick(){
+  const c = catOf(curType, curCat);
+  document.getElementById('pickIco').innerHTML = svgIcon(c.k, 20);
+  document.getElementById('pickName').textContent = c.n;
+}
+function renderAmt(){
+  const el = document.getElementById('amtDisp');
+  el.textContent = amtStr || '0.00';
+  el.classList.toggle('zero', !amtStr);
+}
+function openSheet(){
+  sheet.classList.add('on');
+  amtStr=''; curType='expense'; curCat='餐饮';
+  document.getElementById('noteInput').value='';
+  document.getElementById('dateInput').value = todayISO();
+  document.querySelectorAll('#segType button').forEach(b=>b.classList.toggle('on', b.dataset.t==='expense'));
+  renderCatGrid(); renderPick(); renderAmt();
+}
+function closeSheet(){ sheet.classList.remove('on'); }
+
+function pressKey(k){
+  if(k==='del') amtStr = amtStr.slice(0,-1);
+  else if(k==='clear') amtStr='';
+  else if(k==='ok'){ saveTxn(); return; }
+  else if(k==='.'){ if(!amtStr.includes('.')) amtStr = (amtStr||'0')+'.'; }
+  else {
+    if(amtStr.length>=9) return;
+    if(amtStr.includes('.')){
+      if(amtStr.split('.')[1].length<2) amtStr += k;
+    } else {
+      amtStr = (amtStr==='0' ? '' : amtStr) + k;
+    }
+  }
+  renderAmt();
+}
+function saveTxn(){
+  const v = parseFloat(amtStr || '0');
+  if(!v || v<=0){ toast('请先输入金额'); return; }
+  const d = document.getElementById('dateInput').value || todayISO();
+  txns.push({ id:Date.now(), d, t:curType, c:curCat,
+    n: document.getElementById('noteInput').value.trim(), a: Math.round(v*100)/100 });
+  closeSheet();
+  const [y,m] = d.split('-').map(Number);
+  cur = {y, m};
+  renderAll(); go('detail');
+  toast(`已记录：${curType==='expense'?'支出':'收入'} ¥${fmt(v)}`);
+}
+
+/* ================= 导出 / 导入 ================= */
+function openExport(){
+  const list = monthTxns();
+  if(!list.length){ toast('本月没有可导出的记录'); return; }
+  const exp = list.filter(t=>t.t==='expense').reduce((s,t)=>s+t.a,0);
+  document.getElementById('mdTitle').textContent = '导出为 Excel';
+  document.getElementById('mdBody').innerHTML = `
+    <p>将导出 <b>${cur.y}年${cur.m}月</b> 的 <b>${list.length}</b> 条记录，共 <b>¥${fmt(exp)}</b> 支出。</p>
+    <p>文件名：<code>${APP_NAME}_${cur.y}-${pad(cur.m)}.xlsx</code></p>
+    <p>列结构：日期 / 类型 / 分类 / 备注 / 金额。导出的文件可直接用 WPS 或 Excel 打开编辑。</p>`;
+  document.getElementById('mdOk').onclick = ()=>{ closeModal(); toast('已导出到「下载」目录（原型示意）'); };
+  document.getElementById('mask').classList.add('on');
+}
+function openImport(){
+  document.getElementById('mdTitle').textContent = '从 Excel 导入';
+  document.getElementById('mdBody').innerHTML = `
+    <p>表头需包含：<code>日期</code> <code>类型</code> <code>分类</code> <code>备注</code> <code>金额</code>。</p>
+    <p><code>类型</code> 填「支出」或「收入」；<code>日期</code> 建议用 <code>2026-10-15</code> 格式。</p>
+    <p>导入不会覆盖已有数据，重复记录会在确认页里让你逐条勾选。</p>`;
+  document.getElementById('mdOk').onclick = ()=>{ closeModal(); toast('请选择 .xlsx 文件（原型示意）'); };
+  document.getElementById('mask').classList.add('on');
+}
+function closeModal(){ document.getElementById('mask').classList.remove('on'); }
+
+/* ================= 导航 ================= */
+const TAB_OF = { cats:'mine' };   /* 子页面 → 该高亮哪个底部 tab */
+function go(p){
+  document.querySelectorAll('.page').forEach(el=>el.classList.toggle('on', el.id==='p-'+p));
+  const t = TAB_OF[p] || p;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on', b.dataset.p===t));
+}
+function tog(el){ const s = el.querySelector('.sw'); if(s) s.classList.toggle('on'); }
+
+/* ================= 渲染总入口 ================= */
+function renderAll(){
+  renderDetail(); renderStats(); renderCatPage(); renderPlan();
+  document.getElementById('heroSub').textContent = `已记录 ${txns.length} 笔 · 数据仅存本机`;
+}
+
+/* ================= 初始化 ================= */
+document.querySelectorAll('.tab').forEach(b => b.onclick = ()=> go(b.dataset.p));
+document.querySelectorAll('.namebar button').forEach(b => b.onclick = ()=> setAppName(b.dataset.name));
+document.getElementById('fab').onclick = openSheet;
+document.querySelectorAll('#segType button').forEach(b => b.onclick = ()=>{
+  curType = b.dataset.t;
+  document.querySelectorAll('#segType button').forEach(x=>x.classList.toggle('on', x===b));
+  curCat = CATS[curType][0].n;
+  renderCatGrid(); renderPick();
+});
+document.querySelectorAll('#segStat button').forEach(b => b.onclick = ()=>{
+  statType = b.dataset.t;
+  document.querySelectorAll('#segStat button').forEach(x=>x.classList.toggle('on', x===b));
+  renderStats();
+});
+document.getElementById('catGrid').addEventListener('click', e=>{
+  const cell = e.target.closest('.cat-cell'); if(!cell) return;
+  curCat = cell.dataset.c; renderCatGrid(); renderPick();
+});
+document.querySelectorAll('.key').forEach(k => k.onclick = ()=> pressKey(k.dataset.k));
+
+document.addEventListener('keydown', e=>{
+  if(!sheet.classList.contains('on')) return;
+  if(/^[0-9.]$/.test(e.key)) pressKey(e.key);
+  else if(e.key==='Backspace'){ e.preventDefault(); pressKey('del'); }
+  else if(e.key==='Enter'){ pressKey('ok'); }
+  else if(e.key==='Escape'){ closeSheet(); }
+});
+
+/* 我的页图标 + 头像标记 */
+[['icExport','upload'],['icImport','download'],['icBackup','lock'],['icTag','tag'],
+ ['icBell','bell'],['icCoin','coin'],['icMoon','moon'],['icDoc','doc'],['icInfo','info'],
+ ['icLedger','book'],['icAccount','card'],['icTpl','tpl'],['icRec','rec']]
+ .forEach(([id,k]) => { const el = document.getElementById(id); if(el) el.innerHTML = svgIcon(k, 18); });
+document.getElementById('avatMark').innerHTML = markInner('#FFFFFF', '#E8493A');
+
+const clock = ()=>{ const d=new Date(); document.getElementById('clock').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+clock(); setInterval(clock, 10000);
+
+renderAll();
+setAppName('黑塔消费日记');
+</script>
+</body>
+</html>
