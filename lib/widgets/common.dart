@@ -6,29 +6,42 @@ import '../data/ui_flags.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 
-/// 白底描边卡片 —— 原型里 `.sec` 的对应实现
+/// 卡片 —— 原型里 `.sec` 的对应实现。
+///
+/// 1.5.0 重做：从「白底 + 1px 描边」改成「白面 + 柔和投影 + 连续圆角」。
+/// 旧做法的问题见 [C.cardBg] 的注释 —— 底与卡只差 1.06:1，边界只能靠描边撑，
+/// 而 1.29:1 的描边又几乎看不见，整屏退化成「被细线切开的白板」。
+/// 现在卡片靠 [E.low] 的柔和投影浮起来，[C.line] 只留给真正要「切断」的地方。
+///
+/// `sunken: true` 出「压下去」的那一档（概览卡、输入底），用 [C.heroBg] 且不加投影
+/// —— 旧版 [C.heroBg] 全库只用了 1 次，「汇总压下、记录浮上」的层级等于没落地。
 class SectionCard extends StatelessWidget {
   const SectionCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(S.lg),
-    this.margin = const EdgeInsets.symmetric(horizontal: S.xl, vertical: S.sm),
+    // 左右从 20 收到 16：与明细日卡（16）对齐。旧版三套卡片三套边距
+    // （20/8、16/8、16/12/4），屏幕被切成一堆对不齐的矩形。
+    this.margin = const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.sm),
+    this.sunken = false,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
 
+  /// true = 压下去的面（[C.heroBg]，无投影）；false = 浮起来的卡（[C.cardBg]，有投影）
+  final bool sunken;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: margin,
       padding: padding,
-      decoration: BoxDecoration(
-        // 卡片面：浅色是纯白，黑塔版抬一档（见 C.cardBg 的注释）
-        color: C.cardBg,
-        border: Border.all(color: C.line),
-        borderRadius: BorderRadius.circular(R.card),
+      decoration: ShapeDecoration(
+        color: sunken ? C.heroBg : C.cardBg,
+        shadows: sunken ? E.none : E.low,
+        shape: Shape.squircle(R.card),
       ),
       child: child,
     );
@@ -45,7 +58,8 @@ class SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.xl, S.lg, S.xl, S.sm),
+      // 左右与 SectionCard 对齐到 16；上下拉开到 20/10，给分组标题一个区块停顿
+      padding: const EdgeInsets.fromLTRB(S.lg, S.xl, S.lg, S.md),
       child: Row(
         children: [
           Text(text, style: T.section),
@@ -120,20 +134,25 @@ class SegTabs extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: () => onChanged(t),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            height: 32,
+            duration: M.fast,
+            curve: M.standard,
+            height: 34,
             alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: on ? C.ink : Colors.transparent,
-              borderRadius: BorderRadius.circular(R.sm),
+            decoration: ShapeDecoration(
+              color: on ? C.cardBg : Colors.transparent,
+              shadows: on ? E.low : E.none,
+              shape: Shape.squircle(R.sm),
             ),
-            child: Text(
-              label,
+            // 文字颜色也要跟着动，否则底色滑过去了、字色是硬切的
+            child: AnimatedDefaultTextStyle(
+              duration: M.fast,
+              curve: M.standard,
               style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: on ? C.bg : C.ink2,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: on ? C.ink : C.ink2,
               ),
+              child: Text(label),
             ),
           ),
         ),
@@ -141,10 +160,10 @@ class SegTabs extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.all(4),
+      decoration: ShapeDecoration(
         color: C.bg2,
-        borderRadius: BorderRadius.circular(R.md),
+        shape: Shape.squircle(R.md),
       ),
       child: Row(
         children: [item(left, TxnType.expense), item(right, TxnType.income)],
