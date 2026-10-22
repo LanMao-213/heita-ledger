@@ -59,6 +59,8 @@ app.*.map.json
 *.xls
 黑塔消费日记-备份-*.json
 auto-wipe-*.json
+*备份*.json
+*backup*.json
 
 # 环境与凭证
 .env
