@@ -49,6 +49,22 @@ app.*.map.json
 *.keystore
 **/key.properties
 
+# 本机数据与导出：仓库已公开，这些一旦提交就是把真实账目公开
+# （App 的备份是 JSON、导出是 xlsx、库是 sqlite；拷进来调试时别顺手提交）
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.xlsx
+*.xls
+黑塔消费日记-备份-*.json
+auto-wipe-*.json
+
+# 环境与凭证
+.env
+.env.*
+!.env.example
+
 # 出好的安装包：惯例放在仓库同级目录（apk/），本来就不在版本库范围内。
 # 这条是兜底 —— 万一把 apk/ 挪进来或从别处拷进来，别让几十 MB 二进制跟着提交。
 apk/
