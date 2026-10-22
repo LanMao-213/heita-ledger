@@ -167,17 +167,15 @@ class _DetailPageState extends State<DetailPage>
     final dayIncome = sumBySide(items, TxnType.income);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
-      decoration: BoxDecoration(
+      // 与 SectionCard 同边距（左右 16 / 上下 8）：同屏两种卡必须一样宽、
+      // 一样间距，否则日卡和 SectionCard 的边界会错开一条
+      margin: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.sm),
+      decoration: ShapeDecoration(
         color: C.cardBg,
-        borderRadius: BorderRadius.circular(R.card),
-        border: Border.all(color: C.line),
-        // 极淡的投影：白卡叠在白底上只靠 1px 描边，看起来还是一条长列表；
-        // 一点点投影就够让它「浮」起来，不至于抢走顶部概览卡的分量。
-        // 暗底上 4% 的黑等于没有投影，所以这个值也是分主题的（C.cardShadow）。
-        boxShadow: const [
-          BoxShadow(color: C.cardShadow, blurRadius: 10, offset: Offset(0, 2)),
-        ],
+        // 原来是「描边 + 投影 + 白底」三层叠加，紧邻的概览卡又是「异色底 +
+        // 暖描边」—— 同屏两套卡片语法，边界发糊。现在只留 E.low 一种分界手段。
+        shadows: E.low,
+        shape: Shape.squircle(R.card),
       ),
       child: Column(
         children: [

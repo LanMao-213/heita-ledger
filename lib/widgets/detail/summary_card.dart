@@ -141,11 +141,13 @@ class SummaryCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.xs),
       padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
-      decoration: BoxDecoration(
+      // 概览卡是「压下去」的那一档（heroBg 比 bg 深），靠明度差分界，
+      // 不再叠一条暖描边 —— 日卡是「浮起来」的一档（白面 + E.low），
+      // 同屏只留这一套语法，边界才不糊。
+      decoration: ShapeDecoration(
         color: C.heroBg,
-        borderRadius: BorderRadius.circular(R.lg),
-        // 描边比普通描边（C.line）再暖一档，和压下去的卡身同族（C.heroEdge）
-        border: Border.all(color: C.heroEdge),
+        shadows: E.none,
+        shape: Shape.squircle(R.lg),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,7 +253,7 @@ class SummaryCard extends StatelessWidget {
             ],
             const SizedBox(height: S.sm),
             ClipRRect(
-              borderRadius: BorderRadius.circular(99),
+              borderRadius: BorderRadius.circular(R.pill),
               child: LinearProgressIndicator(
                 value: pacing.usedRatio.clamp(0.0, 1.0),
                 minHeight: 6,

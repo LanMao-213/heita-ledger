@@ -299,7 +299,7 @@ class _RuleCard extends StatelessWidget {
             height: 38,
             decoration: BoxDecoration(
               color: C.bg2,
-              borderRadius: BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(R.sm),
             ),
             child: Center(
               child: LineIcon(cat?.icon ?? 'rec', size: 19, color: C.ink),

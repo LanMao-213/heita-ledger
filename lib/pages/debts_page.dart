@@ -190,11 +190,13 @@ class _PersonRow extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
         padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: S.md),
-        decoration: BoxDecoration(
+        decoration: ShapeDecoration(
           // 卡片面：纯白，比纸白底亮一档（见 C.cardBg）
+          // 边界交给 E.low 的柔投影 —— 1px 描边在 1.29:1 下几乎看不见，
+          // 只是把整屏切成「被细线划开的白板」（见 C.line 注释）
           color: C.cardBg,
-          borderRadius: BorderRadius.circular(R.card),
-          border: Border.all(color: C.line),
+          shadows: E.low,
+          shape: Shape.squircle(R.card),
         ),
         child: Row(
           children: [
@@ -203,7 +205,7 @@ class _PersonRow extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: C.bg2,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(R.sm),
               ),
               child: Center(
                 child: LineIcon(icon, size: 19, color: C.ink),
@@ -348,11 +350,11 @@ class _DebtRow extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
         padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: S.md),
-        decoration: BoxDecoration(
+        decoration: ShapeDecoration(
           // 卡片面：纯白，比纸白底亮一档（见 C.cardBg）
           color: C.cardBg,
-          borderRadius: BorderRadius.circular(R.card),
-          border: Border.all(color: C.line),
+          shadows: E.low,
+          shape: Shape.squircle(R.card),
         ),
         child: Row(
           children: [
@@ -361,7 +363,7 @@ class _DebtRow extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: C.bg2,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(R.sm),
               ),
               child: Center(
                 child: LineIcon(

@@ -560,7 +560,7 @@ class _Goals extends StatelessWidget {
                         height: 38,
                         decoration: BoxDecoration(
                           color: icon == k ? C.ink : C.bg2,
-                          borderRadius: BorderRadius.circular(11),
+                          borderRadius: BorderRadius.circular(R.sm),
                         ),
                         child: Center(
                           child: LineIcon(
@@ -639,7 +639,7 @@ class _GoalCard extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     color: C.bg2,
-                    borderRadius: BorderRadius.circular(11),
+                    borderRadius: BorderRadius.circular(R.sm),
                   ),
                   child: Center(
                     child: LineIcon(goal.icon, size: 20, color: C.ink),
@@ -665,7 +665,7 @@ class _GoalCard extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: C.ink,
-                                borderRadius: BorderRadius.circular(5),
+                                borderRadius: BorderRadius.circular(R.xs),
                               ),
                               child: const Text(
                                 '已达成',

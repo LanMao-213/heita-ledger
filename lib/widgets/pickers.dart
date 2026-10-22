@@ -58,7 +58,7 @@ class CategoryGrid extends StatelessWidget {
                   height: 44,
                   decoration: BoxDecoration(
                     color: on ? C.ink : C.bg2,
-                    borderRadius: BorderRadius.circular(13),
+                    borderRadius: BorderRadius.circular(R.md),
                   ),
                   child: Center(
                     child: LineIcon(

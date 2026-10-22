@@ -1573,7 +1573,7 @@ class _LiftRow extends StatelessWidget {
               alignment: on ? Alignment.centerRight : Alignment.centerLeft,
               decoration: BoxDecoration(
                 color: on ? C.ink : C.line,
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(R.pill),
               ),
               child: Container(
                 width: 20,

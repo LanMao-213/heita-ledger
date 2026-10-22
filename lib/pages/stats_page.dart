@@ -260,7 +260,7 @@ class _BasisSwitch extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             color: on ? C.ink : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(R.pill),
             border: Border.all(color: on ? C.ink : C.line),
           ),
           child: Text(
@@ -411,7 +411,7 @@ class _MonthlyTrend extends StatelessWidget {
         height: 9,
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(3),
+          borderRadius: BorderRadius.circular(R.xs),
         ),
       ),
       const SizedBox(width: 5),

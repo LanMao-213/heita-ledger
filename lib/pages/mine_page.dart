@@ -806,7 +806,7 @@ class _CycleDaySheet extends StatelessWidget {
             height: 4,
             decoration: BoxDecoration(
               color: C.line,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(R.xs),
             ),
           ),
           Padding(

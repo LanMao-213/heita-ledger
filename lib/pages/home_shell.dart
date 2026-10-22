@@ -230,7 +230,14 @@ class _TabBar extends StatelessWidget {
               scale: on ? 1.0 : 0.92,
               duration: M.fast,
               curve: M.standard,
-              child: LineIcon(t.icon, size: 22, color: on ? C.ink : C.ink3),
+              // 选中态除了变色再加一档线宽：颜色 + 重量同时变，才像「同一颗
+              // 图标被点亮」，而不是换了一颗图标
+              child: LineIcon(
+                t.icon,
+                size: 22,
+                color: on ? C.ink : C.ink3,
+                strokeWidth: on ? 2.0 : 1.5,
+              ),
             ),
             const SizedBox(height: 4),
             // 颜色和字重一起渐变：这两个是同一个「强调」信号，分开切会打架

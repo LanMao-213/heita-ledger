@@ -262,7 +262,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
               height: 4,
               decoration: BoxDecoration(
                 color: C.line2,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(R.xs),
               ),
             ),
             _stickyHead(),

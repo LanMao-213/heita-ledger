@@ -64,7 +64,7 @@ class TxnRow extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: C.bg2,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(R.sm),
                 ),
                 child: Center(
                   child: LineIcon(
@@ -178,7 +178,7 @@ class _AutoTag extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
         color: C.bg2,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(R.xs),
       ),
       child: const Text(
         '周期',

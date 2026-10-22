@@ -322,7 +322,7 @@ class _CatsPageState extends State<CatsPage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: on ? C.ink : C.bg2,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(R.sm),
                           ),
                           child: Center(
                             child: LineIcon(

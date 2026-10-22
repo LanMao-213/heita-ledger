@@ -220,7 +220,7 @@ class _TemplateRow extends StatelessWidget {
                 height: 40,
                 decoration: BoxDecoration(
                   color: C.bg2,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(R.md),
                 ),
                 child: Center(
                   child: LineIcon(template.icon, size: 20, color: C.ink2),
@@ -465,7 +465,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                       height: 40,
                       decoration: BoxDecoration(
                         color: k == _icon ? C.ink : C.bg2,
-                        borderRadius: BorderRadius.circular(11),
+                        borderRadius: BorderRadius.circular(R.sm),
                       ),
                       child: Center(
                         child: LineIcon(
@@ -512,7 +512,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                           height: 44,
                           decoration: BoxDecoration(
                             color: on ? C.ink : C.bg2,
-                            borderRadius: BorderRadius.circular(13),
+                            borderRadius: BorderRadius.circular(R.md),
                           ),
                           child: Center(
                             child: LineIcon(
