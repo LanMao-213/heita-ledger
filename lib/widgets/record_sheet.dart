@@ -7,6 +7,7 @@ import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
 import '../design/icons.dart';
+import '../design/motion.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import 'common.dart';
@@ -304,10 +305,9 @@ class _RecordSheetState extends State<RecordSheet> {
   ///
   /// 规则收在 [pruneDetails]（纯函数，保存时也走它），这里只负责把结果写回控件。
   void _pruneDetails() {
-    final kept = pruneDetails(
-      Store.i.categoryOf(_categoryId)?.name,
-      {for (final f in TxnField.values) f: _detailCtl[f]!.text},
-    );
+    final kept = pruneDetails(Store.i.categoryOf(_categoryId)?.name, {
+      for (final f in TxnField.values) f: _detailCtl[f]!.text,
+    });
     for (final e in kept.entries) {
       if (e.value.isEmpty) _detailCtl[e.key]!.clear();
     }
@@ -424,10 +424,9 @@ class _RecordSheetState extends State<RecordSheet> {
     // 只写**当前分类用得到**的字段（规则见 [pruneDetails]）。同一组字段的场景
     // （公共交通 ⇄ 打车）照旧带上，中间不该丢一次；但换成「书籍」时，控件里
     // 残留的出发地必须丢掉 —— 否则界面上看不见的值会跟着写进库里。
-    final detailValues = pruneDetails(
-      Store.i.categoryOf(_categoryId)?.name,
-      {for (final f in TxnField.values) f: _detailCtl[f]!.text},
-    );
+    final detailValues = pruneDetails(Store.i.categoryOf(_categoryId)?.name, {
+      for (final f in TxnField.values) f: _detailCtl[f]!.text,
+    });
     String d(TxnField f) => detailValues[f]!;
 
     try {
@@ -1070,9 +1069,7 @@ class _DebtFields extends StatelessWidget {
               Expanded(
                 child: _Chip(
                   icon: 'rec',
-                  label: dueDate == null
-                      ? '应还日（可不选）'
-                      : Fmt.friendly(dueDate!),
+                  label: dueDate == null ? '应还日（可不选）' : Fmt.friendly(dueDate!),
                   onTap: onPickDue,
                 ),
               ),
@@ -1417,11 +1414,15 @@ class _DetailBlock extends StatelessWidget {
             ),
           ),
         ),
-        if (open)
-          Padding(
+        // 展开/收起原来是 `if (open)` 的裸切换：点一下详情区「啪」地整块出现
+        // 或消失，高度突变还会把下面的键盘顶一下。这里改成高度 + 淡出一起动。
+        AnimatedExpand(
+          expanded: open,
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.xs),
             child: Column(children: _rows),
           ),
+        ),
       ],
     );
   }

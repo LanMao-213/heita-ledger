@@ -4,6 +4,7 @@ import '../../data/cycle.dart';
 import '../../data/models.dart';
 import '../../data/pacing.dart';
 import '../../design/haptics.dart';
+import '../../design/motion.dart';
 import '../../design/tokens.dart';
 import '../../store.dart';
 import '../calendar_picker.dart';
@@ -173,9 +174,10 @@ class SummaryCard extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(
-              Fmt.money(expense),
-              maxLines: 1,
+            // 翻期/筛选时这一行是全场最大的数字，硬切最像「卡了一下」。
+            // 新的从下方滑上来、旧的往上淡出，眼睛能跟上数字是怎么变的。
+            child: AnimatedMoney(
+              text: Fmt.money(expense),
               style: T.hero.copyWith(fontSize: 34),
             ),
           ),
@@ -357,10 +359,7 @@ class _NoBudgetSummary extends StatelessWidget {
             const SizedBox(width: S.sm),
             // 只放天数，不再重复「N 笔」—— 上面那行右边本来就写着笔数，
             // 一屏里同一个数字出现两次，只会让人怀疑是不是两个数
-            Text(
-              dayText,
-              style: TextStyle(fontSize: 11.5, color: faint),
-            ),
+            Text(dayText, style: TextStyle(fontSize: 11.5, color: faint)),
           ],
         ),
       ],
@@ -376,7 +375,8 @@ class _NoBudgetSummary extends StatelessWidget {
     if (prev == null || prev.count == 0) return '上一期没有记账';
     final prevDaily = prev.expense ~/ (prev.days == 0 ? 1 : prev.days);
     if (prevDaily <= 0) return '上一期没有支出';
-    final pct = ((pacing.perDayRealCents - prevDaily) * 100 / prevDaily).round();
+    final pct = ((pacing.perDayRealCents - prevDaily) * 100 / prevDaily)
+        .round();
     if (pct == 0) return '与上一期持平';
     return pct > 0 ? '比上一期多 $pct%' : '比上一期少 ${-pct}%';
   }
