@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/cycle.dart';
 import '../../data/models.dart';
 import '../../data/pacing.dart';
+import '../../design/hairline.dart';
 import '../../design/haptics.dart';
 import '../../design/motion.dart';
 import '../../design/tokens.dart';
@@ -205,7 +206,7 @@ class SummaryCard extends StatelessWidget {
           ),
           if (pacing != null) ...[
             const SizedBox(height: S.lg),
-            const Divider(height: 1, color: C.line),
+            Divider(height: 1, thickness: hairlineOf(context), color: C.line),
             const SizedBox(height: S.md),
             Row(
               children: [
@@ -322,7 +323,7 @@ class _NoBudgetSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: S.lg),
-        const Divider(height: 1, color: C.line),
+        Divider(height: 1, thickness: hairlineOf(context), color: C.line),
         const SizedBox(height: S.md),
         Row(
           children: [
@@ -399,7 +400,7 @@ class _HeroStat extends StatelessWidget {
             value,
             maxLines: 1,
             style: T.amountSm.copyWith(
-              fontSize: 16,
+              fontSize: T.section.fontSize,
               fontWeight: FontWeight.w500,
             ),
           ),

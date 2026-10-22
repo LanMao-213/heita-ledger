@@ -6,6 +6,7 @@ import '../data/category_seed.dart';
 import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/motion.dart';
 import '../design/tokens.dart';
@@ -684,7 +685,7 @@ class _RecordSheetState extends State<RecordSheet> {
               },
             ),
             _AmountDisplay(input: _amountInput),
-            const Divider(height: 1, color: C.line),
+            Divider(height: 1, thickness: hairlineOf(context), color: C.line),
             // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
             // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
             Flexible(
@@ -706,14 +707,22 @@ class _RecordSheetState extends State<RecordSheet> {
                             onCountChanged: (v) =>
                                 setState(() => _countInBudget = v),
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                           _NoteField(
                             key: _noteKey,
                             controller: _note,
                             focusNode: _noteFocus,
                             onSubmitted: (_) => _noteFocus.unfocus(),
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                         ] else ...[
                           _CategoryNoteRow(
                             category: Store.i.categoryOf(_categoryId),
@@ -723,7 +732,11 @@ class _RecordSheetState extends State<RecordSheet> {
                             note: _note,
                             onTap: _pickCategory,
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                         ],
                         // 有详情字段时，备注框**提到详情前面**。
                         // 详情区一出现就把信息区撑高，备注留在最后会被整块顶出
@@ -737,7 +750,11 @@ class _RecordSheetState extends State<RecordSheet> {
                             focusNode: _noteFocus,
                             onSubmitted: (_) => _noteFocus.unfocus(),
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                           _DetailBlock(
                             fields: _fields,
                             folded: _folded,
@@ -748,7 +765,11 @@ class _RecordSheetState extends State<RecordSheet> {
                             onToggle: () =>
                                 setState(() => _detailsOpen = !_detailsOpen),
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                         ],
                         _MetaRow(
                           date: _date,
@@ -827,7 +848,11 @@ class _RecordSheetState extends State<RecordSheet> {
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Divider(height: 1, color: C.line),
+                        Divider(
+                          height: 1,
+                          thickness: hairlineOf(context),
+                          color: C.line,
+                        ),
                         CalcKeypad(
                           onKey: _pressKey,
                           onConfirm: _save,

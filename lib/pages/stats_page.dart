@@ -493,7 +493,7 @@ class _AccountsCard extends StatelessWidget {
                   Text(
                     Fmt.money(a.balanceCents),
                     style: T.amountSm.copyWith(
-                      fontSize: 13.5,
+                      fontSize: T.body2.fontSize,
                       color: a.balanceCents < 0 ? C.over : C.ink,
                     ),
                   ),

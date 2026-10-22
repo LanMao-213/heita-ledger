@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import '../design/hairline.dart';
 import '../design/tokens.dart';
 import 'common.dart';
 
@@ -146,7 +147,11 @@ class _CatWheelSheetState extends State<_CatWheelSheet> {
                     ],
                   ),
                 ),
-                Container(width: 1, height: 160, color: C.line),
+                Container(
+                  width: hairlineOf(context),
+                  height: 160,
+                  color: C.line,
+                ),
                 Expanded(
                   flex: 5,
                   child: CupertinoPicker(

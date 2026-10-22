@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/backup_service.dart';
 import '../data/integrity.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -288,7 +289,12 @@ class _SafetyPageState extends State<SafetyPage> {
                       children: [
                         for (var i = 0; i < _items.length; i++) ...[
                           if (i > 0)
-                            const Divider(height: 1, color: C.line, indent: 52),
+                            Divider(
+                              height: 1,
+                              thickness: hairlineOf(context),
+                              color: C.line,
+                              indent: 52,
+                            ),
                           _SnapshotRow(
                             info: _items[i],
                             onRestore: _busy ? null : () => _restore(_items[i]),

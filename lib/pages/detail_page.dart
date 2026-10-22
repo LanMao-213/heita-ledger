@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/haptics.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -211,10 +212,15 @@ class _DetailPageState extends State<DetailPage>
               ],
             ),
           ),
-          const Divider(height: 1, thickness: 1, color: C.line),
+          Divider(height: 1, thickness: hairlineOf(context), color: C.line),
           for (var i = 0; i < items.length; i++) ...[
             if (i > 0)
-              const Divider(height: 1, thickness: 1, color: C.line, indent: 56),
+              Divider(
+                height: 1,
+                thickness: hairlineOf(context),
+                color: C.line,
+                indent: 56,
+              ),
             TxnRow(txn: items[i]),
           ],
         ],
@@ -485,10 +491,7 @@ class _FilterBar extends StatelessWidget {
                         ),
                         child: Text(
                           c,
-                          style: T.caption.copyWith(
-                            color: C.ink2,
-                            fontSize: 12,
-                          ),
+                          style: T.caption.copyWith(color: C.ink2),
                         ),
                       ),
                     ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/category_seed.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -105,8 +106,9 @@ class _CatsPageState extends State<CatsPage> {
                                 ),
                               ),
                               if (i < cats.length - 1 || archived.isNotEmpty)
-                                const Divider(
+                                Divider(
                                   height: 1,
+                                  thickness: hairlineOf(context),
                                   color: C.line,
                                   indent: 64,
                                   endIndent: S.lg,
@@ -466,8 +468,9 @@ class _SubCatsPageState extends State<_SubCatsPage> {
                     ),
                   ),
                   if (i < subs.length - 1 || archived.isNotEmpty)
-                    const Divider(
+                    Divider(
                       height: 1,
+                      thickness: hairlineOf(context),
                       color: C.line,
                       indent: 64,
                       endIndent: S.lg,

@@ -6,6 +6,7 @@ import '../data/db.dart';
 import '../data/excel_service.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -41,7 +42,12 @@ class MinePage extends StatelessWidget {
                   subtitle: '${s.accounts.length} 个账户',
                   onTap: () => _manageAccounts(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'tag',
                   title: '分类管理',
@@ -52,7 +58,12 @@ class MinePage extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const CatsPage()),
                   ),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'tpl',
                   title: '记账模板',
@@ -64,14 +75,24 @@ class MinePage extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const TemplatesPage()),
                   ),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'book',
                   title: '账本管理',
                   subtitle: '${s.ledgers.length} 个账本',
                   onTap: () => _manageLedgers(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'rec',
                   title: '周期账单',
@@ -105,14 +126,24 @@ class MinePage extends StatelessWidget {
                   subtitle: '生成 .xlsx，可发微信 / 存网盘',
                   onTap: () => _export(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'download',
                   title: '从 Excel 导入账单',
                   subtitle: '按导出格式即可批量导入',
                   onTap: () => _import(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 // Excel 只带账单；下面这两行才是「换手机能原样搬过去」
                 SettingRow(
                   icon: 'upload',
@@ -120,14 +151,24 @@ class MinePage extends StatelessWidget {
                   subtitle: 'JSON，含预算、目标、模板、账户余额',
                   onTap: () => _backup(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'download',
                   title: '从备份恢复',
                   subtitle: '会覆盖当前全部数据，覆盖前自动留快照',
                   onTap: () => _restore(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'shield',
                   title: '数据安全',
@@ -186,7 +227,12 @@ class MinePage extends StatelessWidget {
                   title: kAppName,
                   subtitle: '版本 $kAppVersion · 数据存在本机',
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 const SettingRow(
                   icon: 'lock',
                   title: '本地存储',
@@ -758,7 +804,7 @@ class _NetWorthCard extends StatelessWidget {
           ],
           if (s.accounts.isNotEmpty) ...[
             const SizedBox(height: S.md),
-            const Divider(height: 1, color: C.line),
+            Divider(height: 1, thickness: hairlineOf(context), color: C.line),
             const SizedBox(height: S.sm),
             for (final a in s.accounts)
               Padding(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
@@ -130,7 +131,7 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
               ],
             ),
           ),
-          const Divider(height: 1, color: C.line),
+          Divider(height: 1, thickness: hairlineOf(context), color: C.line),
           Expanded(
             child: rows.isEmpty
                 ? const EmptyHint(
@@ -152,9 +153,9 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (prev is Txn)
-                            const Divider(
+                            Divider(
                               height: 1,
-                              thickness: 1,
+                              thickness: hairlineOf(context),
                               color: C.line,
                               indent: S.lg + 36 + S.md,
                             ),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../data/debt_grouping.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -101,7 +102,11 @@ class _SummaryCard extends StatelessWidget {
           Expanded(
             child: _Figure(label: '应收（别人欠我）', cents: receivable),
           ),
-          Container(width: 1, height: 34, color: C.line),
+          Container(
+            width: hairlineOf(context),
+            height: 34,
+            color: C.line,
+          ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(left: S.md),
@@ -404,7 +409,7 @@ class _DebtRow extends StatelessWidget {
                 Text(
                   dimmed ? '已结清' : Fmt.money(debt.remainingCents),
                   style: T.amount.copyWith(
-                    fontSize: 16,
+                    fontSize: T.section.fontSize,
                     color: dimmed ? C.ink3 : C.ink,
                   ),
                 ),

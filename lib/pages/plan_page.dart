@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/models.dart';
 import '../data/pacing.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -342,7 +343,7 @@ class _CategoryBudgets extends StatelessWidget {
       child: Column(
         children: [
           for (final b in rows) _BudgetRow(stat: b),
-          const Divider(height: 1, color: C.line),
+          Divider(height: 1, thickness: hairlineOf(context), color: C.line),
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
@@ -431,7 +432,7 @@ class _BudgetRow extends StatelessWidget {
                 Text(
                   '${Fmt.money(stat.spentCents)} / ${Fmt.money(stat.budgetCents)}',
                   style: T.amountSm.copyWith(
-                    fontSize: 13,
+                    fontSize: T.body2.fontSize,
                     color: stat.over ? C.over : C.ink,
                   ),
                 )
