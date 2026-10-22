@@ -201,7 +201,13 @@ void main() {
     // 假时钟里 await 真实 I/O 永远不会返回（交接说明第 2 节第 2 条）
     await tester.runAsync(() async {
       await tester.tap(find.text('恢复'));
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // 原来这里固定等 200ms 真实时间。全量跑测试时 isolates 并行、机器负载高，
+      // 数据库写入偶尔超过 200ms，下面那条断言就会红 —— 与业务无关，纯粹是
+      // 等得不够。改成轮询到状态真的落库为止（最多 2 秒），不再赌某个具体毫秒数。
+      for (var i = 0; i < 40; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        if (s.expenseCats.any((c) => c.id == target.id)) break;
+      }
     });
     await tester.pump();
     // 把 toast 的时间走完，避免结束时留着未完成的定时器
