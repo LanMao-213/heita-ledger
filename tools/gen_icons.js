@@ -4,8 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
-const SRC = 'C:/Users/<用户名>/WorkBuddy/2026-10-16-09-53-46/记账App/黑塔图标.svg';
-const RES = 'C:/Users/<用户名>/WorkBuddy/2026-10-16-09-53-46/heita_ledger/android/app/src/main/res';
+const SRC = process.env.HEITA_ICON_SVG || 'prototype/记账App/黑塔图标.svg';
+const RES = process.env.HEITA_RES_DIR || 'android/app/src/main/res';
 
 const src = fs.readFileSync(SRC, 'utf8');
 const ds = [...src.matchAll(/\sd="([^"]+)"/g)].map((m) => m[1]);
@@ -108,8 +108,8 @@ const DENSITIES = [
 
   // 中间产物：留一张 432 供人工核对
   await sharp(Buffer.from(fg), { density: 600 }).resize(432, 432).png()
-    .toFile('C:/Users/<用户名>/WorkBuddy/2026-10-16-09-53-46/heita_ledger/build/visual/icon_fg_preview.png');
+    .toFile(path.join('build', 'visual', 'icon_fg_preview.png'));
   await sharp(Buffer.from(lg), { density: 600 }).resize(432, 432).png()
-    .toFile('C:/Users/<用户名>/WorkBuddy/2026-10-16-09-53-46/heita_ledger/build/visual/icon_legacy_preview.png');
+    .toFile(path.join('build', 'visual', 'icon_legacy_preview.png'));
   console.log('已生成预览图');
 })();

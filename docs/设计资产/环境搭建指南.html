@@ -154,7 +154,7 @@ Remove-Item .\flutter.zip</pre>
   <pre>https://developer.android.google.cn/studio</pre>
   <p>安装时保持默认选项即可。装完后首次启动会走一遍设置向导，选择 <b>Standard（标准）</b>，
   SDK 会自动下载到默认位置：</p>
-  <pre>C:\Users\<用户名>\AppData\Local\Android\Sdk</pre>
+  <pre>C:\Users\&lt;用户名&gt;\AppData\Local\Android\Sdk</pre>
   <p>这一步会下载 Android SDK 主体，是全程最耗时的一步，让它自己跑完。</p>
 
   <div class="step"><div class="n">5</div><h3>补齐 SDK 组件</h3></div>
@@ -210,7 +210,7 @@ flutter devices
 
   <h2>五、创建工程验证（最后一步）</h2>
   <p>全部装完后，跑一个空白工程确认整条链路通了：</p>
-  <pre>cd C:\Users\<用户名>\WorkBuddy\2026-10-16-09-53-46
+  <pre>cd &lt;项目根目录&gt;
 flutter create --platforms=android --org com.example ledger_smoke_test
 cd ledger_smoke_test
 flutter run</pre>

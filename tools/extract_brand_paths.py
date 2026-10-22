@@ -5,12 +5,13 @@
 绝不手抄路径数据 —— 手工复制极易出错（本次就发生过），
 必须由脚本原样提取，保证图形与设计稿一致。
 """
+import os
 import re
 import sys
 from pathlib import Path
 
-SRC = Path(r"C:/Users/<用户名>/WorkBuddy/2026-10-16-09-53-46/记账App/index.html")
-OUT = Path(r"C:/Users/<用户名>/WorkBuddy/2026-10-16-09-53-46/heita_ledger/lib/design/brand_paths.dart")
+SRC = Path(os.environ.get("HEITA_PROTOTYPE_HTML", "prototype/记账App/index.html"))
+OUT = Path(os.environ.get("HEITA_BRAND_OUT", "lib/design/brand_paths.dart"))
 
 html = SRC.read_text(encoding="utf-8")
 
