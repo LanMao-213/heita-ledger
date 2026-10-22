@@ -126,7 +126,7 @@ class _CatsPageState extends State<CatsPage> {
         foregroundColor: C.bg,
         elevation: 0,
         icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
-        label: const Text('新增分类', style: TextStyle(fontSize: 14)),
+        label: const Text('新增分类', style: T.body),
       ),
     );
   }
@@ -484,7 +484,7 @@ class _SubCatsPageState extends State<_SubCatsPage> {
         foregroundColor: C.bg,
         elevation: 0,
         icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
-        label: const Text('新增子分类', style: TextStyle(fontSize: 14)),
+        label: const Text('新增子分类', style: T.body),
       ),
     );
   }
@@ -626,7 +626,7 @@ class _ArchivedBlock extends StatelessWidget {
               ),
               child: const Text(
                 '恢复',
-                style: TextStyle(fontSize: 13, color: C.ink2),
+                style: T.body2,
               ),
             ),
           ),

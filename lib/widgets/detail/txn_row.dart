@@ -180,9 +180,9 @@ class _AutoTag extends StatelessWidget {
         color: C.bg2,
         borderRadius: BorderRadius.circular(R.xs),
       ),
-      child: const Text(
+      child: Text(
         '周期',
-        style: TextStyle(fontSize: 9.5, height: 1.35, color: C.ink3),
+        style: T.overline.copyWith(height: 1.35),
       ),
     );
   }

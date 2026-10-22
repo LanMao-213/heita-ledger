@@ -71,8 +71,7 @@ class CategoryGrid extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   c.name,
-                  style: TextStyle(
-                    fontSize: 11.5,
+                  style: T.overline.copyWith(
                     color: on ? C.ink : C.ink2,
                     fontWeight: on ? FontWeight.w500 : FontWeight.w400,
                   ),

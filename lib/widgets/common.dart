@@ -147,8 +147,7 @@ class SegTabs extends StatelessWidget {
             child: AnimatedDefaultTextStyle(
               duration: M.fast,
               curve: M.standard,
-              style: TextStyle(
-                fontSize: 14,
+              style: T.body.copyWith(
                 fontWeight: FontWeight.w600,
                 color: on ? C.ink : C.ink2,
               ),
@@ -229,12 +228,7 @@ class CycleBar extends StatelessWidget {
                 child: Text(
                   cycleLabel(from, to),
                   maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: label,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  style: T.amountSm.copyWith(color: label),
                 ),
               ),
             ),
@@ -370,11 +364,7 @@ class MonthBar extends StatelessWidget {
                 child: Text(
                   Fmt.monthLabel(month),
                   maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: label,
-                  ),
+                  style: T.amountSm.copyWith(color: label),
                 ),
               ),
             ),
@@ -530,7 +520,7 @@ void showToast(BuildContext context, String message) {
       SnackBar(
         content: Text(
           message,
-          style: const TextStyle(color: C.bg, fontSize: 13.5),
+          style: T.body2.copyWith(color: C.bg),
         ),
         backgroundColor: C.ink.withValues(alpha: 0.92),
         behavior: SnackBarBehavior.floating,

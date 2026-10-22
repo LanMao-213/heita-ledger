@@ -217,7 +217,7 @@ class _SafetyPageState extends State<SafetyPage> {
             onPressed: _busy ? null : _backupNow,
             child: const Text(
               '现在备份',
-              style: TextStyle(fontSize: 13, color: C.ink2),
+              style: T.body2,
             ),
           ),
         ],

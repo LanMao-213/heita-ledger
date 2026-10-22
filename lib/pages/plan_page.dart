@@ -202,7 +202,7 @@ class _TotalBudgetCard extends StatelessWidget {
                 ),
                 child: Text(
                   budget == null ? '设置' : '修改',
-                  style: const TextStyle(fontSize: 13, color: C.ink2),
+                  style: T.body2,
                 ),
               ),
             ],
@@ -352,7 +352,7 @@ class _CategoryBudgets extends StatelessWidget {
                 icon: const LineIcon('plus', size: 16, color: C.ink2),
                 label: const Text(
                   '为分类设置额度',
-                  style: TextStyle(fontSize: 13, color: C.ink2),
+                  style: T.body2,
                 ),
               ),
             ),
@@ -502,7 +502,7 @@ class _Goals extends StatelessWidget {
               foregroundColor: C.ink,
             ),
             icon: const LineIcon('plus', size: 18, color: C.ink),
-            label: const Text('新建储蓄目标', style: TextStyle(fontSize: 14)),
+            label: const Text('新建储蓄目标', style: T.body),
           ),
         ),
       ],
@@ -667,9 +667,9 @@ class _GoalCard extends StatelessWidget {
                                 color: C.ink,
                                 borderRadius: BorderRadius.circular(R.xs),
                               ),
-                              child: const Text(
+                              child: Text(
                                 '已达成',
-                                style: TextStyle(fontSize: 10, color: C.bg),
+                                style: T.overline.copyWith(color: C.bg),
                               ),
                             ),
                           ],
@@ -692,7 +692,7 @@ class _GoalCard extends StatelessWidget {
                   ),
                   child: const Text(
                     '存一笔',
-                    style: TextStyle(fontSize: 13, color: C.ink2),
+                    style: T.body2,
                   ),
                 ),
               ],

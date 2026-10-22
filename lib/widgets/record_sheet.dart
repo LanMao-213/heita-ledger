@@ -654,7 +654,7 @@ class _RecordSheetState extends State<RecordSheet> {
                       onPressed: _saveAsTemplate,
                       child: const Text(
                         '存为模板',
-                        style: TextStyle(fontSize: 13, color: C.ink2),
+                        style: T.body2,
                       ),
                     ),
             ),
@@ -912,8 +912,7 @@ class _TemplateStrip extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     t.name,
-                    style: TextStyle(
-                      fontSize: 12.5,
+                    style: T.caption.copyWith(
                       color: on ? C.bg : C.ink,
                       fontWeight: on ? FontWeight.w500 : FontWeight.w400,
                     ),
@@ -922,8 +921,7 @@ class _TemplateStrip extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       Fmt.yuan(t.amountCents),
-                      style: TextStyle(
-                        fontSize: 11.5,
+                      style: T.overline.copyWith(
                         color: on ? C.bg.withValues(alpha: 0.72) : C.ink3,
                       ),
                     ),
@@ -994,8 +992,7 @@ class _ModeTabs extends StatelessWidget {
                     ),
                     child: Text(
                       m.label,
-                      style: TextStyle(
-                        fontSize: 13,
+                      style: T.body2.copyWith(
                         fontWeight: FontWeight.w500,
                         color: value == m ? C.bg : C.ink2,
                       ),
@@ -1087,8 +1084,7 @@ class _DebtFields extends StatelessWidget {
                     child: Center(
                       child: Text(
                         '计入预算',
-                        style: TextStyle(
-                          fontSize: 13,
+                        style: T.body2.copyWith(
                           color: countInBudget ? C.bg : C.ink2,
                         ),
                       ),

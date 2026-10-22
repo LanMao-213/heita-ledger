@@ -272,7 +272,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 onPressed: _reset,
                 child: const Text(
                   '重置',
-                  style: TextStyle(fontSize: 13, color: C.ink2),
+                  style: T.body2,
                 ),
               ),
             ),
@@ -501,7 +501,7 @@ class _FilterSheetState extends State<_FilterSheet> {
           onChanged: (_) => _scheduleCount(),
           decoration: InputDecoration.collapsed(
             hintText: hint,
-            hintStyle: const TextStyle(color: C.ink4, fontSize: 14.5),
+            hintStyle: T.body.copyWith(color: C.ink4),
           ),
         ),
       ),
@@ -576,8 +576,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 ),
                 child: Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 14.5,
+                  style: T.body.copyWith(
                     fontWeight: FontWeight.w600,
                     color: canApply ? C.bg : C.ink4,
                   ),
@@ -628,8 +627,7 @@ class _ToggleChip extends StatelessWidget {
             ],
             Text(
               label,
-              style: TextStyle(
-                fontSize: 13,
+              style: T.body2.copyWith(
                 fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
                 color: selected ? C.bg : C.ink2,
               ),

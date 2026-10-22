@@ -242,8 +242,7 @@ class _TabBar extends StatelessWidget {
             const SizedBox(height: 4),
             // 颜色和字重一起渐变：这两个是同一个「强调」信号，分开切会打架
             AnimatedDefaultTextStyle(
-              style: TextStyle(
-                fontSize: 10.5,
+              style: T.overline.copyWith(
                 color: on ? C.ink : C.ink3,
                 fontWeight: on ? FontWeight.w500 : FontWeight.w400,
               ),

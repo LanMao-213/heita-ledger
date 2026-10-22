@@ -57,27 +57,24 @@ class _PeriodHead extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 15,
+              style: T.body.copyWith(
                 fontWeight: FontWeight.w500,
                 color: C.ink2,
                 height: 1.2,
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 7),
-              child: Text('·', style: TextStyle(fontSize: 14, color: C.ink4)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              child: Text('·', style: T.body.copyWith(color: C.ink4)),
             ),
             Flexible(
               child: Text(
                 periodLabel(from, to),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  color: C.ink3,
+                style: T.caption.copyWith(
                   letterSpacing: 0.1,
-                  fontFeatures: [FontFeature.tabularFigures()],
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ),
@@ -104,7 +101,6 @@ class SummaryCard extends StatelessWidget {
 
     // 次要文字的灰度：浅底上不能再用「白字压暗」，那是深色卡的做法
     final dim = C.ink2;
-    final faint = C.ink3;
     final budget = s.totalBudgetCents;
     // 进度与「还剩几天能花多少」都按**可用额度**算（预算 + 本期计入预算的借入），
     // 否则借入打开后这一行会和计划页对不上
@@ -157,7 +153,7 @@ class SummaryCard extends StatelessWidget {
           if (filtering) ...[
             const _FilterHead(),
             const SizedBox(height: S.md),
-            Text('筛选支出', style: TextStyle(fontSize: 12, color: faint)),
+            Text('筛选支出', style: T.caption),
           ] else
             _PeriodHead(
               from: s.cycleFrom,
@@ -202,7 +198,7 @@ class SummaryCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
                   '$count 笔',
-                  style: TextStyle(fontSize: 12, color: faint),
+                  style: T.caption,
                 ),
               ),
             ],
@@ -221,7 +217,7 @@ class SummaryCard extends StatelessWidget {
                     '${Fmt.money(cap)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: dim),
+                    style: T.caption.copyWith(color: dim),
                   ),
                 ),
                 const SizedBox(width: S.sm),
@@ -229,8 +225,7 @@ class SummaryCard extends StatelessWidget {
                   s.overBudget
                       ? '超支 ${Fmt.money(s.overBudgetCents)}'
                       : '剩 ${Fmt.money(s.budgetLeftCents)}',
-                  style: TextStyle(
-                    fontSize: 12,
+                  style: T.caption.copyWith(
                     fontWeight: FontWeight.w500,
                     color: s.overBudget ? C.over : C.ink,
                   ),
@@ -248,7 +243,7 @@ class SummaryCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '额度 ${Fmt.money(budget!)}（含借入 ${Fmt.money(borrowed)}）',
-                style: TextStyle(fontSize: 11.5, color: faint),
+                style: T.overline,
               ),
             ],
             const SizedBox(height: S.sm),
@@ -270,13 +265,12 @@ class SummaryCard extends StatelessWidget {
               children: [
                 Text(
                   '还剩 ${pacing.remainDays} 天',
-                  style: TextStyle(fontSize: 11.5, color: faint),
+                  style: T.overline,
                 ),
                 const Spacer(),
                 Text(
                   '每天可花 ${Fmt.money(pacing.canSpendPerDayCents)}',
-                  style: const TextStyle(
-                    fontSize: 12,
+                  style: T.caption.copyWith(
                     fontWeight: FontWeight.w600,
                     color: C.ink,
                   ),
@@ -308,7 +302,6 @@ class _NoBudgetSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    final faint = C.ink3;
     final dim = C.ink2;
 
     // 最大一笔从**已加载的这一期流水**里取，不发查询。
@@ -335,12 +328,12 @@ class _NoBudgetSummary extends StatelessWidget {
           children: [
             Text(
               '日均 ${Fmt.money(pacing.perDayRealCents)}',
-              style: TextStyle(fontSize: 12, color: dim),
+              style: T.caption.copyWith(color: dim),
             ),
             const Spacer(),
             Text(
               _compare(s, pacing),
-              style: TextStyle(fontSize: 12, color: faint),
+              style: T.caption,
             ),
           ],
         ),
@@ -355,13 +348,13 @@ class _NoBudgetSummary extends StatelessWidget {
                           '${cat == null ? '' : ' · $cat'}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11.5, color: faint),
+                style: T.overline,
               ),
             ),
             const SizedBox(width: S.sm),
             // 只放天数，不再重复「N 笔」—— 上面那行右边本来就写着笔数，
             // 一屏里同一个数字出现两次，只会让人怀疑是不是两个数
-            Text(dayText, style: TextStyle(fontSize: 11.5, color: faint)),
+            Text(dayText, style: T.overline),
           ],
         ),
       ],
@@ -396,7 +389,7 @@ class _HeroStat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 11.5, color: C.ink3)),
+        Text(label, style: T.overline),
         const SizedBox(height: 2),
         // 金额可能很长（收入五位数 + 结余带符号），等比缩一点保证单行
         FittedBox(

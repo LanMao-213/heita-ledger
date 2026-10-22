@@ -204,12 +204,12 @@ class MinePage extends StatelessWidget {
             ),
           ),
           // 版本脚注：出问题时用户第一时间要报的就是这个号
-          const Padding(
-            padding: EdgeInsets.fromLTRB(S.xl, S.xl, S.xl, S.lg),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.xl, S.xl, S.xl, S.lg),
             child: Text(
               '$kAppName v$kAppVersion · 本地版',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11.5, color: C.ink4),
+              style: T.overline.copyWith(color: C.ink4),
             ),
           ),
         ],
@@ -536,15 +536,14 @@ class MinePage extends StatelessWidget {
                       ChoiceChip(
                         label: Text(
                           k.label,
-                          style: const TextStyle(fontSize: 12.5),
+                          style: T.caption,
                         ),
                         selected: kind == k,
                         onSelected: (_) => setLocal(() => kind = k),
                         backgroundColor: C.bg2,
                         selectedColor: C.ink,
-                        labelStyle: TextStyle(
+                        labelStyle: T.caption.copyWith(
                           color: kind == k ? C.bg : C.ink2,
-                          fontSize: 12.5,
                         ),
                         side: BorderSide.none,
                         showCheckmark: false,

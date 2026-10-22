@@ -165,7 +165,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
         foregroundColor: C.bg,
         elevation: 0,
         icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
-        label: const Text('新增模板', style: TextStyle(fontSize: 14)),
+        label: const Text('新增模板', style: T.body),
       ),
     );
   }
@@ -408,7 +408,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
             onPressed: _save,
             child: const Text(
               '保存',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              style: T.amountSm,
             ),
           ),
         ],
@@ -525,8 +525,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                         const SizedBox(height: 6),
                         Text(
                           c.name,
-                          style: TextStyle(
-                            fontSize: 11.5,
+                          style: T.overline.copyWith(
                             color: on ? C.ink : C.ink2,
                             fontWeight: on ? FontWeight.w500 : FontWeight.w400,
                           ),
