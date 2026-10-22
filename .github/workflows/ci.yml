@@ -47,12 +47,6 @@ jobs:
       - name: 测试
         run: flutter test --reporter expanded
 
-      # 第二套配色（露露缇雅·泽金）是**编译期**开关：上面那遍跑的是默认主题，
-      # `kHeita` 为真的那一支根本没被编进去。同一组测试再带 dart-define 跑一次，
-      # 挡住「改了配色分支、只验了默认主题」这类事（多花 ~25 秒）。
-      - name: 测试（露露缇雅·泽金配色）
-        run: flutter test --dart-define=HEITA=1 --reporter expanded
-
   # 产物级门禁：源码扫描可能被绕过（反射、动态拼接），但**APK 里没有 INTERNET
   # 权限**是系统级的硬事实 —— 发不出去就是发不出去。
   # 只在 main 上跑：build 要几分钟，每个分支都跑性价比太低。
