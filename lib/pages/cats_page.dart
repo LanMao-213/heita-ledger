@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/category_seed.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -45,7 +46,7 @@ class _CatsPageState extends State<CatsPage> {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: S.xl,
+                  horizontal: S.lg,
                   vertical: S.sm,
                 ),
                 child: SegTabs(
@@ -54,6 +55,9 @@ class _CatsPageState extends State<CatsPage> {
                 ),
               ),
               Expanded(
+                // 列表底部那 90 不是节奏间距：是给右下角悬浮按钮让出的定位
+                // 余量（按钮 56 + 常规下边距），滚到底时末尾一行才不被压住。
+                // 收编到 S 令牌会让最后一行被按钮盖住，故保留数值。
                 child: cats.isEmpty && archived.isEmpty
                     ? const EmptyHint(text: '这个类型下还没有分类')
                     : ReorderableListView.builder(
@@ -105,8 +109,9 @@ class _CatsPageState extends State<CatsPage> {
                                 ),
                               ),
                               if (i < cats.length - 1 || archived.isNotEmpty)
-                                const Divider(
+                                Divider(
                                   height: 1,
+                                  thickness: hairlineOf(context),
                                   color: C.line,
                                   indent: 64,
                                   endIndent: S.lg,
@@ -126,7 +131,7 @@ class _CatsPageState extends State<CatsPage> {
         foregroundColor: C.bg,
         elevation: 0,
         icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
-        label: const Text('新增分类', style: TextStyle(fontSize: 14)),
+        label: const Text('新增分类', style: T.body),
       ),
     );
   }
@@ -322,7 +327,7 @@ class _CatsPageState extends State<CatsPage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: on ? C.ink : C.bg2,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(R.sm),
                           ),
                           child: Center(
                             child: LineIcon(
@@ -434,6 +439,9 @@ class _SubCatsPageState extends State<_SubCatsPage> {
             return const EmptyHint(text: '还没有子分类，点右下角添加');
           }
           return ReorderableListView.builder(
+            // 90 不是节奏间距：是给右下角悬浮按钮让出的定位余量
+            // （按钮 56 + 常规下边距），滚到底时末尾一行才不被压住。
+            // 收编到 S 令牌会让最后一行被按钮盖住，故保留数值。
             padding: const EdgeInsets.only(bottom: 90),
             buildDefaultDragHandles: false,
             itemCount: subs.length + (archived.isEmpty ? 0 : 1),
@@ -466,8 +474,9 @@ class _SubCatsPageState extends State<_SubCatsPage> {
                     ),
                   ),
                   if (i < subs.length - 1 || archived.isNotEmpty)
-                    const Divider(
+                    Divider(
                       height: 1,
+                      thickness: hairlineOf(context),
                       color: C.line,
                       indent: 64,
                       endIndent: S.lg,
@@ -484,7 +493,7 @@ class _SubCatsPageState extends State<_SubCatsPage> {
         foregroundColor: C.bg,
         elevation: 0,
         icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
-        label: const Text('新增子分类', style: TextStyle(fontSize: 14)),
+        label: const Text('新增子分类', style: T.body),
       ),
     );
   }
@@ -626,7 +635,7 @@ class _ArchivedBlock extends StatelessWidget {
               ),
               child: const Text(
                 '恢复',
-                style: TextStyle(fontSize: 13, color: C.ink2),
+                style: T.body2,
               ),
             ),
           ),

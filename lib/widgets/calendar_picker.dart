@@ -262,7 +262,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
               height: 4,
               decoration: BoxDecoration(
                 color: C.line2,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(R.xs),
               ),
             ),
             _stickyHead(),
@@ -308,12 +308,9 @@ class _CalendarPickerState extends State<_CalendarPicker> {
             alignment: Alignment.centerLeft,
             child: Text(
               year,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: C.ink,
+              style: T.title.copyWith(
                 letterSpacing: 0.5,
-                fontFeatures: [FontFeature.tabularFigures()],
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),
@@ -458,13 +455,11 @@ class _CalendarPickerState extends State<_CalendarPicker> {
                     : null,
                 child: Text(
                   '$day',
-                  style: TextStyle(
-                    fontSize: 17.5,
+                  style: T.amount.copyWith(
                     height: 1,
                     letterSpacing: -0.4,
                     fontWeight: isToday ? FontWeight.w600 : FontWeight.w500,
                     color: fg,
-                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
@@ -479,8 +474,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
                 amountLabel(cents),
                 textAlign: TextAlign.center,
                 maxLines: 1,
-                style: TextStyle(
-                  fontSize: 10.5,
+                style: T.overline.copyWith(
                   height: 1.1,
                   fontWeight: FontWeight.w600,
                   color: isActive ? C.ink3 : C.ink4,

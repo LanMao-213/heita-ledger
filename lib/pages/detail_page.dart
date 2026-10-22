@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/haptics.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -19,13 +22,26 @@ class DetailPage extends StatefulWidget {
   State<DetailPage> createState() => _DetailPageState();
 }
 
-class _DetailPageState extends State<DetailPage> {
+class _DetailPageState extends State<DetailPage>
+    with SingleTickerProviderStateMixin {
   /// 翻期之后要把列表拉回顶部，所以必须自己持有 controller
   /// （原来是隐式的 `PrimaryScrollController`，拿不到位置就没法回顶）。
   final _scroll = ScrollController();
 
+  /// 翻期时正文淡入用。
+  ///
+  /// 这里没有用 `AnimatedSwitcher` 直接包 `CustomScrollView`：那样翻期会给
+  /// scroll view 换 key，翻完旧的 `ScrollPosition` 就被丢掉了，回顶动画和
+  /// 「翻完停在顶部」都落不到新列表上。改成同一个 view 淡入，位置也保住了。
+  late final _flipFade = AnimationController(
+    vsync: this,
+    value: 1,
+    duration: M.base,
+  );
+
   @override
   void dispose() {
+    _flipFade.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -47,9 +63,16 @@ class _DetailPageState extends State<DetailPage> {
     // 「翻过头了」。想提前给下一期设预算，走计划页或日历（那两条路没封）。
     if (delta > 0 && s.isCurrentPeriod) return;
     await s.shiftCycle(delta);
+    if (!mounted) return;
     Haptics.tap();
-    // 不回顶的话会停在「上一期的第 3 天」这种半截位置，看起来像翻错了
-    if (_scroll.hasClients) _scroll.jumpTo(0);
+    // 不回顶的话会停在「上一期的第 3 天」这种半截位置，看起来像翻错了。
+    // 原来是 `jumpTo`：列表会「瞬移」，配上瞬间替换的数据，整个翻期就是一次
+    // 硬切。改成 animateTo 之后，「列表滚回顶部」本身就是翻期的解释动画。
+    if (_scroll.hasClients) {
+      unawaited(_scroll.animateTo(0, duration: M.base, curve: M.standard));
+    }
+    // 数据已经换完了：正文淡入一次，代替「一帧之内整屏换掉」
+    unawaited(_flipFade.forward(from: 0));
   }
 
   @override
@@ -74,51 +97,55 @@ class _DetailPageState extends State<DetailPage> {
             // 筛选条会把「全部历史」写明，口径不再含糊。
             if (s.filtering) _FilterBar(),
             Expanded(
-              // ★ 懒加载（1.4.5）：原来是 `ListView(children: [...])`，一期几百笔
-              //   会一次性构建所有行 —— 1.4.4 的「明细只显示 500 条」就是为了躲它。
-              //   换成 `SliverList.builder` 后只构建可视区域内的那几张日卡，
-              //   滚动时才按需建下一张，摊还成本与屏高成正比，与总条数无关。
-              child: CustomScrollView(
-                controller: _scroll,
-                slivers: [
-                  // 翻期的热区就是这一块。`enabled: false` 时**不注册**横向
-                  // 识别器，手势落回外层 PageView —— 这正是「筛选态下横滑
-                  // 仍然切 Tab」的实现方式，不是靠 return 拦。
-                  // 不加 const：SummaryCard 直接读 Store.i，const 会被 Flutter
-                  // 当成「同一个 widget」跳过重建，翻期后数字会停在旧口径
-                  SliverToBoxAdapter(
-                    child: SwipeFlip(
-                      enabled: !s.filtering,
-                      onPrev: () => _flip(-1),
-                      onNext: () => _flip(1),
-                      child: SummaryCard(),
-                    ),
-                  ),
-                  if (s.visibleTxns.isEmpty)
+              // 翻期的淡入挂在这一层：整块正文一起淡，而不是每张日卡各自淡
+              child: FadeTransition(
+                opacity: _flipFade,
+                // ★ 懒加载（1.4.5）：原来是 `ListView(children: [...])`，一期几百笔
+                //   会一次性构建所有行 —— 1.4.4 的「明细只显示 500 条」就是为了躲它。
+                //   换成 `SliverList.builder` 后只构建可视区域内的那几张日卡，
+                //   滚动时才按需建下一张，摊还成本与屏高成正比，与总条数无关。
+                child: CustomScrollView(
+                  controller: _scroll,
+                  slivers: [
+                    // 翻期的热区就是这一块。`enabled: false` 时**不注册**横向
+                    // 识别器，手势落回外层 PageView —— 这正是「筛选态下横滑
+                    // 仍然切 Tab」的实现方式，不是靠 return 拦。
+                    // 不加 const：SummaryCard 直接读 Store.i，const 会被 Flutter
+                    // 当成「同一个 widget」跳过重建，翻期后数字会停在旧口径
                     SliverToBoxAdapter(
-                      child: s.filtering
-                          ? const EmptyHint(
-                              icon: 'list',
-                              text: '没有符合条件的记录',
-                              hint: '试试放宽条件，或点上面的「重置」',
-                            )
-                          : const EmptyHint(
-                              icon: 'doc',
-                              text: '这一期还没有记账',
-                              hint: '点下面的「＋」记第一笔',
-                            ),
-                    )
-                  else
-                    SliverList.builder(
-                      // 超大批量时的兜底提示仍留在末尾（见 _MoreHint）：
-                      // 上限已经从 500 提到 2000，但「说不清楚少了」这个毛病不能回来
-                      itemCount: groups.length + (s.txnTruncated ? 1 : 0),
-                      itemBuilder: (context, i) => i >= groups.length
-                          ? const _MoreHint()
-                          : _dayCard(context, s, groups[i]),
+                      child: SwipeFlip(
+                        enabled: !s.filtering,
+                        onPrev: () => _flip(-1),
+                        onNext: () => _flip(1),
+                        child: SummaryCard(),
+                      ),
                     ),
-                  const SliverToBoxAdapter(child: SizedBox(height: S.xxl)),
-                ],
+                    if (s.visibleTxns.isEmpty)
+                      SliverToBoxAdapter(
+                        child: s.filtering
+                            ? const EmptyHint(
+                                icon: 'list',
+                                text: '没有符合条件的记录',
+                                hint: '试试放宽条件，或点上面的「重置」',
+                              )
+                            : const EmptyHint(
+                                icon: 'doc',
+                                text: '这一期还没有记账',
+                                hint: '点下面的「＋」记第一笔',
+                              ),
+                      )
+                    else
+                      SliverList.builder(
+                        // 超大批量时的兜底提示仍留在末尾（见 _MoreHint）：
+                        // 上限已经从 500 提到 2000，但「说不清楚少了」这个毛病不能回来
+                        itemCount: groups.length + (s.txnTruncated ? 1 : 0),
+                        itemBuilder: (context, i) => i >= groups.length
+                            ? const _MoreHint()
+                            : _dayCard(context, s, groups[i]),
+                      ),
+                    const SliverToBoxAdapter(child: SizedBox(height: S.xxl)),
+                  ],
+                ),
               ),
             ),
           ],
@@ -141,70 +168,64 @@ class _DetailPageState extends State<DetailPage> {
     final dayIncome = sumBySide(items, TxnType.income);
 
     return Container(
-          margin: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
-          decoration: BoxDecoration(
-            color: C.cardBg,
-            borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(color: C.line),
-            // 极淡的投影：白卡叠在白底上只靠 1px 描边，看起来还是一条长列表；
-            // 一点点投影就够让它「浮」起来，不至于抢走顶部概览卡的分量。
-            // 暗底上 4% 的黑等于没有投影，所以这个值也是分主题的（C.cardShadow）。
-            boxShadow: const [
-              BoxShadow(
-                color: C.cardShadow,
-                blurRadius: 10,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // 日期是这张卡的头，放在卡里 —— 挂在卡外面的话，
-              // 一屏几张卡会读成一串「小标题 + 列表」，不像卡片
-              Padding(
-                padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
-                child: Row(
-                  children: [
-                    // 日期让出剩余宽度：某天既有收入又有支出、数字又长时，
-                    // 三个 Text 并排会顶出屏幕（真机上表现为右侧被裁掉一截）
-                    Expanded(
-                      child: Text(
-                        Fmt.friendly(date),
-                        style: T.caption.copyWith(
-                          color: C.ink2,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+      // 与 SectionCard 同边距（左右 16 / 上下 8）：同屏两种卡必须一样宽、
+      // 一样间距，否则日卡和 SectionCard 的边界会错开一条
+      margin: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.sm),
+      decoration: ShapeDecoration(
+        color: C.cardBg,
+        // 原来是「描边 + 投影 + 白底」三层叠加，紧邻的概览卡又是「异色底 +
+        // 暖描边」—— 同屏两套卡片语法，边界发糊。现在只留 E.low 一种分界手段。
+        shadows: E.low,
+        shape: Shape.squircle(R.card),
+      ),
+      child: Column(
+        children: [
+          // 日期是这张卡的头，放在卡里 —— 挂在卡外面的话，
+          // 一屏几张卡会读成一串「小标题 + 列表」，不像卡片
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
+            child: Row(
+              children: [
+                // 日期让出剩余宽度：某天既有收入又有支出、数字又长时，
+                // 三个 Text 并排会顶出屏幕（真机上表现为右侧被裁掉一截）
+                Expanded(
+                  child: Text(
+                    Fmt.friendly(date),
+                    style: T.caption.copyWith(
+                      color: C.ink2,
+                      fontWeight: FontWeight.w500,
                     ),
-                    if (dayIncome > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(right: S.sm),
-                        child: Text(
-                          '收入 ${Fmt.money(dayIncome)}',
-                          style: T.caption.copyWith(color: C.ink2),
-                        ),
-                      ),
-                    if (dayExpense > 0)
-                      Text('支出 ${Fmt.money(dayExpense)}', style: T.caption),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, thickness: 1, color: C.line),
-              for (var i = 0; i < items.length; i++) ...[
-                if (i > 0)
-                  const Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: C.line,
-                    indent: 56,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                TxnRow(txn: items[i]),
+                ),
+                if (dayIncome > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: S.sm),
+                    child: Text(
+                      '收入 ${Fmt.money(dayIncome)}',
+                      style: T.caption.copyWith(color: C.ink2),
+                    ),
+                  ),
+                if (dayExpense > 0)
+                  Text('支出 ${Fmt.money(dayExpense)}', style: T.caption),
               ],
-            ],
+            ),
           ),
-        );
+          Divider(height: 1, thickness: hairlineOf(context), color: C.line),
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                thickness: hairlineOf(context),
+                color: C.line,
+                indent: 56,
+              ),
+            TxnRow(txn: items[i]),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -418,11 +439,7 @@ class _MoreHint extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 2),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: C.ink2,
-              ),
+              const Icon(Icons.chevron_right_rounded, size: 18, color: C.ink2),
             ],
           ),
         ),
@@ -467,6 +484,7 @@ class _FilterBar extends StatelessWidget {
                       child: Container(
                         height: 28,
                         alignment: Alignment.center,
+                        // 左右 10 是筛选 chip（高 28 固定）的内缩，不是节奏间距
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         decoration: BoxDecoration(
                           color: C.bg2,
@@ -474,10 +492,7 @@ class _FilterBar extends StatelessWidget {
                         ),
                         child: Text(
                           c,
-                          style: T.caption.copyWith(
-                            color: C.ink2,
-                            fontSize: 12,
-                          ),
+                          style: T.caption.copyWith(color: C.ink2),
                         ),
                       ),
                     ),

@@ -72,44 +72,46 @@ void main() {
       // 换单套色板时把「两套三元表达式」换成了字面量。这组断言是那句话的证据：
       // 只要有一个值被顺手改掉，肉眼看不见的那点色差会在这里先红。
       expect(C.ink, const Color(0xFF1C1A17));
-      expect(C.ink2, const Color(0xFF5C5850));
-      expect(C.ink3, const Color(0xFF6F695C));
-      expect(C.ink4, const Color(0xFFB9B2A5));
+      expect(C.ink2, const Color(0xFF5B554D));
+      expect(C.ink3, const Color(0xFF6D655B));
+      expect(C.ink4, const Color(0xFFACA69E));
       expect(C.inkWash, const Color(0x0F1C1A17));
-      expect(C.bg, const Color(0xFFFBFAF7));
-      expect(C.bg2, const Color(0xFFEFEBE3));
-      expect(C.bg3, const Color(0xFFF7F5F0));
-      expect(C.line, const Color(0xFFE6E2DA));
-      expect(C.line2, const Color(0xFFDBD5C9));
-      expect(C.over, const Color(0xFFA6321F));
-      expect(C.overD, const Color(0xFFC4472F));
-      expect(C.stage, const Color(0xFFE8E5DD));
+      expect(C.bg, const Color(0xFFF5F2EA));
+      expect(C.bg2, const Color(0xFFE4DED0));
+      expect(C.bg3, const Color(0xFFEDE8DF));
+      expect(C.line, const Color(0xFFE6E1D7));
+      expect(C.line2, const Color(0xFFD5CDBC));
+      expect(C.over, const Color(0xFFB13521));
+      expect(C.overD, const Color(0xFFC46556));
+      expect(C.stage, const Color(0xFFDBD8D1));
       // 强调色 === 主文字色（纸墨原则：不引入装饰色）
       expect(C.accent, C.ink, reason: '强调色 = 主文字色');
-      // 压在深色块上的字必须是纯白：纸白 #FBFAF7 压上去会脏，且对比度略低
+      // 压在深色块上的字必须是纯白：纸白 #F5F2EA 压上去会脏，且对比度略低
       expect(C.onAccent, const Color(0xFFFFFFFF));
-      expect(C.accentSoft, C.bg2, reason: '选中胶囊底与卡内次级面同一档');
-      expect(C.accentWash, C.bg2);
+      // 旧色板里 accentSoft / accentWash / bg2 三个都是 #EFEBE3，互相钉死会掩盖
+      // 单值漂移（改一个等于改三个）；这一版三者互不相同，各自钉自己的值。
+      expect(C.accentSoft, const Color(0xFFEEEAE3));
+      expect(C.accentWash, const Color(0xFFF2F0EB));
       expect(C.todayMark, C.ink);
       expect(C.onTodayMark, const Color(0xFFFFFFFF));
-      expect(C.cardShadow, const Color(0x0A1C1A17));
-      expect(C.handle, const Color(0xFFE9E4DA));
-      expect(C.heroEdge, const Color(0xFFE3DED4));
-      // 白卡压纸白底，靠描边 + 投影分开（D-10）
+      expect(C.cardShadow, const Color(0x0D1C1A17));
+      expect(C.handle, const Color(0xFFE9E5DC));
+      expect(C.heroEdge, const Color(0xFFD8D0C1));
+      // 白卡压纸白底（1.12:1），靠明度差 + 投影分开（D-10）
       expect(C.cardBg, const Color(0xFFFFFFFF));
-      expect(C.heroBg, const Color(0xFFF3F1EC));
+      expect(C.heroBg, const Color(0xFFECE7DE));
       // 图表色阶：暖灰十档，越靠前越主要
       expect(kChart, const [
         Color(0xFF1C1A17),
-        Color(0xFF332F29),
-        Color(0xFF4A453C),
-        Color(0xFF605A4F),
-        Color(0xFF766F62),
-        Color(0xFF8C8477),
-        Color(0xFFA29A8C),
-        Color(0xFFB8B0A2),
-        Color(0xFFCFC7B9),
-        Color(0xFFE4DED2),
+        Color(0xFF322F2B),
+        Color(0xFF47443F),
+        Color(0xFF5D5952),
+        Color(0xFF726E66),
+        Color(0xFF88837A),
+        Color(0xFF9D988E),
+        Color(0xFFB3ADA1),
+        Color(0xFFC8C2B5),
+        Color(0xFFDED7C9),
       ]);
       expect(kChart.length, 10, reason: '饼图切片按十档循环');
     });

@@ -224,15 +224,31 @@ class _TabBar extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            LineIcon(t.icon, size: 22, color: on ? C.ink : C.ink3),
+            // 选中/未选中是「同一颗图标的两种状态」，不是两颗图标：
+            // 颜色瞬切 + 尺寸跟着变一下，才看得出是它自己被点亮了
+            AnimatedScale(
+              scale: on ? 1.0 : 0.92,
+              duration: M.fast,
+              curve: M.standard,
+              // 选中态除了变色再加一档线宽：颜色 + 重量同时变，才像「同一颗
+              // 图标被点亮」，而不是换了一颗图标
+              child: LineIcon(
+                t.icon,
+                size: 22,
+                color: on ? C.ink : C.ink3,
+                strokeWidth: on ? 2.0 : 1.5,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(
-              t.label,
-              style: TextStyle(
-                fontSize: 10.5,
+            // 颜色和字重一起渐变：这两个是同一个「强调」信号，分开切会打架
+            AnimatedDefaultTextStyle(
+              style: T.overline.copyWith(
                 color: on ? C.ink : C.ink3,
                 fontWeight: on ? FontWeight.w500 : FontWeight.w400,
               ),
+              duration: M.fast,
+              curve: M.standard,
+              child: Text(t.label),
             ),
           ],
         ),

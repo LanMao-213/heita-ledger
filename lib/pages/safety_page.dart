@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/backup_service.dart';
 import '../data/integrity.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -217,7 +218,7 @@ class _SafetyPageState extends State<SafetyPage> {
             onPressed: _busy ? null : _backupNow,
             child: const Text(
               '现在备份',
-              style: TextStyle(fontSize: 13, color: C.ink2),
+              style: T.body2,
             ),
           ),
         ],
@@ -235,7 +236,8 @@ class _SafetyPageState extends State<SafetyPage> {
               children: [
                 const SectionTitle('数据体检'),
                 SectionCard(
-                  padding: EdgeInsets.zero,
+                  // 列表卡：SettingRow 自带左右 16，卡片只留上下 8
+                  padding: const EdgeInsets.symmetric(vertical: S.sm),
                   child: SettingRow(
                     icon: 'shield',
                     title: '检查数据完整性',
@@ -283,12 +285,18 @@ class _SafetyPageState extends State<SafetyPage> {
                   )
                 else
                   SectionCard(
-                    padding: EdgeInsets.zero,
+                    // 列表卡：行间有分隔线，行自己带左右 16，卡片只留上下 8
+                    padding: const EdgeInsets.symmetric(vertical: S.sm),
                     child: Column(
                       children: [
                         for (var i = 0; i < _items.length; i++) ...[
                           if (i > 0)
-                            const Divider(height: 1, color: C.line, indent: 52),
+                            Divider(
+                              height: 1,
+                              thickness: hairlineOf(context),
+                              color: C.line,
+                              indent: 52,
+                            ),
                           _SnapshotRow(
                             info: _items[i],
                             onRestore: _busy ? null : () => _restore(_items[i]),
@@ -301,7 +309,7 @@ class _SafetyPageState extends State<SafetyPage> {
                   ),
                 const SizedBox(height: S.md),
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: S.xl),
+                  padding: EdgeInsets.symmetric(horizontal: S.lg),
                   child: Text(
                     '恢复是覆盖式的：会先把当前数据再存一份快照，然后整库替换。'
                     '所以「恢复错了」也还有退路。',

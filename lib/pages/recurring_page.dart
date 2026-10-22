@@ -60,10 +60,11 @@ class _RecurringPageState extends State<RecurringPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: C.ink))
           : ListView(
+              // 底部 90 是给悬浮「新建规则」按钮让位的固定留白，不是节奏间距
               padding: const EdgeInsets.only(bottom: 90),
               children: [
                 const Padding(
-                  padding: EdgeInsets.fromLTRB(S.xl, S.sm, S.xl, S.md),
+                  padding: EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.md),
                   child: Text(
                     '房租、话费、订阅这类固定支出，设一次就够了。\n'
                     '应用不联网、没有后台服务，所以补记是在**每次打开应用时**'
@@ -87,7 +88,7 @@ class _RecurringPageState extends State<RecurringPage> {
         foregroundColor: C.bg,
         elevation: 0,
         icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
-        label: const Text('新建规则', style: TextStyle(fontSize: 14)),
+        label: const Text('新建规则', style: T.body),
       ),
     );
   }
@@ -290,8 +291,8 @@ class _RuleCard extends StatelessWidget {
     final stale = rule.nextRunDate.compareTo(Fmt.today()) <= 0;
 
     return SectionCard(
-      padding: const EdgeInsets.all(S.md),
-      margin: const EdgeInsets.symmetric(horizontal: S.xl, vertical: S.xs),
+      // 内容卡：卡内只有一行，用默认 padding（all 16）
+      margin: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xs),
       child: Row(
         children: [
           Container(
@@ -299,7 +300,7 @@ class _RuleCard extends StatelessWidget {
             height: 38,
             decoration: BoxDecoration(
               color: C.bg2,
-              borderRadius: BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(R.sm),
             ),
             child: Center(
               child: LineIcon(cat?.icon ?? 'rec', size: 19, color: C.ink),

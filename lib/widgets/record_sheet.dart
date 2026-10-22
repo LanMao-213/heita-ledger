@@ -6,7 +6,9 @@ import '../data/category_seed.dart';
 import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
+import '../design/motion.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import 'common.dart';
@@ -304,10 +306,9 @@ class _RecordSheetState extends State<RecordSheet> {
   ///
   /// 规则收在 [pruneDetails]（纯函数，保存时也走它），这里只负责把结果写回控件。
   void _pruneDetails() {
-    final kept = pruneDetails(
-      Store.i.categoryOf(_categoryId)?.name,
-      {for (final f in TxnField.values) f: _detailCtl[f]!.text},
-    );
+    final kept = pruneDetails(Store.i.categoryOf(_categoryId)?.name, {
+      for (final f in TxnField.values) f: _detailCtl[f]!.text,
+    });
     for (final e in kept.entries) {
       if (e.value.isEmpty) _detailCtl[e.key]!.clear();
     }
@@ -424,10 +425,9 @@ class _RecordSheetState extends State<RecordSheet> {
     // 只写**当前分类用得到**的字段（规则见 [pruneDetails]）。同一组字段的场景
     // （公共交通 ⇄ 打车）照旧带上，中间不该丢一次；但换成「书籍」时，控件里
     // 残留的出发地必须丢掉 —— 否则界面上看不见的值会跟着写进库里。
-    final detailValues = pruneDetails(
-      Store.i.categoryOf(_categoryId)?.name,
-      {for (final f in TxnField.values) f: _detailCtl[f]!.text},
-    );
+    final detailValues = pruneDetails(Store.i.categoryOf(_categoryId)?.name, {
+      for (final f in TxnField.values) f: _detailCtl[f]!.text,
+    });
     String d(TxnField f) => detailValues[f]!;
 
     try {
@@ -655,7 +655,7 @@ class _RecordSheetState extends State<RecordSheet> {
                       onPressed: _saveAsTemplate,
                       child: const Text(
                         '存为模板',
-                        style: TextStyle(fontSize: 13, color: C.ink2),
+                        style: T.body2,
                       ),
                     ),
             ),
@@ -685,7 +685,7 @@ class _RecordSheetState extends State<RecordSheet> {
               },
             ),
             _AmountDisplay(input: _amountInput),
-            const Divider(height: 1, color: C.line),
+            Divider(height: 1, thickness: hairlineOf(context), color: C.line),
             // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
             // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
             Flexible(
@@ -707,14 +707,22 @@ class _RecordSheetState extends State<RecordSheet> {
                             onCountChanged: (v) =>
                                 setState(() => _countInBudget = v),
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                           _NoteField(
                             key: _noteKey,
                             controller: _note,
                             focusNode: _noteFocus,
                             onSubmitted: (_) => _noteFocus.unfocus(),
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                         ] else ...[
                           _CategoryNoteRow(
                             category: Store.i.categoryOf(_categoryId),
@@ -724,7 +732,11 @@ class _RecordSheetState extends State<RecordSheet> {
                             note: _note,
                             onTap: _pickCategory,
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                         ],
                         // 有详情字段时，备注框**提到详情前面**。
                         // 详情区一出现就把信息区撑高，备注留在最后会被整块顶出
@@ -738,7 +750,11 @@ class _RecordSheetState extends State<RecordSheet> {
                             focusNode: _noteFocus,
                             onSubmitted: (_) => _noteFocus.unfocus(),
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                           _DetailBlock(
                             fields: _fields,
                             folded: _folded,
@@ -749,7 +765,11 @@ class _RecordSheetState extends State<RecordSheet> {
                             onToggle: () =>
                                 setState(() => _detailsOpen = !_detailsOpen),
                           ),
-                          const Divider(height: 1, color: C.line),
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
                         ],
                         _MetaRow(
                           date: _date,
@@ -828,7 +848,11 @@ class _RecordSheetState extends State<RecordSheet> {
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Divider(height: 1, color: C.line),
+                        Divider(
+                          height: 1,
+                          thickness: hairlineOf(context),
+                          color: C.line,
+                        ),
                         CalcKeypad(
                           onKey: _pressKey,
                           onConfirm: _save,
@@ -901,7 +925,9 @@ class _TemplateStrip extends StatelessWidget {
           return GestureDetector(
             onTap: () => onTap(t),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11),
+              // 11 是个孤立值：模板胶囊和下面的日期 / 账户胶囊（_Chip，左右
+              // S.md）是同屏并排的两种胶囊，收到 S.md 让它们的字边距同一档
+              padding: const EdgeInsets.symmetric(horizontal: S.md),
               decoration: BoxDecoration(
                 color: on ? C.ink : C.bg2,
                 borderRadius: BorderRadius.circular(R.md),
@@ -913,8 +939,7 @@ class _TemplateStrip extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     t.name,
-                    style: TextStyle(
-                      fontSize: 12.5,
+                    style: T.caption.copyWith(
                       color: on ? C.bg : C.ink,
                       fontWeight: on ? FontWeight.w500 : FontWeight.w400,
                     ),
@@ -923,8 +948,7 @@ class _TemplateStrip extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       Fmt.yuan(t.amountCents),
-                      style: TextStyle(
-                        fontSize: 11.5,
+                      style: T.overline.copyWith(
                         color: on ? C.bg.withValues(alpha: 0.72) : C.ink3,
                       ),
                     ),
@@ -987,6 +1011,8 @@ class _ModeTabs extends StatelessWidget {
                   onTap: () => onChanged(m),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 160),
+                    // 2 是分段控件的固定内缩：轨道高 32 减去上下各 2 才是 28 的
+                    // 胶囊高，改了胶囊就顶到轨道外，属于组件内部尺寸，不参与节奏
                     margin: const EdgeInsets.all(2),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
@@ -995,8 +1021,7 @@ class _ModeTabs extends StatelessWidget {
                     ),
                     child: Text(
                       m.label,
-                      style: TextStyle(
-                        fontSize: 13,
+                      style: T.body2.copyWith(
                         fontWeight: FontWeight.w500,
                         color: value == m ? C.bg : C.ink2,
                       ),
@@ -1070,9 +1095,7 @@ class _DebtFields extends StatelessWidget {
               Expanded(
                 child: _Chip(
                   icon: 'rec',
-                  label: dueDate == null
-                      ? '应还日（可不选）'
-                      : Fmt.friendly(dueDate!),
+                  label: dueDate == null ? '应还日（可不选）' : Fmt.friendly(dueDate!),
                   onTap: onPickDue,
                 ),
               ),
@@ -1090,8 +1113,7 @@ class _DebtFields extends StatelessWidget {
                     child: Center(
                       child: Text(
                         '计入预算',
-                        style: TextStyle(
-                          fontSize: 13,
+                        style: T.body2.copyWith(
                           color: countInBudget ? C.bg : C.ink2,
                         ),
                       ),
@@ -1279,7 +1301,11 @@ class _CategoryNoteRow extends StatelessWidget {
               ? '${parent!.name} · 备注可不填'
               : '未细分 · 备注可不填';
           return Padding(
-            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.md, S.md),
+            // 右侧原本收到 S.md(12)，是为了给行尾箭头再补 8 的间距 —— 结果
+            // 箭头落在离边 20 的位置，比备注框 / 日期胶囊的右缘（16）多出 4，
+            // 信息区整列右边对不齐。现在右侧归到 S.lg(16)，行尾那个 8 的
+            // SizedBox 一并去掉，箭头正好压在 16 这条线上。
+            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.md),
             child: Row(
               children: [
                 Container(
@@ -1321,7 +1347,6 @@ class _CategoryNoteRow extends StatelessWidget {
                   size: 20,
                   color: C.ink4,
                 ),
-                const SizedBox(width: S.sm),
               ],
             ),
           );
@@ -1417,11 +1442,15 @@ class _DetailBlock extends StatelessWidget {
             ),
           ),
         ),
-        if (open)
-          Padding(
+        // 展开/收起原来是 `if (open)` 的裸切换：点一下详情区「啪」地整块出现
+        // 或消失，高度突变还会把下面的键盘顶一下。这里改成高度 + 淡出一起动。
+        AnimatedExpand(
+          expanded: open,
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.xs),
             child: Column(children: _rows),
           ),
+        ),
       ],
     );
   }
@@ -1466,6 +1495,8 @@ class _DetailInput extends StatelessWidget {
               filled: true,
               fillColor: C.bg2,
               isDense: true,
+              // 纵向 9 是 dense 输入框的固定内边距：和 isDense + body2(13px)
+              // 一起决定这个框的高度，属于组件内部尺寸，不参与页面节奏
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: S.md,
                 vertical: 9,
@@ -1518,6 +1549,8 @@ class _NoteField extends StatelessWidget {
           filled: true,
           fillColor: C.bg2,
           isDense: true,
+          // 纵向 13 同上：和 isDense + body(15px) 一起决定备注框的高度，
+          // 比详情框高一点是因为备注是主输入项，属于组件内部尺寸
           contentPadding: const EdgeInsets.symmetric(
             horizontal: S.md,
             vertical: 13,
@@ -1568,11 +1601,13 @@ class _LiftRow extends StatelessWidget {
               duration: const Duration(milliseconds: 160),
               width: 44,
               height: 26,
+              // 3 是开关的固定内缩：轨道高 26 减去上下各 3 正好是 20 的滑块，
+              // 改了滑块就会压出轨道或浮空，属于组件内部尺寸
               padding: const EdgeInsets.all(3),
               alignment: on ? Alignment.centerRight : Alignment.centerLeft,
               decoration: BoxDecoration(
                 color: on ? C.ink : C.line,
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(R.pill),
               ),
               child: Container(
                 width: 20,

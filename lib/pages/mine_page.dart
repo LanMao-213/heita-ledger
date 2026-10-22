@@ -6,6 +6,7 @@ import '../data/db.dart';
 import '../data/excel_service.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -32,7 +33,7 @@ class MinePage extends StatelessWidget {
           _NetWorthCard(),
           const SectionTitle('管理'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: Column(
               children: [
                 SettingRow(
@@ -41,7 +42,12 @@ class MinePage extends StatelessWidget {
                   subtitle: '${s.accounts.length} 个账户',
                   onTap: () => _manageAccounts(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'tag',
                   title: '分类管理',
@@ -52,7 +58,12 @@ class MinePage extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const CatsPage()),
                   ),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'tpl',
                   title: '记账模板',
@@ -64,14 +75,24 @@ class MinePage extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const TemplatesPage()),
                   ),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'book',
                   title: '账本管理',
                   subtitle: '${s.ledgers.length} 个账本',
                   onTap: () => _manageLedgers(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'rec',
                   title: '周期账单',
@@ -86,7 +107,7 @@ class MinePage extends StatelessWidget {
           ),
           const SectionTitle('记账周期'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: SettingRow(
               icon: 'card',
               title: '账单日',
@@ -96,7 +117,7 @@ class MinePage extends StatelessWidget {
           ),
           const SectionTitle('数据'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: Column(
               children: [
                 SettingRow(
@@ -105,14 +126,24 @@ class MinePage extends StatelessWidget {
                   subtitle: '生成 .xlsx，可发微信 / 存网盘',
                   onTap: () => _export(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'download',
                   title: '从 Excel 导入账单',
                   subtitle: '按导出格式即可批量导入',
                   onTap: () => _import(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 // Excel 只带账单；下面这两行才是「换手机能原样搬过去」
                 SettingRow(
                   icon: 'upload',
@@ -120,14 +151,24 @@ class MinePage extends StatelessWidget {
                   subtitle: 'JSON，含预算、目标、模板、账户余额',
                   onTap: () => _backup(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'download',
                   title: '从备份恢复',
                   subtitle: '会覆盖当前全部数据，覆盖前自动留快照',
                   onTap: () => _restore(context),
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'shield',
                   title: '数据安全',
@@ -150,7 +191,7 @@ class MinePage extends StatelessWidget {
           // 音频库），没有开关可加。真要做提示音属于新功能，不是开关。
           const SectionTitle('偏好'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: SettingRow(
               icon: 'pulse',
               title: '触感反馈',
@@ -165,7 +206,7 @@ class MinePage extends StatelessWidget {
           // 「清空」单独拎出来：它和导出/导入不是一类操作，混在一张卡里容易误触
           const SectionTitle('危险操作'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: SettingRow(
               icon: 'more',
               title: '清空全部数据',
@@ -178,7 +219,7 @@ class MinePage extends StatelessWidget {
           ),
           const SectionTitle('关于'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: Column(
               children: [
                 const SettingRow(
@@ -186,7 +227,12 @@ class MinePage extends StatelessWidget {
                   title: kAppName,
                   subtitle: '版本 $kAppVersion · 数据存在本机',
                 ),
-                const Divider(height: 1, color: C.line, indent: 52),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 const SettingRow(
                   icon: 'lock',
                   title: '本地存储',
@@ -196,7 +242,7 @@ class MinePage extends StatelessWidget {
             ),
           ),
           const Padding(
-            padding: EdgeInsets.fromLTRB(S.xl, S.xl, S.xl, 0),
+            padding: EdgeInsets.fromLTRB(S.lg, S.xl, S.lg, 0),
             child: Text(
               '所有数据保存在这台设备上，应用不会发起任何网络请求。\n'
               '换手机或重装前，记得先导出 Excel 备份。',
@@ -204,12 +250,12 @@ class MinePage extends StatelessWidget {
             ),
           ),
           // 版本脚注：出问题时用户第一时间要报的就是这个号
-          const Padding(
-            padding: EdgeInsets.fromLTRB(S.xl, S.xl, S.xl, S.lg),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.lg, S.xl, S.lg, S.lg),
             child: Text(
               '$kAppName v$kAppVersion · 本地版',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11.5, color: C.ink4),
+              style: T.overline.copyWith(color: C.ink4),
             ),
           ),
         ],
@@ -536,15 +582,14 @@ class MinePage extends StatelessWidget {
                       ChoiceChip(
                         label: Text(
                           k.label,
-                          style: const TextStyle(fontSize: 12.5),
+                          style: T.caption,
                         ),
                         selected: kind == k,
                         onSelected: (_) => setLocal(() => kind = k),
                         backgroundColor: C.bg2,
                         selectedColor: C.ink,
-                        labelStyle: TextStyle(
+                        labelStyle: T.caption.copyWith(
                           color: kind == k ? C.bg : C.ink2,
-                          fontSize: 12.5,
                         ),
                         side: BorderSide.none,
                         showCheckmark: false,
@@ -713,7 +758,7 @@ class _BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.xl, S.lg, S.xl, S.md),
+      padding: const EdgeInsets.fromLTRB(S.lg, S.lg, S.lg, S.md),
       child: Row(
         children: [
           const BrandMark(height: 50),
@@ -759,11 +804,11 @@ class _NetWorthCard extends StatelessWidget {
           ],
           if (s.accounts.isNotEmpty) ...[
             const SizedBox(height: S.md),
-            const Divider(height: 1, color: C.line),
+            Divider(height: 1, thickness: hairlineOf(context), color: C.line),
             const SizedBox(height: S.sm),
             for (final a in s.accounts)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 5),
+                padding: const EdgeInsets.symmetric(vertical: S.xs),
                 child: Row(
                   children: [
                     LineIcon(a.icon, size: 17, color: C.ink3),
@@ -806,11 +851,11 @@ class _CycleDaySheet extends StatelessWidget {
             height: 4,
             decoration: BoxDecoration(
               color: C.line,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(R.xs),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(S.xl, S.md, S.xl, S.sm),
+            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
             child: Row(
               children: [
                 Text('账单日', style: T.section),
@@ -820,7 +865,8 @@ class _CycleDaySheet extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.md),
+            // 与上面「账单日」标题行同是 16，两者左右对齐
+            padding: const EdgeInsets.symmetric(horizontal: S.lg),
             child: GridView.count(
               crossAxisCount: 7,
               shrinkWrap: true,

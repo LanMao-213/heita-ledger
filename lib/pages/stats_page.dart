@@ -78,7 +78,7 @@ class _StatsPageState extends State<StatsPage> {
               child: _BasisSwitch(),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: S.xl),
+              padding: const EdgeInsets.symmetric(horizontal: S.lg),
               child: s.statBasis == StatBasis.period
                   ? CycleBar(
                       from: s.statFrom,
@@ -102,7 +102,7 @@ class _StatsPageState extends State<StatsPage> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: S.xl,
+                horizontal: S.lg,
                 vertical: S.sm,
               ),
               child: SegTabs(
@@ -160,7 +160,7 @@ class _StatsPageState extends State<StatsPage> {
                               const SizedBox(height: S.sm),
                               for (var i = 0; i < stats.length && i < 5; i++)
                                 Padding(
-                                  padding: const EdgeInsets.only(bottom: 7),
+                                  padding: const EdgeInsets.only(bottom: S.sm),
                                   child: Row(
                                     children: [
                                       Container(
@@ -257,10 +257,11 @@ class _BasisSwitch extends StatelessWidget {
         onTap: () => s.setStatBasis(b),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          // 左右 16 归到 S.lg；上下 6 是胶囊自身的内缩，不是节奏间距，保留原值
+          padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 6),
           decoration: BoxDecoration(
             color: on ? C.ink : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(R.pill),
             border: Border.all(color: on ? C.ink : C.line),
           ),
           child: Text(
@@ -411,7 +412,7 @@ class _MonthlyTrend extends StatelessWidget {
         height: 9,
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(3),
+          borderRadius: BorderRadius.circular(R.xs),
         ),
       ),
       const SizedBox(width: 5),
@@ -441,11 +442,15 @@ class _AccountsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Store.i;
     return SectionCard(
-      padding: const EdgeInsets.symmetric(vertical: S.xs),
+      // 列表卡：行自己补左右 16，卡片只留上下 8
+      padding: const EdgeInsets.symmetric(vertical: S.sm),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(S.md, S.sm, S.md, S.sm),
+            padding: const EdgeInsets.symmetric(
+              horizontal: S.lg,
+              vertical: S.sm,
+            ),
             child: Row(
               children: [
                 Text('合计', style: T.caption),
@@ -473,11 +478,9 @@ class _AccountsCard extends StatelessWidget {
               decoration: const BoxDecoration(
                 border: Border(top: BorderSide(color: C.line)),
               ),
-              padding: const EdgeInsets.fromLTRB(
-                S.md,
-                S.sm + 2,
-                S.md,
-                S.sm + 2,
+              padding: const EdgeInsets.symmetric(
+                horizontal: S.lg,
+                vertical: S.sm + 2,
               ),
               child: Row(
                 children: [
@@ -493,7 +496,7 @@ class _AccountsCard extends StatelessWidget {
                   Text(
                     Fmt.money(a.balanceCents),
                     style: T.amountSm.copyWith(
-                      fontSize: 13.5,
+                      fontSize: T.body2.fontSize,
                       color: a.balanceCents < 0 ? C.over : C.ink,
                     ),
                   ),

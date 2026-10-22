@@ -18,6 +18,8 @@ import 'package:ledger/store.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'support/wait_write.dart';
+
 const _dbName = 'test_category_archive.db';
 
 Future<String> _dbPath() async =>
@@ -199,10 +201,15 @@ void main() {
 
     // 点「恢复」的回调里要 await 真实数据库，必须放进 runAsync ——
     // 假时钟里 await 真实 I/O 永远不会返回（交接说明第 2 节第 2 条）
-    await tester.runAsync(() async {
-      await tester.tap(find.text('恢复'));
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
+    await tester.runAsync(() => tester.tap(find.text('恢复')));
+    // 原来这里是 runAsync 里死等 200ms。两个问题：
+    //   ① `tester.tap` 不等回调里的异步 —— `_setArchived` 要走完
+    //      afterCategoryChange 的 _loadCategories → loadCycle → loadStats 三步
+    //      真实数据库查询，测试体先结束就把后两步留在半路上；
+    //   ② 于是测试结束后那条查询撞上已关闭的库，抛 `database_closed`，
+    //      框架按失败计（表现为「偶发 flaky」，全量跑时约一半概率红）。
+    // 改用仓库统一的 settleWrites：真实时间与 pump 交替，让整条链走完再断言。
+    await settleWrites(tester);
     await tester.pump();
     // 把 toast 的时间走完，避免结束时留着未完成的定时器
     await tester.pump(const Duration(seconds: 3));

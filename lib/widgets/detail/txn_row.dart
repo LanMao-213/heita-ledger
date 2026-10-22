@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/models.dart';
 import '../../design/haptics.dart';
 import '../../design/icons.dart';
+import '../../design/motion.dart';
 import '../../design/tokens.dart';
 import '../../pages/debts_page.dart';
 import '../../store.dart';
@@ -44,85 +45,92 @@ class TxnRow extends StatelessWidget {
       if (acc != null) acc.name,
     ];
 
-    return InkWell(
-      // 借贷流水不能当普通支出编辑：改金额会和债务记录对不上。
-      // 点它直接看往来详情，记还款也在那一页。
-      onTap: debt != null
-          ? () => showDebtDetail(context, debt)
-          : () => showRecordSheet(context, editing: txn),
-      onLongPress: () => _confirmDelete(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 11),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: C.bg2,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: LineIcon(
-                  // 借出=钱出去、借入=钱进来
-                  debt != null
-                      ? (debt.direction.isMoneyOut ? 'upload' : 'download')
-                      : (cat?.icon ?? 'more'),
-                  size: 19,
-                  color: C.ink,
+    return FadeSlideIn(
+      // 记一笔/删一笔之后整段列表是重建的：没有这一下，新增和删除都是
+      // 「凭空出现 / 凭空消失」，看不出是哪一行变了。
+      child: InkWell(
+        // 借贷流水不能当普通支出编辑：改金额会和债务记录对不上。
+        // 点它直接看往来详情，记还款也在那一页。
+        onTap: debt != null
+            ? () => showDebtDetail(context, debt)
+            : () => showRecordSheet(context, editing: txn),
+        onLongPress: () => _confirmDelete(context),
+        child: Padding(
+          // 左右 S.lg(16)：与日卡里其他元素（日期头、合计行）的右缘同一条线。
+          // 纵向 11 是行内固定留白（配 36 的图标底 → 行高 58），属于组件内部
+          // 尺寸，不参与页面节奏，不要收进 S 令牌
+          padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: C.bg2,
+                  borderRadius: BorderRadius.circular(R.sm),
+                ),
+                child: Center(
+                  child: LineIcon(
+                    // 借出=钱出去、借入=钱进来
+                    debt != null
+                        ? (debt.direction.isMoneyOut ? 'upload' : 'download')
+                        : (cat?.icon ?? 'more'),
+                    size: 19,
+                    color: C.ink,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: S.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          title,
-                          style: T.body.copyWith(fontWeight: FontWeight.w500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+              const SizedBox(width: S.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: T.body.copyWith(fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                      // 「周期账单」是它自己记的，不是用户点的。1.4.4 起补记会
-                      // 在回到前台时就发生，列表里凭空多出几笔不标一下，
-                      // 第一反应会是「我没记过这笔」。
-                      if (debt == null && txn.recurringId != null) ...[
-                        const SizedBox(width: 6),
-                        const _AutoTag(),
+                        // 「周期账单」是它自己记的，不是用户点的。1.4.4 起补记会
+                        // 在回到前台时就发生，列表里凭空多出几笔不标一下，
+                        // 第一反应会是「我没记过这笔」。
+                        if (debt == null && txn.recurringId != null) ...[
+                          const SizedBox(width: 6),
+                          const _AutoTag(),
+                        ],
                       ],
-                    ],
-                  ),
-                  if (subParts.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subParts.join(' · '),
-                      style: T.caption,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
+                    if (subParts.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subParts.join(' · '),
+                        style: T.caption,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: S.sm),
-            Text(
-              // 用 signedCents：支出为负、收入为正。金额本身为负（净额，如代购
-              // 对方多给的钱）时符号自然翻转，不会出现「--20.00」
-              Fmt.money(txn.signedCents, sign: true),
-              style: T.amount.copyWith(
-                // 借贷用中性灰：它既不是消费也不是收入，用支出红会让
-                // 「这个月花了多少」在视觉上被一笔借款顶掉
-                color: debt != null
-                    ? C.ink3
-                    : (txn.type.isIncome ? C.ink2 : C.ink),
+              const SizedBox(width: S.sm),
+              Text(
+                // 用 signedCents：支出为负、收入为正。金额本身为负（净额，如代购
+                // 对方多给的钱）时符号自然翻转，不会出现「--20.00」
+                Fmt.money(txn.signedCents, sign: true),
+                style: T.amount.copyWith(
+                  // 借贷用中性灰：它既不是消费也不是收入，用支出红会让
+                  // 「这个月花了多少」在视觉上被一笔借款顶掉
+                  color: debt != null
+                      ? C.ink3
+                      : (txn.type.isIncome ? C.ink2 : C.ink),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -170,14 +178,16 @@ class _AutoTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      // 角标自己的固定内边距：5/1 只为了把「周期」两个字包出一圈底，
+      // 和行高无关，属于组件内部尺寸，不参与页面节奏
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
         color: C.bg2,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(R.xs),
       ),
-      child: const Text(
+      child: Text(
         '周期',
-        style: TextStyle(fontSize: 9.5, height: 1.35, color: C.ink3),
+        style: T.overline.copyWith(height: 1.35),
       ),
     );
   }

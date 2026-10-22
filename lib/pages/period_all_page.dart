@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
@@ -117,7 +118,7 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(S.xl, 0, S.xl, S.sm),
+            padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
             child: Row(
               children: [
                 Expanded(
@@ -130,7 +131,7 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
               ],
             ),
           ),
-          const Divider(height: 1, color: C.line),
+          Divider(height: 1, thickness: hairlineOf(context), color: C.line),
           Expanded(
             child: rows.isEmpty
                 ? const EmptyHint(
@@ -152,9 +153,9 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (prev is Txn)
-                            const Divider(
+                            Divider(
                               height: 1,
-                              thickness: 1,
+                              thickness: hairlineOf(context),
                               color: C.line,
                               indent: S.lg + 36 + S.md,
                             ),
@@ -171,7 +172,7 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
 
   Widget _dayHeader(String date) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.xl, S.lg, S.xl, S.sm),
+      padding: const EdgeInsets.fromLTRB(S.lg, S.lg, S.lg, S.sm),
       child: Text(
         Fmt.friendly(date),
         style: T.caption.copyWith(color: C.ink2, fontWeight: FontWeight.w500),

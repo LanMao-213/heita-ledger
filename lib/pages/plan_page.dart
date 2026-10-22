@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/models.dart';
 import '../data/pacing.dart';
 import '../data/repo.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -202,7 +203,7 @@ class _TotalBudgetCard extends StatelessWidget {
                 ),
                 child: Text(
                   budget == null ? '设置' : '修改',
-                  style: const TextStyle(fontSize: 13, color: C.ink2),
+                  style: T.body2,
                 ),
               ),
             ],
@@ -327,12 +328,14 @@ class _CategoryBudgets extends StatelessWidget {
     final rows = s.budgetStats;
 
     if (rows.isEmpty) {
+      // 空态卡：上下 24 由卡自己撑，EmptyHint 不再叠一层内边距
       return const SectionCard(
+        padding: EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xxl),
         child: EmptyHint(
           icon: 'tag',
           text: '还没有分类预算或支出',
           hint: '可以在下方为常用分类单独设额度',
-          padding: EdgeInsets.symmetric(vertical: S.lg),
+          padding: EdgeInsets.zero,
         ),
       );
     }
@@ -342,7 +345,7 @@ class _CategoryBudgets extends StatelessWidget {
       child: Column(
         children: [
           for (final b in rows) _BudgetRow(stat: b),
-          const Divider(height: 1, color: C.line),
+          Divider(height: 1, thickness: hairlineOf(context), color: C.line),
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
@@ -352,7 +355,7 @@ class _CategoryBudgets extends StatelessWidget {
                 icon: const LineIcon('plus', size: 16, color: C.ink2),
                 label: const Text(
                   '为分类设置额度',
-                  style: TextStyle(fontSize: 13, color: C.ink2),
+                  style: T.body2,
                 ),
               ),
             ),
@@ -415,7 +418,8 @@ class _BudgetRow extends StatelessWidget {
     final ratio = hasBudget ? stat.ratio : 0.0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: 10),
+      // 列表卡的左右内边距是 0，左右 16 由行自己补，才和别的内容卡对齐
+      padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.md),
       child: Column(
         children: [
           Row(
@@ -431,7 +435,7 @@ class _BudgetRow extends StatelessWidget {
                 Text(
                   '${Fmt.money(stat.spentCents)} / ${Fmt.money(stat.budgetCents)}',
                   style: T.amountSm.copyWith(
-                    fontSize: 13,
+                    fontSize: T.body2.fontSize,
                     color: stat.over ? C.over : C.ink,
                   ),
                 )
@@ -480,17 +484,18 @@ class _Goals extends StatelessWidget {
       children: [
         if (s.goals.isEmpty)
           const SectionCard(
+            padding: EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xxl),
             child: EmptyHint(
               icon: 'flag',
               text: '还没有储蓄目标',
               hint: '比如「旅行基金 20000 元」',
-              padding: EdgeInsets.symmetric(vertical: S.lg),
+              padding: EdgeInsets.zero,
             ),
           )
         else
           for (final g in s.goals) _GoalCard(goal: g),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: S.xl),
+          padding: const EdgeInsets.symmetric(horizontal: S.lg),
           child: OutlinedButton.icon(
             onPressed: () => _edit(context, null),
             style: OutlinedButton.styleFrom(
@@ -502,7 +507,7 @@ class _Goals extends StatelessWidget {
               foregroundColor: C.ink,
             ),
             icon: const LineIcon('plus', size: 18, color: C.ink),
-            label: const Text('新建储蓄目标', style: TextStyle(fontSize: 14)),
+            label: const Text('新建储蓄目标', style: T.body),
           ),
         ),
       ],
@@ -560,7 +565,7 @@ class _Goals extends StatelessWidget {
                         height: 38,
                         decoration: BoxDecoration(
                           color: icon == k ? C.ink : C.bg2,
-                          borderRadius: BorderRadius.circular(11),
+                          borderRadius: BorderRadius.circular(R.sm),
                         ),
                         child: Center(
                           child: LineIcon(
@@ -625,8 +630,9 @@ class _GoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
-      padding: const EdgeInsets.all(S.md),
-      margin: const EdgeInsets.symmetric(horizontal: S.xl, vertical: S.xs),
+      // 内容卡：内边距用默认 16。左右外边距也归一到 16 —— 目标卡和按钮
+      // 原是 20，与本页其他卡（16）差 4，整屏会错开一条
+      margin: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xs),
       child: InkWell(
         onLongPress: () => _menu(context),
         child: Column(
@@ -639,7 +645,7 @@ class _GoalCard extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     color: C.bg2,
-                    borderRadius: BorderRadius.circular(11),
+                    borderRadius: BorderRadius.circular(R.sm),
                   ),
                   child: Center(
                     child: LineIcon(goal.icon, size: 20, color: C.ink),
@@ -665,11 +671,11 @@ class _GoalCard extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: C.ink,
-                                borderRadius: BorderRadius.circular(5),
+                                borderRadius: BorderRadius.circular(R.xs),
                               ),
-                              child: const Text(
+                              child: Text(
                                 '已达成',
-                                style: TextStyle(fontSize: 10, color: C.bg),
+                                style: T.overline.copyWith(color: C.bg),
                               ),
                             ),
                           ],
@@ -692,7 +698,7 @@ class _GoalCard extends StatelessWidget {
                   ),
                   child: const Text(
                     '存一笔',
-                    style: TextStyle(fontSize: 13, color: C.ink2),
+                    style: T.body2,
                   ),
                 ),
               ],
