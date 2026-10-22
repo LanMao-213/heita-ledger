@@ -31,8 +31,15 @@ final _shotKey = GlobalKey();
 /// 这里把系统「等线」加载成默认字体族，截图才看得出真实效果。
 Future<void> _loadChineseFont() async {
   const candidates = [
+    // Windows（本机开发）
     r'C:\Windows\Fonts\Deng.ttf',
     r'C:\Windows\Fonts\simhei.ttf',
+    // Linux（CI 的 ubuntu runner）。缺了它中文会渲染成方块，
+    // 方块字宽比真实汉字宽，会让「计划页」这类 Row 误报 95px 溢出。
+    // 对应 CI 里 apt-get install fonts-droid-fallback。
+    '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
+    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
   ];
   // Cupertino 的滚轮（CupertinoPicker）用的是它自己的默认字族，不是 Roboto。
   // 只注册 Roboto 的话，双轮盘截图里的中文会变成方块。
@@ -56,8 +63,14 @@ Future<void> _loadChineseFont() async {
     print('已加载中文字体：$path（$families）');
     return;
   }
-  // ignore: avoid_print
-  print('⚠️ 未找到中文字体，截图中的文字会显示为方块');
+  // 找不到就直接失败：缺字体时中文渲染成方块，而方块字宽与真实汉字不同，
+  // 会让布局断言报出「溢出 95px」这类假阳性 —— 看着像 UI bug，其实只是缺字体。
+  // 与其留下误导性的截图和报错，不如在这里明确地说清原因。
+  fail(
+    '未找到中文字体，测试无法可信地校验中文布局。查找过：\n'
+    '${candidates.map((p) => '  - $p').join('\n')}\n'
+    'Linux/CI 上执行：sudo apt-get install -y fonts-droid-fallback',
+  );
 }
 
 /// 图标字体在测试环境里不会自动加载，不补的话所有 Icon 都是方块。

@@ -43,6 +43,13 @@ jobs:
       - name: 静态检查
         run: flutter analyze
 
+      # 截图测试会把界面真的渲染出来，所以必须装中文字体。
+      # ubuntu runner 默认没有 CJK 字体，缺了中文会渲染成方块；方块的字宽和
+      # 真实汉字不同，会让布局断言报出「溢出 95px」这类**假阳性**（1.4.6 踩过）。
+      # 字体路径与 test/ui_shot_test.dart 的 _loadChineseFont 一一对应。
+      - name: 安装中文字体
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-droid-fallback
+
       # 不加 --coverage：这个项目还没有覆盖率门槛，先让「跑没跑过」变成硬约束
       - name: 测试
         run: flutter test --reporter expanded
