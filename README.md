@@ -1,203 +1,187 @@
 # 黑塔消费日记
 
-「纸墨」配色的**本地记账 App**（纸白底 + 暖灰墨字，不引入装饰色）。不联网、不注册、不上传 —— 所有账目保存在设备本地的 SQLite 里，
-卸载即清除，靠导出 Excel 做备份。
+一个**不联网**的 Android 记账 App。所有账目存在手机的 SQLite 里,不注册、不上传、没有云同步;
+卸载即清空,备份靠导出 Excel。界面是「纸墨」——纸白底、暖灰墨字,不引入装饰色。
 
-当前版本 **1.4.5+13（未发版，在 `feat/v2-merge` 分支上）**，已发版的最新是 1.4.4+12（`main`）。包名 `com.heita.ledger`，Android。
-
-> **1.4.5+13（未发版）起只出一套配色**（「纸墨」）。原先那套「露露缇雅·泽金」及其编译期开关
-> `--dart-define=HEITA=1` 已删除，不再需要出两个包 —— 详见 `CHANGELOG.md` 的「未发版」一节。
-
-## 接手先看这里
-
-第一次进这个仓库，按下面顺序读，**别从代码开始翻**：
-
-| 文档 | 讲什么 | 什么时候看 |
-| --- | --- | --- |
-| **[`docs/交接说明.md`](docs/交接说明.md)** | 环境搭建、踩过的坑、代码地图、**当前进度与待办** | **先读这个**，半小时能把工程跑起来 |
-| [`CHANGELOG.md`](CHANGELOG.md) | 每个版本改了什么；顶部有「版本 → 标签 → 签名方式」索引 | 想知道某版为什么不能覆盖安装 |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 新机器配环境（认证、出网、依赖、已知坑） | 换电脑第一次拉代码 |
-| [`docs/版本对比.md`](docs/版本对比.md) | 原版 vs 另一次「从零重写」的逐项对比与**决策记录** | 想知道为什么没有直接换代 |
-| [`docs/开源准备.md`](docs/开源准备.md) | 公开前的安全自查结论 + 每次发版前的检查命令 | 改完代码准备发版时 |
-
-**当前状态（2026-10-22）**
-
-- **默认分支 `feat/v2-merge` = `1.4.5+13`（未发版）**：单套「纸墨」色板、往来可删除、
-  新建账本补齐两级分类、**306 条测试全绿**、`flutter analyze` 0 issue。
-- **`main` = `1.4.4+12`（已发版）**，是 `feat/v2-merge` 的祖先；验证满意后可
-  `git merge --ff-only` 快进。两边都随时能跑。
-- 仓库已**公开**并采用 **MIT**（见文末「许可」）。签名密钥从未进入提交历史。
-- 待办：视觉还有 5 项没定（卡片圆角/描边 → 字号阶梯 → 间距密度 → 图标 → 动效）；
-  1.4.2 以来十二条行为 + 1.4.1 遗留六项的**真机验证**仍挂在 `CHANGELOG.md` 里逐条打勾。
-
-要开始干活，直接跳到交接说明的当前状态一节。
+包名 `com.heita.ledger`,Flutter 3.47 / Dart 3.13,Android 7.0(API 24)以上。
 
 ---
 
-## 现在做到哪了
+## 当前状态
 
-V1.0 的 P0 功能已全部打通，能当一个真正的账本用：
+| | |
+|---|---|
+| 默认分支 | **`feat/v2-merge`**,版本 **`1.4.5+13`**(未发版) |
+| 已发版 | **`1.4.4+12`**,在 `main`(是 `feat/v2-merge` 的祖先,可 `--ff-only` 快进) |
+| 质量闸门 | `flutter analyze` 0 issue、**306 条测试**全绿(含 24 张界面截图自检) |
+| 规模 | `lib/` 约 1.9 万行、`test/` 约 1.1 万行,无第三方状态管理(就是 `ChangeNotifier`) |
+| 许可 | [MIT](LICENSE) |
+| 待办 | 视觉还有 5 项没定(圆角描边 → 字号 → 间距 → 图标 → 动效);1.4.2 以来十二条行为的**真机验证**未逐条打勾 |
 
-| 模块 | 状态 | 说明 |
-| --- | --- | --- |
-| 账本管理 | 完成 | 多账本、换图标、归档、切换器 |
-| 账户管理 | 完成 | 六种账户类型、初始余额、是否计入总资产 |
-| 分类管理 | 完成 | 支出 9 类 49 子分类、收入 6 类 24 子分类，两级、可自建；可停用/恢复、可拖拽排序 |
-| 记一笔 | 完成 | 自建数字键盘、账户、日期、备注；部分子分类带详情（出发地/目的地、对象、名称） |
-| 记账模板 | 完成 | 常用一笔存模板，顶部三个一键填充 |
-| 周期账单 | 完成 | 每天/周/月/年，启动时自动补记 |
-| 明细 | 完成 | 按日分组、月度概览、多条件筛选、关键词搜索、左滑删除；周期条左右轻扫翻页、双击回本期 |
-| 图表 | 完成 | 分类甜甜圈 + 排行（点排行下钻到该分类的明细）+ 近 6 个月趋势 |
-| 预算 | 完成 | 总预算/分类预算、按周期归集、节奏（每天能花多少）、借入计入可用额度 |
-| Excel | 完成 | 导出 .xlsx（11 列）、按表头名导入，兼容旧 6 列文件 |
-| 借贷往来 | 完成 | 借出/借入、对方与应还日、剩余按流水算、记还款核销、**可整笔删除（连带回滚余额）**；不计入收支与预算 |
-| 我的/设置 | 完成 | 备份、清空数据、数据安全（自动快照可回滚）、关于 |
+> 1.4.5 起**只出一套配色**。原先那套「露露缇雅·泽金」和它的编译期开关 `--dart-define=HEITA=1`
+> 已删除,不再需要打两个包 —— 详见 [`CHANGELOG.md`](CHANGELOG.md) 的「未发版」一节。
 
-未做（PRD V1.1 起）：密码锁与生物识别、年视图、按账户统计、多币种、还款到期提醒。
+---
 
-代码规模：`lib/` 约 1.9 万行 + `test/` 约 1.1 万行，**306 条测试**（含 24 张界面截图）与
-`flutter analyze` 两道闸门；没有第三方状态管理框架，就是 `ChangeNotifier`。
+## 三条设计取舍
 
-详细需求见 `docs/设计资产/PRD-产品需求文档.html`。
-接手前先读 **`docs/交接说明.md`**，环境、坑、代码地图都在里面。
+1. **离线优先,不是"暂时没做云同步"。** 没有 INTERNET 权限,发不出去就是发不出去
+   —— 这是单机应用免备案的前提,也是"账目不会被谁看到"的唯一保证。
+2. **金额全程用 `int` 存"分"。** 没有 `double`,不靠四舍五入维持平衡,求和永远精确。
+3. **数据必须能带走。** 导出 `.xlsx` 与 JSON 备份是核心功能,不是附属品;
+   换 App 或换手机都不该丢账。
+
+---
+
+## 功能
+
+| 模块 | 说明 |
+|---|---|
+| 账本 | 多账本、换图标、归档、切换 |
+| 账户 | 六种类型、期初余额、是否计入总资产 |
+| 分类 | 两级:支出 9 类 49 子、收入 6 类 24 子;可自建、停用/恢复、拖拽排序 |
+| 记一笔 | 自建数字键盘(支持算式)、账户、日期、备注;部分子分类带专属字段(出发地/目的地、对象、名称) |
+| 模板 | 常用一笔存成模板,面板顶部三个一键填充 |
+| 周期账单 | 每天/周/月/年,启动与回前台自动补记,重复插入有物理约束兜底 |
+| 明细 | 按日分组、月度概览、多条件筛选、关键词搜索、左滑删除;周期条横扫翻期、双击回本期;keyset 分页 |
+| 图表 | 分类甜甜圈 + 排行(点排行下钻到该分类明细)+ 近 6 期趋势 |
+| 预算 | 总预算与分类预算、按期归集、节奏(每天能花多少)、借入计入可用额度 |
+| 借贷往来 | 借出/借入、对方与应还日、剩余按流水算、记还款核销、**可整笔删除(连带回滚余额)**;不计入收支 |
+| Excel | 导出 **12 列** `.xlsx`(含往来列);按**表头名**定位导入,兼容旧 6 列文件 |
+| 我的 | 备份、恢复、清空、数据安全(自动快照可回滚)、数据体检、关于 |
+
+**明确不做**:云同步、多端、密码锁与生物识别、多币种、年视图、按账户统计、还款提醒(见 PRD 的「不做清单」)。
 
 ---
 
 ## 跑起来
 
-前置：Flutter SDK（本机验证版本 3.47.7 / Dart 3.13.5）、Android Studio（含 SDK 与 JDK）、一台开了 USB 调试的手机或模拟器。
+前置:Flutter SDK(验证于 3.47.7 / Dart 3.13.5)、Android SDK + JDK、一台开了 USB 调试的手机或模拟器。
 
 ```bash
-./tools/pub_get.sh          # 装依赖（固定国内源，见下）
-flutter run                 # 连上手机或模拟器后直接跑
+git clone https://github.com/LanMao-213/heita-ledger.git
+cd heita-ledger
+./tools/pub_get.sh     # 装依赖(固定国内源)
+flutter run
 ```
 
-> **别直接跑 `flutter pub get`**：`pubspec.lock` 是用镜像 `pub.flutter-io.cn` 解析的，
-> 而 pub 会按当前源的地址重写 lock 里每个包的 `url` 字段 —— 版本一个不变，却多出
-> 87 行脏改动。`tools/pub_get.sh` 只是替你设了 `PUB_HOSTED_URL` 再调 pub，
-> 想手工跑就自己带上这个变量。约定：lock 的**版本**变化要提交，纯 `url` 变化不提交。
+> **别直接 `flutter pub get`。** 仓库里的 `pubspec.lock` 是按镜像 `pub.flutter-io.cn` 解析的,
+> 直接跑会按当前源重写每个包的 `url` 字段 —— 版本一个不变,却多出 87 行脏改动。
+> `tools/pub_get.sh` 只是替你设了 `PUB_HOSTED_URL` 再调 pub。约定:lock 的**版本**变化要提交,纯 `url` 变化不提交。
+>
+> `android/local.properties`(SDK 路径)由每台机器自己生成,不进版本库。
 
-第一次跑 Android 要下载 Gradle 与依赖，几分钟到十几分钟不等。国内网络建议挂镜像，具体见交接说明。
-
-> `android/local.properties` 是每台机器自己生成的（记录 SDK 路径），**不进版本库**。
-> 用 Android Studio 打开工程会自动生成；直接 `flutter build apk` 也会生成。
+首次构建 Android 要下 Gradle 与依赖,几分钟到十几分钟;国内网络建议挂镜像,见交接说明。
 
 ## 常用命令
 
 ```bash
-flutter analyze                               # 静态检查，提交前必须 0 issue
-flutter test                                  # 全部测试
-flutter test test/ui_shot_test.dart           # 只跑界面截图自检
-flutter build apk --release --target-platform android-arm64   # 发版用：只出 arm64，约 20 MB
-flutter build apk --release --split-per-abi   # 出包（分 ABI，给老机型也要装时用）
+flutter analyze                                                # 提交前必须 0 issue
+flutter test                                                   # 全部测试
+flutter test test/ui_shot_test.dart                            # 只跑界面截图自检
+flutter build apk --release --target-platform android-arm64    # 发版:只出 arm64,约 20 MB
+flutter build apk --release --split-per-abi                    # 兼容老机型时用
 ```
 
-> **代理环境下跑测试必须剥掉代理变量**，否则会报
-> `Unable to connect to flutter_tester process: Invalid WebSocket upgrade request`——
-> 那是 flutter_tester 的本地 WebSocket 被代理拦了，不是代码坏了：
+`flutter test` 会真的把界面渲染成 PNG 到 `build/visual/`,可直接核对观感;
+布局溢出(文字撑破卡片一类)会让测试失败,比肉眼可靠。
+
+> **代理环境下跑测试必须剥掉代理变量**,否则会报
+> `Unable to connect to flutter_tester process: Invalid WebSocket upgrade request`
+> —— 那是 flutter_tester 的本地 WebSocket 被代理拦了,不是代码坏了:
 >
 > ```bash
 > env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
 >     NO_PROXY=localhost,127.0.0.1 flutter test
 > ```
 
-测试会真的把界面渲染成 PNG，输出在 `build/visual/`，可以直接核对视觉效果；
-布局溢出（文字撑破卡片一类）会在测试里抛异常，比肉眼可靠。
+---
 
-## 真机走查
+## 打包与签名(「装不上」九成是这里)
 
-```bash
-adb devices                  # 设备在列表里才算通了；显示 unauthorized 是手机上没点「允许」
-flutter run --release        # 直接装到手机上跑（首次编译慢，之后改代码热重载）
-```
+正式包用**仓库外**的密钥签:见 `android/app/release.jks` + `android/key.properties`,
+两者都被 `.gitignore` 挡住,**从未进入过提交历史**(签名文件泄露等于别人能以你的名义发版)。
 
-不想插线就出包再拷到手机：
+- 有这两个文件 → release 自动用正式密钥签,**可直接覆盖安装**。
+- 新克隆的机器没有 → 自动回落 **debug 签名**,构建照样成功,但签出来的包与手机上已有版本
+  签名不同,装不上、只能卸载(本地账目会跟着没)。
 
-```bash
-flutter build apk --release --split-per-abi
-# 产物：build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-```
+同理,`flutter build` 出来的包版本号取 `pubspec.yaml` 的 `version`;
+改版本要同时改 `lib/app.dart` 的 `kAppVersion`(「我的」页底部显示的就是它)。
 
-> release 用**仓库外**的正式密钥签名：`android/app/release.jks` + `android/key.properties`，
-> 两者都被 git 忽略（签名文件泄露等于别人能以你的名义发版）。
-> **新克隆的机器没有这两个文件，会自动退回 debug 签名** —— 构建照样成功，但签出来的包
-> 和手机上已有的正式包签名不同，装不上、只能卸载（本地账目会跟着没）。
-> 要覆盖升级，先找维护者要这两个文件。拿不到密钥时只能装 `com.heita.ledger.dev` 测试包做临时
-> 诊断（见交接说明第 4 节）——**它不能当正式包用**：包名不同，而且库里没有流水时会灌 23 条演示数据。
+---
 
-> 沙箱 / CI 里跑不了 `flutter devices`（它要调 `reg query` 读浏览器版本，可能被安全策略拦），
-> 但 `adb devices` 不受影响，排查设备以它为准。
-
-## 目录结构
+## 项目结构
 
 ```
 lib/
   main.dart            入口
   app.dart             主题、启动闸门、开屏、版本号常量
-  store.dart           全局状态（ChangeNotifier），页面都读它
+  store.dart           全局状态(ChangeNotifier),页面都读它
   data/
-    db.dart            SQLite 建表 / 种子数据 / 版本迁移
+    db.dart            建表 / 种子数据 / 版本迁移(schema v8)
     models.dart        数据模型 + 格式化工具 Fmt
-    repo.dart          所有 SQL 都在这里，页面不直接碰库
+    repo.dart          所有 SQL 都在这里,页面不直接碰库
     excel_service.dart 导入导出 xlsx
   design/
-    tokens.dart        配色、间距、圆角、字号（唯一来源）
+    tokens.dart        配色、间距、圆角、字号(唯一来源)
     icons.dart         线稿图标库
-    svg_path.dart      SVG 路径解析器（手写）
+    svg_path.dart      SVG 路径解析器(手写)
     brand_paths.dart   品牌标志路径
-  pages/               明细 / 图表 / 计划 / 我的 / 分类 / 周期账单 / 记账模板
+  pages/               明细 / 图表 / 计划 / 我的 / 分类 / 周期账单 / 模板
   widgets/             公共组件、图表、记一笔面板
 docs/
-  交接说明.md          给协作者的落地文档（环境、坑、代码地图、当前进度）
-  版本对比.md          原版 vs 重写版的逐项对比与决策记录
+  交接说明.md          落地文档:环境、坑、代码地图、当前进度
+  版本对比.md          原版 vs 一次「从零重写」的逐项对比与决策记录
   开源准备.md          公开前的安全自查 + 每次发版前的检查命令
   设计资产/            PRD、视觉规范、高保真原型、图标与启动页
 ```
 
 ## 开发约定
 
-1. **颜色只用 `design/tokens.dart` 里的 `C`**。整套是「纸墨」——纸白底 + 暖灰墨字，
-   不引入装饰色；唯一的彩色是超支用的砖红 `C.over`，且它**只表示超支**，不做美化。
-2. **金额一律用 `int` 存「分」**，日期一律 `TEXT 'YYYY-MM-DD'`，月份 `'YYYY-MM'`。
-3. **页面不写 SQL**，一律走 `Repo`；`Store` 只做内存缓存与刷新通知。
-4. **改表结构必须升 `Db._version` 并写 `onUpgrade`**，老用户数据不能丢（1→2 加模板统计列就是样例）。
-5. **新增页面要能通过截图自检**，不能有布局溢出。
-6. 涉及数据库的 widget 测试，开库与造数据必须包在 `tester.runAsync` 里
-   （假时钟里 await 真实 I/O 会永久卡死，超时都不触发）。
-7. 红线：不加任何联网、统计、广告、崩溃上报 SDK。这是「单机应用免备案」的前提。
+1. **颜色只用 `design/tokens.dart` 里的 `C`**。整套「纸墨」不引入装饰色,唯一的彩色是超支砖红 `C.over`,它只表示超支。
+2. **金额一律 `int` 存"分"**;日期 `TEXT 'YYYY-MM-DD'`;月份 `'YYYY-MM'`。
+3. **页面不写 SQL**,一律走 `Repo`;`Store` 只做内存缓存与刷新通知。
+4. **改表结构必须升 `Db._version` 并写 `onUpgrade`**,老用户数据不能丢。
+5. **新增页面要能通过截图自检**,不允许布局溢出。
+6. 涉及数据库的 widget 测试,开库与造数据必须包在 `tester.runAsync` 里(假时钟里 await 真实 I/O 会永久卡死)。
+7. **红线**:不加任何联网、统计、广告、崩溃上报 SDK。
 
 ## 协作方式
 
 ```bash
-git pull                                      # 开工前先拉
-git checkout -b feat/budget-by-category
+git checkout feat/v2-merge      # 日常开发都在这一条线上
+git pull --ff-only
+git checkout -b feat/your-thing
 # ……写代码……
 flutter analyze && flutter test
-git add -A && git commit -m "feat: 分类预算"
-git push -u origin feat/budget-by-category
+git add -A && git commit -m "feat: 做了什么"
+git push -u origin feat/your-thing
 ```
 
-- 分支用 `feat/xxx`、`fix/xxx`、`docs/xxx`、`chore/xxx`。
-- **日常开发都在 `feat/v2-merge`**（默认分支）；`main` 只放已发版，任何时刻都必须能 analyze + test 全过。
-- 合并前必须 analyze 干净 + 测试全过；界面有改动的，把 `build/visual/` 的截图贴进 PR。
+- 分支命名 `feat/` `fix/` `docs/` `chore/`;**`main` 只放已发版**,任何时刻都必须能 analyze + test 全过。
+- 界面有改动的,把 `build/visual/` 里的截图贴进 PR。
+- 新机器配环境(认证、出网、依赖、已知坑)看 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
-**第一次在新机器上配环境**（认证、出网、依赖、已知坑）看 [`CONTRIBUTING.md`](CONTRIBUTING.md)：
-五六分钟能把「能拉、能跑、能推」全部搞定，第 8 节列了每一条踩过的坑。
+---
 
-## 设计资产
+## 文档
 
-`docs/设计资产/` 下：
+| 文档 | 讲什么 |
+|---|---|
+| [`docs/交接说明.md`](docs/交接说明.md) | **先读这个**:环境、踩过的坑、代码地图、当前进度与待办 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 从零配一台能拉能跑能推的机器;每一条踩过的坑 |
+| [`CHANGELOG.md`](CHANGELOG.md) | 每版改了什么;顶部有「版本 → 标签 → 签名方式」索引 |
+| [`docs/版本对比.md`](docs/版本对比.md) | 原版 vs 重写版的逐项对比与**决策记录**(为什么没有直接换代) |
+| [`docs/开源准备.md`](docs/开源准备.md) | 公开前的安全自查结论 + 每次发版前的检查命令 |
 
-- `PRD-产品需求文档.html` 需求、表结构、优先级、明确不做的事
-- `视觉规范.html` 色彩、字号、图标规范
-- `index.html` 高保真可交互原型（改界面前对着看）
-- `启动页.html` / `启动页定稿.png` 开屏方案
-- `黑塔图标.svg` / `app-icon.svg` / `brand-mark.svg` 标志与图标
+产品边界与「明确不做的事」在 `docs/设计资产/PRD-产品需求文档.html`;
+界面原型是 `docs/设计资产/index.html`,改界面之前对着看。
 
 ---
 
 ## 许可
 
-[MIT](LICENSE)。可以随便用、改、再发布，保留版权声明即可。
+[MIT](LICENSE)。可以随便用、改、再发布,保留版权声明即可。
 
-数据全在本机 SQLite 里，不联网、不上传；仓库里**不含**签名密钥（`android/key.properties` 与 `*.jks` 已被 `.gitignore` 挡住，且从未进过提交历史）。
+仓库里**不含**任何签名密钥、也没有任何联网权限 —— 这两件事都是有意为之,不是遗漏。
