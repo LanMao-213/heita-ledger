@@ -194,7 +194,8 @@ class _PersonRow extends StatelessWidget {
       },
       child: Container(
         margin: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
-        padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: S.md),
+        // 左右归一到 16：原来 12，卡边（margin 16）+ 12 = 28，比别处的内容少 4
+        padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.md),
         decoration: ShapeDecoration(
           // 卡片面：纯白，比纸白底亮一档（见 C.cardBg）
           // 边界交给 E.low 的柔投影 —— 1px 描边在 1.29:1 下几乎看不见，
@@ -354,7 +355,8 @@ class _DebtRow extends StatelessWidget {
       onTap: () => showDebtDetail(context, debt),
       child: Container(
         margin: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
-        padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: S.md),
+        // 左右归一到 16：原来 12，卡边（margin 16）+ 12 = 28，比别处的内容少 4
+        padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.md),
         decoration: ShapeDecoration(
           // 卡片面：纯白，比纸白底亮一档（见 C.cardBg）
           color: C.cardBg,

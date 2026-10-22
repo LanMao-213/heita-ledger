@@ -925,7 +925,9 @@ class _TemplateStrip extends StatelessWidget {
           return GestureDetector(
             onTap: () => onTap(t),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11),
+              // 11 是个孤立值：模板胶囊和下面的日期 / 账户胶囊（_Chip，左右
+              // S.md）是同屏并排的两种胶囊，收到 S.md 让它们的字边距同一档
+              padding: const EdgeInsets.symmetric(horizontal: S.md),
               decoration: BoxDecoration(
                 color: on ? C.ink : C.bg2,
                 borderRadius: BorderRadius.circular(R.md),
@@ -1009,6 +1011,8 @@ class _ModeTabs extends StatelessWidget {
                   onTap: () => onChanged(m),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 160),
+                    // 2 是分段控件的固定内缩：轨道高 32 减去上下各 2 才是 28 的
+                    // 胶囊高，改了胶囊就顶到轨道外，属于组件内部尺寸，不参与节奏
                     margin: const EdgeInsets.all(2),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
@@ -1297,7 +1301,11 @@ class _CategoryNoteRow extends StatelessWidget {
               ? '${parent!.name} · 备注可不填'
               : '未细分 · 备注可不填';
           return Padding(
-            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.md, S.md),
+            // 右侧原本收到 S.md(12)，是为了给行尾箭头再补 8 的间距 —— 结果
+            // 箭头落在离边 20 的位置，比备注框 / 日期胶囊的右缘（16）多出 4，
+            // 信息区整列右边对不齐。现在右侧归到 S.lg(16)，行尾那个 8 的
+            // SizedBox 一并去掉，箭头正好压在 16 这条线上。
+            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.md),
             child: Row(
               children: [
                 Container(
@@ -1339,7 +1347,6 @@ class _CategoryNoteRow extends StatelessWidget {
                   size: 20,
                   color: C.ink4,
                 ),
-                const SizedBox(width: S.sm),
               ],
             ),
           );
@@ -1488,6 +1495,8 @@ class _DetailInput extends StatelessWidget {
               filled: true,
               fillColor: C.bg2,
               isDense: true,
+              // 纵向 9 是 dense 输入框的固定内边距：和 isDense + body2(13px)
+              // 一起决定这个框的高度，属于组件内部尺寸，不参与页面节奏
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: S.md,
                 vertical: 9,
@@ -1540,6 +1549,8 @@ class _NoteField extends StatelessWidget {
           filled: true,
           fillColor: C.bg2,
           isDense: true,
+          // 纵向 13 同上：和 isDense + body(15px) 一起决定备注框的高度，
+          // 比详情框高一点是因为备注是主输入项，属于组件内部尺寸
           contentPadding: const EdgeInsets.symmetric(
             horizontal: S.md,
             vertical: 13,
@@ -1590,6 +1601,8 @@ class _LiftRow extends StatelessWidget {
               duration: const Duration(milliseconds: 160),
               width: 44,
               height: 26,
+              // 3 是开关的固定内缩：轨道高 26 减去上下各 3 正好是 20 的滑块，
+              // 改了滑块就会压出轨道或浮空，属于组件内部尺寸
               padding: const EdgeInsets.all(3),
               alignment: on ? Alignment.centerRight : Alignment.centerLeft,
               decoration: BoxDecoration(

@@ -118,7 +118,7 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(S.xl, 0, S.xl, S.sm),
+            padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
             child: Row(
               children: [
                 Expanded(
@@ -172,7 +172,7 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
 
   Widget _dayHeader(String date) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.xl, S.lg, S.xl, S.sm),
+      padding: const EdgeInsets.fromLTRB(S.lg, S.lg, S.lg, S.sm),
       child: Text(
         Fmt.friendly(date),
         style: T.caption.copyWith(color: C.ink2, fontWeight: FontWeight.w500),

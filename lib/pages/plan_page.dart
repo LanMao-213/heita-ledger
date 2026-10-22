@@ -328,12 +328,14 @@ class _CategoryBudgets extends StatelessWidget {
     final rows = s.budgetStats;
 
     if (rows.isEmpty) {
+      // 空态卡：上下 24 由卡自己撑，EmptyHint 不再叠一层内边距
       return const SectionCard(
+        padding: EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xxl),
         child: EmptyHint(
           icon: 'tag',
           text: '还没有分类预算或支出',
           hint: '可以在下方为常用分类单独设额度',
-          padding: EdgeInsets.symmetric(vertical: S.lg),
+          padding: EdgeInsets.zero,
         ),
       );
     }
@@ -416,7 +418,8 @@ class _BudgetRow extends StatelessWidget {
     final ratio = hasBudget ? stat.ratio : 0.0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: 10),
+      // 列表卡的左右内边距是 0，左右 16 由行自己补，才和别的内容卡对齐
+      padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.md),
       child: Column(
         children: [
           Row(
@@ -481,17 +484,18 @@ class _Goals extends StatelessWidget {
       children: [
         if (s.goals.isEmpty)
           const SectionCard(
+            padding: EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xxl),
             child: EmptyHint(
               icon: 'flag',
               text: '还没有储蓄目标',
               hint: '比如「旅行基金 20000 元」',
-              padding: EdgeInsets.symmetric(vertical: S.lg),
+              padding: EdgeInsets.zero,
             ),
           )
         else
           for (final g in s.goals) _GoalCard(goal: g),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: S.xl),
+          padding: const EdgeInsets.symmetric(horizontal: S.lg),
           child: OutlinedButton.icon(
             onPressed: () => _edit(context, null),
             style: OutlinedButton.styleFrom(
@@ -626,8 +630,9 @@ class _GoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
-      padding: const EdgeInsets.all(S.md),
-      margin: const EdgeInsets.symmetric(horizontal: S.xl, vertical: S.xs),
+      // 内容卡：内边距用默认 16。左右外边距也归一到 16 —— 目标卡和按钮
+      // 原是 20，与本页其他卡（16）差 4，整屏会错开一条
+      margin: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xs),
       child: InkWell(
         onLongPress: () => _menu(context),
         child: Column(

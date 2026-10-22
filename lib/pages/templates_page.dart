@@ -139,7 +139,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
               if (i == list.length) {
                 return const Padding(
                   key: ValueKey('hint'),
-                  padding: EdgeInsets.fromLTRB(S.xl, S.md, S.xl, 0),
+                  padding: EdgeInsets.fromLTRB(S.lg, S.md, S.lg, 0),
                   child: Text(
                     '拖动左侧手柄可调整顺序；最常用的三个会自动出现在「记一笔」顶部。',
                     style: T.caption,
@@ -207,6 +207,7 @@ class _TemplateRow extends StatelessWidget {
               ReorderableDragStartListener(
                 index: index,
                 child: const Padding(
+                  // 左右 6 是拖拽手柄图标的固定内缩，不是节奏间距，保留原值
                   padding: EdgeInsets.symmetric(horizontal: 6),
                   child: Icon(
                     Icons.drag_indicator_rounded,
@@ -417,8 +418,11 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
         padding: const EdgeInsets.only(bottom: S.xxl),
         children: [
           const SectionTitle('模板名称'),
+          // 表单页没有 SectionCard 那 8 的外边距可拼，标题自带的下 4 对输入框
+          // 太挤，补 4 凑成 8（卡片页是 4+8=12，两处都成立）。
+          const SizedBox(height: S.xs),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.xl),
+            padding: const EdgeInsets.symmetric(horizontal: S.lg),
             child: TextField(
               controller: _name,
               maxLength: 8,
@@ -443,13 +447,15 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
             ),
           ),
           const SectionTitle('类型'),
+          const SizedBox(height: S.xs),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.xl),
+            padding: const EdgeInsets.symmetric(horizontal: S.lg),
             child: SegTabs(value: _type, onChanged: _switchType),
           ),
           const SectionTitle('图标'),
+          const SizedBox(height: S.xs),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.xl),
+            padding: const EdgeInsets.symmetric(horizontal: S.lg),
             child: Wrap(
               spacing: S.sm,
               runSpacing: S.sm,
@@ -480,14 +486,15 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
             ),
           ),
           const SectionTitle('分类'),
+          const SizedBox(height: S.xs),
           if (_cats.isEmpty)
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: S.xl),
+              padding: EdgeInsets.symmetric(horizontal: S.lg),
               child: Text('还没有分类，请先到「我的 → 分类管理」添加', style: T.caption),
             )
           else
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: S.xl),
+              padding: const EdgeInsets.symmetric(horizontal: S.lg),
               child: GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -539,8 +546,9 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
               ),
             ),
           const SectionTitle('账户'),
+          const SizedBox(height: S.xs),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.xl),
+            padding: const EdgeInsets.symmetric(horizontal: S.lg),
             child: Wrap(
               spacing: S.sm,
               runSpacing: S.sm,
@@ -582,8 +590,9 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
             ),
           ),
           const SectionTitle('金额'),
+          const SizedBox(height: S.xs),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.xl),
+            padding: const EdgeInsets.symmetric(horizontal: S.lg),
             child: TextField(
               controller: _amount,
               keyboardType: const TextInputType.numberWithOptions(
@@ -613,7 +622,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
             ),
           ),
           const Padding(
-            padding: EdgeInsets.fromLTRB(S.xl, S.sm, S.xl, 0),
+            padding: EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
             child: Text(
               '填了金额 = 点模板就能一键入账；留空 = 只省掉选分类和账户的步骤。',
               style: T.caption,

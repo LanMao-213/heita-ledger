@@ -33,7 +33,7 @@ class MinePage extends StatelessWidget {
           _NetWorthCard(),
           const SectionTitle('管理'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: Column(
               children: [
                 SettingRow(
@@ -107,7 +107,7 @@ class MinePage extends StatelessWidget {
           ),
           const SectionTitle('记账周期'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: SettingRow(
               icon: 'card',
               title: '账单日',
@@ -117,7 +117,7 @@ class MinePage extends StatelessWidget {
           ),
           const SectionTitle('数据'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: Column(
               children: [
                 SettingRow(
@@ -191,7 +191,7 @@ class MinePage extends StatelessWidget {
           // 音频库），没有开关可加。真要做提示音属于新功能，不是开关。
           const SectionTitle('偏好'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: SettingRow(
               icon: 'pulse',
               title: '触感反馈',
@@ -206,7 +206,7 @@ class MinePage extends StatelessWidget {
           // 「清空」单独拎出来：它和导出/导入不是一类操作，混在一张卡里容易误触
           const SectionTitle('危险操作'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: SettingRow(
               icon: 'more',
               title: '清空全部数据',
@@ -219,7 +219,7 @@ class MinePage extends StatelessWidget {
           ),
           const SectionTitle('关于'),
           SectionCard(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: Column(
               children: [
                 const SettingRow(
@@ -242,7 +242,7 @@ class MinePage extends StatelessWidget {
             ),
           ),
           const Padding(
-            padding: EdgeInsets.fromLTRB(S.xl, S.xl, S.xl, 0),
+            padding: EdgeInsets.fromLTRB(S.lg, S.xl, S.lg, 0),
             child: Text(
               '所有数据保存在这台设备上，应用不会发起任何网络请求。\n'
               '换手机或重装前，记得先导出 Excel 备份。',
@@ -251,7 +251,7 @@ class MinePage extends StatelessWidget {
           ),
           // 版本脚注：出问题时用户第一时间要报的就是这个号
           Padding(
-            padding: const EdgeInsets.fromLTRB(S.xl, S.xl, S.xl, S.lg),
+            padding: const EdgeInsets.fromLTRB(S.lg, S.xl, S.lg, S.lg),
             child: Text(
               '$kAppName v$kAppVersion · 本地版',
               textAlign: TextAlign.center,
@@ -758,7 +758,7 @@ class _BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.xl, S.lg, S.xl, S.md),
+      padding: const EdgeInsets.fromLTRB(S.lg, S.lg, S.lg, S.md),
       child: Row(
         children: [
           const BrandMark(height: 50),
@@ -808,7 +808,7 @@ class _NetWorthCard extends StatelessWidget {
             const SizedBox(height: S.sm),
             for (final a in s.accounts)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 5),
+                padding: const EdgeInsets.symmetric(vertical: S.xs),
                 child: Row(
                   children: [
                     LineIcon(a.icon, size: 17, color: C.ink3),
@@ -855,7 +855,7 @@ class _CycleDaySheet extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(S.xl, S.md, S.xl, S.sm),
+            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
             child: Row(
               children: [
                 Text('账单日', style: T.section),
@@ -865,7 +865,8 @@ class _CycleDaySheet extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.md),
+            // 与上面「账单日」标题行同是 16，两者左右对齐
+            padding: const EdgeInsets.symmetric(horizontal: S.lg),
             child: GridView.count(
               crossAxisCount: 7,
               shrinkWrap: true,

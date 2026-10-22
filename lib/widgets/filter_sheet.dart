@@ -312,7 +312,7 @@ class _FilterSheetState extends State<_FilterSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(S.xl, S.md, S.xl, S.sm),
+          padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
           child: Row(
             children: [
               Text(title, style: T.caption),
@@ -372,7 +372,7 @@ class _FilterSheetState extends State<_FilterSheet> {
       children: [
         if (locked)
           Padding(
-            padding: const EdgeInsets.fromLTRB(S.xl, 0, S.xl, S.xs),
+            padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.xs),
             child: Text('收入不按分类筛选', style: T.caption.copyWith(color: C.ink4)),
           ),
         IgnorePointer(
@@ -406,6 +406,8 @@ class _FilterSheetState extends State<_FilterSheet> {
     final activeSub = sel.parentId == null ? null : sel.id;
 
     return Padding(
+      // 左 20 / 右 16 是刻意的：这排是「子分类」，比上面一级的 16 再往里
+      // 缩一档，视觉上才看得出它是下一级；右侧留出常规边距收边。
       padding: const EdgeInsets.fromLTRB(S.xl, S.sm, S.lg, 0),
       child: Wrap(
         spacing: S.sm,
@@ -430,7 +432,7 @@ class _FilterSheetState extends State<_FilterSheet> {
   Widget _accountBlock(Store s) {
     if (s.accounts.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: S.xl),
+        padding: EdgeInsets.symmetric(horizontal: S.lg),
         child: Text('还没有账户，请先到「我的 → 账户管理」添加', style: T.caption),
       );
     }

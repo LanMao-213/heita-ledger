@@ -65,7 +65,9 @@ class _PeriodHead extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 7),
+              // 7 是孤立值：它是「本期支出」和日期之间的间隔点，收到 S.sm(8)
+              // 落到 8pt 栅格上
+              padding: const EdgeInsets.symmetric(horizontal: S.sm),
               child: Text('·', style: T.body.copyWith(color: C.ink4)),
             ),
             Flexible(
@@ -137,7 +139,9 @@ class SummaryCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.xs),
-      padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
+      // 内容卡：四边 16。原来是 16/12/16/16（上边少了 4），和同屏日卡、
+      // SectionCard 的 all(S.lg) 对不上，抬头会比其他卡片的左侧文字高一档
+      padding: const EdgeInsets.all(S.lg),
       // 概览卡是「压下去」的那一档（heroBg 比 bg 深），靠明度差分界，
       // 不再叠一条暖描边 —— 日卡是「浮起来」的一档（白面 + E.low），
       // 同屏只留这一套语法，边界才不糊。
@@ -196,6 +200,8 @@ class SummaryCard extends StatelessWidget {
               ),
               const SizedBox(width: S.sm),
               Padding(
+                // 下 2 是光学补偿：让「N 笔」的基线和左边两格的数字底部对齐，
+                // 不是节奏值，不要收进 S 令牌
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
                   '$count 笔',

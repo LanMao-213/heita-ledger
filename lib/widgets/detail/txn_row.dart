@@ -56,6 +56,9 @@ class TxnRow extends StatelessWidget {
             : () => showRecordSheet(context, editing: txn),
         onLongPress: () => _confirmDelete(context),
         child: Padding(
+          // 左右 S.lg(16)：与日卡里其他元素（日期头、合计行）的右缘同一条线。
+          // 纵向 11 是行内固定留白（配 36 的图标底 → 行高 58），属于组件内部
+          // 尺寸，不参与页面节奏，不要收进 S 令牌
           padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 11),
           child: Row(
             children: [
@@ -175,6 +178,8 @@ class _AutoTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      // 角标自己的固定内边距：5/1 只为了把「周期」两个字包出一圈底，
+      // 和行高无关，属于组件内部尺寸，不参与页面节奏
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
         color: C.bg2,

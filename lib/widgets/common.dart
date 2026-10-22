@@ -15,6 +15,21 @@ import '../design/tokens.dart';
 ///
 /// `sunken: true` 出「压下去」的那一档（概览卡、输入底），用 [C.heroBg] 且不加投影
 /// —— 旧版 [C.heroBg] 全库只用了 1 次，「汇总压下、记录浮上」的层级等于没落地。
+///
+/// ## 内边距约定（只有三档，别再写别的数字）
+///
+/// - **内容卡（默认）**：`const EdgeInsets.all(S.lg)` = 四边 16。
+///   绝大多数卡走这一档，**不要覆盖**。
+/// - **列表卡**：`const EdgeInsets.symmetric(vertical: S.sm)` = 上下 8、左右 0。
+///   卡内是若干行、行之间有分隔线、线要通到卡的左右边，所以卡自己不能有左右
+///   内边距；行内部自己补 `horizontal: S.lg`，左右才和别的内容卡对齐。
+/// - **空态 / 占位卡**：`const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xxl)`
+///   = 左右 16、上下 24。空态没有内容撑高度，靠上下留白把它撑成一块「还没有
+///   内容」的面，而不是一条细条。
+///
+/// ⚠️ 禁止再出现 `EdgeInsets.all(S.md)`、`vertical: 10`、`horizontal: S.md`
+/// 这类不成体系的值：旧代码里三套卡三套边距（20/8、16/8、16/12/4），
+/// 卡与卡左右对不齐，整屏被切成一堆错位的矩形 —— 这正是这轮要收掉的东西。
 class SectionCard extends StatelessWidget {
   const SectionCard({
     super.key,
@@ -49,6 +64,28 @@ class SectionCard extends StatelessWidget {
 }
 
 /// 分组标题
+///
+/// ## 留白节奏（与 [SectionCard] 的 margin 相加才是用户看到的间距）
+///
+/// [SectionCard] 的外边距是 `symmetric(horizontal: S.lg, vertical: S.sm)`（上下各 8），
+/// 标题的 padding 要和它相加才等于屏幕上的实际距离：
+///
+/// | 关系 | 实际值 | 推导 |
+/// |---|---|---|
+/// | 标题 → 它领导的卡 | 12 | bottom 用 S.xs(4) + 卡的 margin 8 |
+/// | 组内 卡 ↔ 卡 | 16 | 8 + 8 |
+/// | 卡 → 下一个标题（组间距） | 32 | 卡的 margin 8 + top 用 S.xxl(24) |
+///
+/// **12 < 16 < 32 是刻意排出来的递进**：标题必须比组内间距更**贴住**它领导的
+/// 那一组，用户才读得出「这个标题是下面这几张卡的」；组与组之间拉到项间距的
+/// 2 倍，一屏才有粗细两种停顿，而不是一路均匀排下去。
+///
+/// 旧值是 20 / 16 / 28：标题离自己那一组（20）比组内两项之间（16）还远，
+/// 标题看起来不属于它下面的组；而组间距（28）只比项间距大 1.75 倍，层级太弱
+/// —— 「界面僵硬」在留白上就是这个：全是差不多的间距，没有呼吸感。
+///
+/// ⚠️ 改这里的上下 padding 等于改全库的分组节奏：动之前先把上面那张表的
+/// 三个数重新算一遍。
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.text, {super.key, this.trailing});
 
@@ -58,8 +95,10 @@ class SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      // 左右与 SectionCard 对齐到 16；上下拉开到 20/10，给分组标题一个区块停顿
-      padding: const EdgeInsets.fromLTRB(S.lg, S.xl, S.lg, S.md),
+      // 左右与 SectionCard 对齐到 16。上 24 = 与上一张卡的 margin 8 拼成 32 的
+      // 组间距；下 4 = 拼成 12，比组内卡间距（16）更紧，标题才像「属于」下面那组。
+      // 推导见类注释里的三行节奏表。
+      padding: const EdgeInsets.fromLTRB(S.lg, S.xxl, S.lg, S.xs),
       child: Row(
         children: [
           Text(text, style: T.section),

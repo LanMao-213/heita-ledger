@@ -170,7 +170,7 @@ class _DetailPageState extends State<DetailPage>
     return Container(
       // 与 SectionCard 同边距（左右 16 / 上下 8）：同屏两种卡必须一样宽、
       // 一样间距，否则日卡和 SectionCard 的边界会错开一条
-      margin: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.sm),
+      margin: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.sm),
       decoration: ShapeDecoration(
         color: C.cardBg,
         // 原来是「描边 + 投影 + 白底」三层叠加，紧邻的概览卡又是「异色底 +
@@ -484,6 +484,7 @@ class _FilterBar extends StatelessWidget {
                       child: Container(
                         height: 28,
                         alignment: Alignment.center,
+                        // 左右 10 是筛选 chip（高 28 固定）的内缩，不是节奏间距
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         decoration: BoxDecoration(
                           color: C.bg2,

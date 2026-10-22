@@ -46,7 +46,7 @@ class _CatsPageState extends State<CatsPage> {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: S.xl,
+                  horizontal: S.lg,
                   vertical: S.sm,
                 ),
                 child: SegTabs(
@@ -55,6 +55,9 @@ class _CatsPageState extends State<CatsPage> {
                 ),
               ),
               Expanded(
+                // 列表底部那 90 不是节奏间距：是给右下角悬浮按钮让出的定位
+                // 余量（按钮 56 + 常规下边距），滚到底时末尾一行才不被压住。
+                // 收编到 S 令牌会让最后一行被按钮盖住，故保留数值。
                 child: cats.isEmpty && archived.isEmpty
                     ? const EmptyHint(text: '这个类型下还没有分类')
                     : ReorderableListView.builder(
@@ -436,6 +439,9 @@ class _SubCatsPageState extends State<_SubCatsPage> {
             return const EmptyHint(text: '还没有子分类，点右下角添加');
           }
           return ReorderableListView.builder(
+            // 90 不是节奏间距：是给右下角悬浮按钮让出的定位余量
+            // （按钮 56 + 常规下边距），滚到底时末尾一行才不被压住。
+            // 收编到 S 令牌会让最后一行被按钮盖住，故保留数值。
             padding: const EdgeInsets.only(bottom: 90),
             buildDefaultDragHandles: false,
             itemCount: subs.length + (archived.isEmpty ? 0 : 1),
