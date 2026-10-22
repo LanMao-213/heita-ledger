@@ -1,0 +1,77 @@
+# 测试与静态检查。
+#
+# 来源：docs/ci-workflow.template.yml（落地时删掉模板头）。
+# 本地跑同一条链：flutter analyze && flutter test && bash tools/check_no_network.sh
+#
+name: 测试与静态检查
+
+# 为什么加这个（1.4.4）：仓库里除了 owner 还有一位 write 权限的协作者，
+# 而 256 条测试一直靠人手动跑 —— 1.4.1 的真机事故里，有两个就是「改动碰了
+# 查询层、没人拦」造成的。把 analyze + test 挂在 push/PR 上，是这里最便宜的护栏。
+#
+# 版本与本地工具链对齐（`flutter --version` → 3.47.7）。升 Flutter 时记得同步改
+# 下面这一行，否则 CI 用旧 SDK 跑、本地用新的，报警会失真。
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 先跑这条：它不依赖 Flutter，几秒钟就能判断「有没有混进联网的东西」。
+      # 放在最前面是为了让这类问题在最便宜的地方失败，而不是等到测试跑完。
+      - name: 不联网门禁
+        run: bash tools/check_no_network.sh
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - name: 取依赖
+        run: flutter pub get
+
+      - name: 静态检查
+        run: flutter analyze
+
+      # 不加 --coverage：这个项目还没有覆盖率门槛，先让「跑没跑过」变成硬约束
+      - name: 测试
+        run: flutter test --reporter expanded
+
+  # 产物级门禁：源码扫描可能被绕过（反射、动态拼接），但**APK 里没有 INTERNET
+  # 权限**是系统级的硬事实 —— 发不出去就是发不出去。
+  # 只在 main 上跑：build 要几分钟，每个分支都跑性价比太低。
+  apk-permission:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # 仓库里没有 release.jks / key.properties，会退回 debug 签名 ——
+      # 这条 job 只关心「权限清单」，不关心签名。
+      - name: 构建 release APK
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: 检查 APK 权限
+        run: |
+          APK=$(ls build/app/outputs/flutter-apk/*-release.apk | head -1)
+          bash tools/check_no_network.sh "$APK"
