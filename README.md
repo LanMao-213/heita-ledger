@@ -17,15 +17,20 @@
 | **[`docs/交接说明.md`](docs/交接说明.md)** | 环境搭建、踩过的坑、代码地图、**当前进度与待办** | **先读这个**，半小时能把工程跑起来 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 每个版本改了什么；顶部有「版本 → 标签 → 签名方式」索引 | 想知道某版为什么不能覆盖安装 |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 新机器配环境（认证、出网、依赖、已知坑） | 换电脑第一次拉代码 |
+| [`docs/版本对比.md`](docs/版本对比.md) | 原版 vs 另一次「从零重写」的逐项对比与**决策记录** | 想知道为什么没有直接换代 |
+| [`docs/开源准备.md`](docs/开源准备.md) | 公开前的安全自查结论 + 每次发版前的检查命令 | 改完代码准备发版时 |
 
-**当前状态**：**1.4.4 已发版**（[Releases](https://github.com/LanMao-213/heita-ledger/releases/latest)）。
-1.4.2 → 1.4.4 这一轮修的全是「界面不说、数据已经不对」的地方：清空点了没反应、
-记完在明细里看不见、点备注像重开面板、周期账单只在冷启动补记、明细超 500 条静默丢弃、
-搜索搜不到分类名/账户名/金额；并补上「清空/恢复前自动留快照」「数据安全」回滚页
-与「本期全览」页。
-**代码是绿的，真机还没验**：1.4.2 ~ 1.4.4 的十二条行为 + 1.4.1 遗留的六项都在
-`CHANGELOG.md` 的「待验证」「待测试」两个小节里，逐条打勾。
-要开始干活，直接跳到交接说明[第 11 节](docs/交接说明.md)。
+**当前状态（2026-10-22）**
+
+- **默认分支 `feat/v2-merge` = `1.4.5+13`（未发版）**：单套「纸墨」色板、往来可删除、
+  新建账本补齐两级分类、**306 条测试全绿**、`flutter analyze` 0 issue。
+- **`main` = `1.4.4+12`（已发版）**，是 `feat/v2-merge` 的祖先；验证满意后可
+  `git merge --ff-only` 快进。两边都随时能跑。
+- 仓库已**公开**并采用 **MIT**（见文末「许可」）。签名密钥从未进入提交历史。
+- 待办：视觉还有 5 项没定（卡片圆角/描边 → 字号阶梯 → 间距密度 → 图标 → 动效）；
+  1.4.2 以来十二条行为 + 1.4.1 遗留六项的**真机验证**仍挂在 `CHANGELOG.md` 里逐条打勾。
+
+要开始干活，直接跳到交接说明的当前状态一节。
 
 ---
 
@@ -45,10 +50,13 @@ V1.0 的 P0 功能已全部打通，能当一个真正的账本用：
 | 图表 | 完成 | 分类甜甜圈 + 排行（点排行下钻到该分类的明细）+ 近 6 个月趋势 |
 | 预算 | 完成 | 总预算/分类预算、按周期归集、节奏（每天能花多少）、借入计入可用额度 |
 | Excel | 完成 | 导出 .xlsx（11 列）、按表头名导入，兼容旧 6 列文件 |
-| 借贷往来 | 完成 | 借出/借入、对方与应还日、剩余按流水算、记还款核销；不计入收支与预算 |
+| 借贷往来 | 完成 | 借出/借入、对方与应还日、剩余按流水算、记还款核销、**可整笔删除（连带回滚余额）**；不计入收支与预算 |
 | 我的/设置 | 完成 | 备份、清空数据、数据安全（自动快照可回滚）、关于 |
 
 未做（PRD V1.1 起）：密码锁与生物识别、年视图、按账户统计、多币种、还款到期提醒。
+
+代码规模：`lib/` 约 1.9 万行 + `test/` 约 1.1 万行，**306 条测试**（含 24 张界面截图）与
+`flutter analyze` 两道闸门；没有第三方状态管理框架，就是 `ChangeNotifier`。
 
 详细需求见 `docs/设计资产/PRD-产品需求文档.html`。
 接手前先读 **`docs/交接说明.md`**，环境、坑、代码地图都在里面。
@@ -80,8 +88,18 @@ flutter run                 # 连上手机或模拟器后直接跑
 flutter analyze                               # 静态检查，提交前必须 0 issue
 flutter test                                  # 全部测试
 flutter test test/ui_shot_test.dart           # 只跑界面截图自检
-flutter build apk --release --split-per-abi   # 出包（分 ABI，体积更小）
+flutter build apk --release --target-platform android-arm64   # 发版用：只出 arm64，约 20 MB
+flutter build apk --release --split-per-abi   # 出包（分 ABI，给老机型也要装时用）
 ```
+
+> **代理环境下跑测试必须剥掉代理变量**，否则会报
+> `Unable to connect to flutter_tester process: Invalid WebSocket upgrade request`——
+> 那是 flutter_tester 的本地 WebSocket 被代理拦了，不是代码坏了：
+>
+> ```bash
+> env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
+>     NO_PROXY=localhost,127.0.0.1 flutter test
+> ```
 
 测试会真的把界面渲染成 PNG，输出在 `build/visual/`，可以直接核对视觉效果；
 布局溢出（文字撑破卡片一类）会在测试里抛异常，比肉眼可靠。
@@ -131,6 +149,8 @@ lib/
   widgets/             公共组件、图表、记一笔面板
 docs/
   交接说明.md          给协作者的落地文档（环境、坑、代码地图、当前进度）
+  版本对比.md          原版 vs 重写版的逐项对比与决策记录
+  开源准备.md          公开前的安全自查 + 每次发版前的检查命令
   设计资产/            PRD、视觉规范、高保真原型、图标与启动页
 ```
 
@@ -156,7 +176,8 @@ git add -A && git commit -m "feat: 分类预算"
 git push -u origin feat/budget-by-category
 ```
 
-- 分支用 `feat/xxx`、`fix/xxx`，`main` 始终保持可运行。
+- 分支用 `feat/xxx`、`fix/xxx`、`docs/xxx`、`chore/xxx`。
+- **日常开发都在 `feat/v2-merge`**（默认分支）；`main` 只放已发版，任何时刻都必须能 analyze + test 全过。
 - 合并前必须 analyze 干净 + 测试全过；界面有改动的，把 `build/visual/` 的截图贴进 PR。
 
 **第一次在新机器上配环境**（认证、出网、依赖、已知坑）看 [`CONTRIBUTING.md`](CONTRIBUTING.md)：

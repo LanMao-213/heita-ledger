@@ -1,7 +1,10 @@
 # 协作配置 · 从拿到地址到能稳定 push
 
-> 适用对象：已经拿到本仓库 **Write 权限** 的协作者。
-> 目标：**5 分钟内**把一台新机器配到「能拉、能跑、能推」，不踩已知的坑。
+> **仓库已公开（MIT）**，所以分两种情况：
+> - **只想看 / 想拿走用**：不用看这份文档，`git clone` 或者网页上 Download ZIP 即可，不需要任何权限。
+> - **想往仓库里推代码**：需要仓库主人给你 **Write 权限**（Settings → Collaborators），
+>   然后按本文配置。目标：**5 分钟内**把一台新机器配到「能拉、能跑、能推」，不踩已知的坑。
+>
 > 代码地图、表结构、测试说明不在这里 —— 那些看 [`docs/交接说明.md`](docs/交接说明.md)。
 
 ---
@@ -12,7 +15,7 @@
 
 - [ ] `git push` 成功，远端能看到自己的分支
 - [ ] `flutter analyze` 输出 `No issues found!`
-- [ ] `flutter test` 全过（当前 80 条）
+- [ ] `flutter test` 全过（当前 **306 条**）
 - [ ] 知道哪些文件**绝对不能**提交（见第 7 节）
 
 ---
@@ -64,17 +67,19 @@ Host github.com
 ```bash
 git clone https://github.com/LanMao-213/heita-ledger.git
 cd heita-ledger
+git checkout feat/v2-merge  # 默认分支就是它，这条只是确认一下
 ./tools/pub_get.sh          # 装依赖，见下方注意
 ```
 
-**已有旧副本**（比如你上次那份基于 `4c009fe` 的）：
+**已有旧副本：**
 
 ```bash
-git pull --ff-only origin main
+git fetch origin
+git checkout feat/v2-merge && git pull --ff-only origin feat/v2-merge
 ```
 
-> ⚠️ **先 pull 再动手**。`main` 已经比你上次的基线新了 3 个提交
-> （`1e79476` → `7730a73` → `b094f99`），不拉就会分叉，之后每轮合并都要处理冲突。
+> 分支关系：`feat/v2-merge`（最新，默认分支）→ `main`（1.4.4 已发版，是它的祖先）。
+> 想跟最新代码就待在 `feat/v2-merge`；`main` 只放已经发出去的版本。
 
 > ⚠️ **装依赖用 `./tools/pub_get.sh`，别直接 `flutter pub get`**。
 > 仓库里的 `pubspec.lock` 是按国内镜像解析的，直接跑会按当前源重写 url 字段，
@@ -113,6 +118,43 @@ curl -I https://github.com
    git bundle create heita-$(date +%m%d).bundle --all
    ```
 
+### 3.1 报 `schannel: CRYPT_E_NO_REVOCATION_CHECK`（Windows 实测会遇到）
+
+现象：
+
+```
+fatal: unable to access 'https://github.com/...': schannel: next InitializeSecurityContext
+failed: CRYPT_E_NO_REVOCATION_CHECK (0x80092012)
+```
+
+**不是权限问题，也不是仓库问题**，是 Windows 的 schannel（走系统代理时常见）无法完成证书吊销检查。
+实测有效的做法是换成 OpenSSL 后端并临时关掉证书校验（只对当前这条命令生效，不改全局配置）：
+
+```bash
+env GIT_SSL_NO_VERIFY=1 git -c http.sslBackend=openssl push
+```
+
+- `-c http.schannelCheckRevoke=false` **实测无效**，别在上面浪费时间。
+- 单独 `http.sslBackend=openssl` 会改报 `unable to get local issuer certificate`，所以两者要一起用。
+- 网络抖动时还会遇到 `send-pack: unexpected disconnect` 或 `502`——**重试 2~3 次**通常就过，
+  成功后用 `git ls-remote origin refs/heads/<分支>` 核对一下远端 SHA 与本地一致。
+
+### 3.2 推不上去的另一类原因：提交里含 `.github/workflows/`
+
+```
+refusing to allow an OAuth App to create or update workflow `.github/workflows/ci.yml` without `workflow` scope
+```
+
+GitHub 检查的是**被推送的所有提交**，不是只有最新那个 —— 只要这一段历史里有提交动过
+workflow 文件，就需要 token 带 `workflow` 权限。两个解法：
+
+```bash
+# ① 给 token 补权限（推荐）
+gh auth refresh -h github.com -s workflow
+
+# ② 或者把那次改 workflow 的提交先摘出去再推（分支未被别人拉过时才安全）
+```
+
 ---
 
 ## 4. 跑起来
@@ -130,17 +172,19 @@ flutter run             # 首次编译几分钟
 ## 5. 每天的开工流程
 
 ```bash
-git pull --ff-only origin main          # 1. 先拉
-git checkout -b feat/your-thing         # 2. 开分支，main 永远可运行
+git checkout feat/v2-merge              # 1. 站在最新线上
+git pull --ff-only origin feat/v2-merge # 2. 先拉
+git checkout -b feat/your-thing         # 3. 开分支
 # ……写代码……
-flutter analyze && flutter test         # 3. 两道闸门
+flutter analyze && flutter test         # 4. 两道闸门
 git add -A && git commit -m "feat: 做了什么"
-git push -u origin feat/your-thing      # 4. 推分支
+git push -u origin feat/your-thing      # 5. 推分支
 ```
 
 - 分支命名：`feat/xxx`、`fix/xxx`、`docs/xxx`、`chore/xxx`
 - 界面有改动的，`build/visual/` 里的截图一起贴出来（截图是测试生成的，见第 6 节）
-- 想直接推 `main` 也可以，但 `main` 上任何时刻都必须能 analyze + test 全过
+- **`main` 只放已发版**；日常开发都基于 `feat/v2-merge`。想直接推也可以，但那条线上任何时刻都必须能 analyze + test 全过
+- 推上去之后建议开 PR：别人能看 diff，也方便回滚
 
 ---
 
@@ -192,8 +236,10 @@ flutter test
 | 现象 | 原因 / 处理 |
 | --- | --- |
 | push 报 502 / CONNECT failed | 出网被代理拦，见第 3 节 |
+| push 报 `schannel: CRYPT_E_NO_REVOCATION_CHECK` | Windows 证书吊销检查失败，见 3.1（换 openssl 后端 + 临时关校验） |
+| push 被拒 `without workflow scope` | 提交历史里动过 `.github/workflows/`，见 3.2（`gh auth refresh -s workflow`） |
 | `flutter test` 全部 `Invalid WebSocket upgrade request` | 代理变量没去掉，见第 6 节 |
-| 覆盖安装提示「应用未安装」 | release 用 **debug 签名**，每台机器 keystore 不同 → **先卸载旧版** |
+| 覆盖安装提示「应用未安装」 | 装的是**别的机器签的**包（比如别人打的 debug 包）。正式包用仓库主人的密钥签，可直接覆盖 |
 | `pubspec.lock` 莫名多 87 行改动 | 直接跑了 `flutter pub get`，改用 `./tools/pub_get.sh` |
 | 截图里中文是方块 | 测试环境没中文字形，`ui_shot_test.dart` 已加载 `Deng.ttf`；换 macOS 要改 `PingFang.ttc` |
 | 截图里图标是方块 | 图标字体不自动加载，测试里按 `FLUTTER_ROOT` 找 `MaterialIcons-Regular.otf`，SDK 装在别处就设这个环境变量 |
@@ -205,19 +251,27 @@ flutter test
 ## 9. 发版
 
 1. **版本号两处要一致**：`pubspec.yaml` 的 `version` + `lib/app.dart` 的 `kAppVersion`
-   （当前 `1.1.1+3`，`+` 后面是构建号，每次发版 +1）
+   （当前 `1.4.5+13`，`+` 后面是构建号，每次发版 +1）
 2. `flutter analyze` + `flutter test`
-3. `flutter build apk --release --split-per-abi`
-   产物在 `build/app/outputs/flutter-apk/`：`app-arm64-v8a-release.apk`（多数手机）、
-   `app-armeabi-v7a-release.apk`（老机型）、`app-x86_64-release.apk`（模拟器）
-4. 装机前先卸载旧版（签名不同）
+3. 出包（**只出一套配色**，1.4.5 起不再有第二个包）：
+
+   ```bash
+   flutter build apk --release --target-platform android-arm64
+   # 产物：build/app/outputs/flutter-apk/app-release.apk，约 20 MB
+   ```
+
+   要兼顾老机型就换成 `--split-per-abi`，会额外产出 `app-armeabi-v7a-release.apk`。
+4. 签名：`android/key.properties` + `*.jks` 由仓库主人持有（**不入库**）。
+   有这两个文件时 release 自动用正式密钥签，可以直接覆盖安装；没有则回落到 debug 签名，
+   那种包换台机器就装不上，别对外发。
+5. 发完在 `CHANGELOG.md` 顶部索引表补一行（版本 / 日期 / 标签 / 签名方式 / 关键变化）。
 
 ---
 
 ## 10. 配好后的一分钟自检
 
 ```bash
-git pull --ff-only origin main                                  # 1. 能拉
+git pull --ff-only origin feat/v2-merge                          # 1. 能拉
 ./tools/pub_get.sh                                              # 2. 依赖能装
 flutter analyze                                                 # 3. 应为 No issues found
 env -u HTTP_PROXY -u HTTPS_PROXY flutter test                   # 4. 应为 All tests passed
