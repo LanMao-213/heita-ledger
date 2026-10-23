@@ -12,7 +12,6 @@ import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/pages/home_shell.dart';
 import 'package:ledger/store.dart';
-import 'package:ledger/widgets/charts.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -80,8 +79,8 @@ void main() {
     await tester.tap(find.text('图表'));
     await tester.pumpAndSettle();
 
-    // 点到「餐饮」那一行（饼图图例里也有「餐饮」，所以按组件定位）
-    final row = find.widgetWithText(CatRankRow, '餐饮');
+    // 点到「餐饮」那一行（图例里也有同名的「餐饮」，所以按 key 定位）
+    final row = find.byKey(ValueKey('freq-$foodId'));
     expect(row, findsOneWidget);
     await tester.ensureVisible(row);
     await tester.pumpAndSettle();

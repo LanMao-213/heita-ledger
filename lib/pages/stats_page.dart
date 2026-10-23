@@ -63,9 +63,26 @@ class _StatsPageState extends State<StatsPage> {
         .where((e) => e.totalCents > 0)
         .toList();
     final total = _type.isExpense ? s.statExpenseCents : s.statIncomeCents;
-    final maxV = stats.isEmpty
-        ? 1
-        : stats.map((e) => e.totalCents).reduce((a, b) => a > b ? a : b);
+
+    // 图例最多 5 行；超过就把尾部合并成「其余 N 类」——
+    // 环形上有几个色块，图例里就必须有几个名字，否则用户找不到第 6 块是谁。
+    final legend = <({String name, int cents, Color color})>[];
+    const legendCap = 5;
+    if (stats.length <= legendCap) {
+      for (var i = 0; i < stats.length; i++) {
+        legend.add((name: stats[i].name, cents: stats[i].totalCents, color: monoSlot(i)));
+      }
+    } else {
+      for (var i = 0; i < legendCap - 1; i++) {
+        legend.add((name: stats[i].name, cents: stats[i].totalCents, color: monoSlot(i)));
+      }
+      final rest = stats.skip(legendCap - 1);
+      legend.add((
+        name: '其余 ${rest.length} 类',
+        cents: rest.fold<int>(0, (a, e) => a + e.totalCents),
+        color: monoSlot(legendCap - 1),
+      ));
+    }
 
     return AnimatedBuilder(
       animation: s,
@@ -119,98 +136,81 @@ class _StatsPageState extends State<StatsPage> {
               )
             else ...[
               SectionCard(
-                child: Column(
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Donut(
-                          size: 128,
-                          thickness: 15,
-                          slices: [
-                            for (var i = 0; i < stats.length; i++)
-                              (value: stats[i].totalCents, color: monoSlot(i)),
-                          ],
-                          center: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _type.isExpense ? '支出' : '收入',
-                                style: T.caption,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                Fmt.compact(total),
-                                style: T.hero.copyWith(fontSize: 20),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: S.lg),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '共 ${stats.length} 个分类',
-                                style: T.body2.copyWith(
-                                  color: C.ink,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: S.sm),
-                              for (var i = 0; i < stats.length && i < 5; i++)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: S.sm),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          color: monoSlot(i),
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: S.sm),
-                                      Expanded(
-                                        child: Text(
-                                          stats[i].name,
-                                          style: T.caption.copyWith(
-                                            color: C.ink2,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${(stats[i].totalCents / (total == 0 ? 1 : total) * 100).toStringAsFixed(0)}%',
-                                        style: T.caption,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
+                    Donut(
+                      size: 128,
+                      thickness: 15,
+                      slices: [
+                        for (final e in legend)
+                          (value: e.cents, color: e.color),
                       ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SectionTitle('分类排行'),
-              SectionCard(
-                padding: const EdgeInsets.symmetric(vertical: S.sm),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < stats.length; i++)
-                      CatRankRow(
-                        stat: stats[i],
-                        ratio: stats[i].totalCents / maxV,
-                        color: monoSlot(i),
-                        // 点排行 → 明细页只留这个分类（点得动就行，不加箭头，
-                        // 和上面「点某天」保持同一种手感）
-                        onTap: () => _openCategory(stats[i]),
+                      center: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _type.isExpense ? '支出' : '收入',
+                            style: T.caption,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            Fmt.compact(total),
+                            style: T.hero.copyWith(fontSize: 20),
+                          ),
+                        ],
                       ),
+                    ),
+                    const SizedBox(width: S.lg),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 一句话结论：不读图也知道哪一块最大。
+                          // 这一行原来是「共 5 个分类」—— 分类数不是用户要的结论。
+                          Text(
+                            stats.isEmpty
+                                ? ''
+                                : '${stats.first.name}占 '
+                                    '${(stats.first.totalCents / (total == 0 ? 1 : total) * 100).round()}%，'
+                                    '最大的一块',
+                            style: T.body2.copyWith(
+                              color: C.ink,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: S.sm),
+                          // 图例给**金额**而不是百分比：百分比说「占多少」，
+                          // 金额说「多少钱」，后者才是记账的人要的。
+                          for (final e in legend)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: S.sm),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: e.color,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: S.sm),
+                                  Expanded(
+                                    child: Text(
+                                      e.name,
+                                      style: T.caption.copyWith(color: C.ink2),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(Fmt.money(e.cents), style: T.amountSm),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -218,6 +218,30 @@ class _StatsPageState extends State<StatsPage> {
               if (_type.isExpense) ...[
                 const SectionTitle('每日支出'),
                 SectionCard(child: _DailyTrend(onDayTap: _openDay)),
+              ],
+
+              // 「分类排行」原来按金额再排一遍，与上面图例是同一份数据换
+              // 一种画法，读起来是「我已经知道了」。换成**按笔数**：
+              // 具体金额看上面，这里回答「我总在哪随手花钱」。
+              if (stats.length > 1) ...[
+                const SectionTitle('记得最多'),
+                SectionCard(
+                  padding: const EdgeInsets.symmetric(vertical: S.sm),
+                  child: Column(
+                    children: [
+                      for (final st in ([...stats]
+                            ..sort((a, b) => b.count.compareTo(a.count)))
+                          .take(3))
+                        _FreqRow(
+                          // 稳定 key：测试要点「某个分类」这一行，
+                          // 靠文本找会撞上图例里同名的分类
+                          key: ValueKey('freq-${st.categoryId}'),
+                          stat: st,
+                          onTap: () => _openCategory(st),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ],
 
@@ -282,6 +306,50 @@ class _BasisSwitch extends StatelessWidget {
         const SizedBox(width: S.sm),
         item(StatBasis.month, '本月'),
       ],
+    );
+  }
+}
+
+/// 「记得最多」的一行：图标 + 名字 + 笔数 + 金额。
+///
+/// 点一下同样是「明细页只看这个分类」—— 和原排行卡保持同一个手感，
+/// 换了维度不等于丢了入口。
+class _FreqRow extends StatelessWidget {
+  const _FreqRow({super.key, required this.stat, required this.onTap});
+
+  final CatStat stat;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: 9),
+        child: Row(
+          children: [
+            LineIcon(stat.icon, size: 19, color: C.ink2),
+            const SizedBox(width: S.md),
+            Expanded(
+              child: Text(
+                stat.name,
+                style: T.body,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text('${stat.count} 笔', style: T.amountSm),
+            const SizedBox(width: S.md),
+            SizedBox(
+              width: 78,
+              child: Text(
+                Fmt.money(stat.totalCents),
+                textAlign: TextAlign.right,
+                style: T.caption,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
