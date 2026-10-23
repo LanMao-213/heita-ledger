@@ -641,14 +641,19 @@ class _RecordSheetState extends State<RecordSheet> {
         // 宁可键矮一点，也不要裁掉「确认」。
         //
         // 有分类详情时上限压到 52：详情区要多吃 40~90 的高度，而信息区里
-        // 的「日期 / 账户」不能因为多填两个框就被挤出可视区。4dp 的键高差
-        // 手感上几乎看不出，信息被裁掉却一眼就能看出。
-        // 详情展开时再压 4dp：展开后是最挤的一屏（备注 + 日期账户 +
-        // 两个字段 + 五排键），52 会让最后一个字段压在键盘边上。
-        // 4dp 的键高差按不出来，字段被裁一半却一眼就能看出。
+        // 的「日期 / 账户」不能因为多填两个框就被挤出可视区。
+        //
+        // **不能再看 `_detailsOpen`**。之前这里写成
+        // `_fields.isEmpty ? 56 : (_detailsOpen ? 48 : 52)`，想着「展开后最挤，
+        // 再压 4dp 腾地方」。结果点一下「添加详情」，5 排键每排矮 4dp、整块
+        // 键盘瞬间少 20dp —— 用户的原话是「打开详情，小键盘抖了一下」。
+        //
+        // 键盘是这一屏最稳的东西：手指正在上面按，它的尺寸不该因为上面内容
+        // 多少而变。内容变高由滚动区吸收，不是压缩键盘。
+        // 只保留「有没有详情字段」这一层结构差异（56 / 52）。
         final keyH = ((box.maxHeight - 380) / 5).clamp(
           38.0,
-          _fields.isEmpty ? 56.0 : (_detailsOpen ? 48.0 : 52.0),
+          _fields.isEmpty ? 56.0 : 52.0,
         );
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -706,7 +711,11 @@ class _RecordSheetState extends State<RecordSheet> {
                     // 写备注时面板不让位，被键盘盖住的那段要靠底部留白补，
                     // 否则备注框「滚到底」也还在键盘底下
                     padding: EdgeInsets.only(
-                      bottom: typingNote ? keyboard + S.sm : S.sm,
+                      bottom: typingNote
+                          ? keyboard + S.sm
+                          // 展开详情时多留一点：键盘不再为内容让位，
+                          // 最后一个字段的边框才不会贴着键盘上沿
+                          : (_detailsOpen ? S.md : S.sm),
                     ),
                     child: Column(
                       children: [
