@@ -8,3 +8,9 @@
 *.otf binary
 *.xlsx binary
 *.apk binary
+
+# 脚本与 workflow 必须 LF。CRLF 在 Linux（CI）上会让 bash 报
+# "$'\r': command not found" —— 数组赋值、行尾续行这类构造尤其容易踩。
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
