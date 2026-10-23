@@ -132,12 +132,36 @@ const Map<String, String> kIcons = {
   'star': r'<path d="M12 3.6l2.6 5.6 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6-4.4-4.2 6-.8z"/>',
 };
 
+
+/// 界面件（箭头、动作、指示）—— **不放进 kIcons**。
+///
+/// 分类管理与模板编辑的图标选择器直接读 `kIcons.keys`，
+/// 界面件混进去会让用户能选到一个「返回箭头」当分类图标。
+/// 所以物理分开，由 [lineIconPath] 统一查。
+///
+/// 路径与业务图标同源同参数（24 视图框、圆头、无填充），只是用途不同。
+const Map<String, String> kChromeIcons = {
+  'chevron_left': r'<path d="m15 18-6-6 6-6"/>',
+  'chevron_right': r'<path d="m9 18 6-6-6-6"/>',
+  'chevron_down': r'<path d="m6 9 6 6 6-6"/>',
+  'chevron_up': r'<path d="m18 15-6-6-6 6"/>',
+  'arrow_left': r'<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  'close': r'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  'check': r'<path d="M20 6 9 17l-5-5"/>',
+  'search': r'<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+  'filter': r'<path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/>',
+  'grip': r'<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
+  'trash': r'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+};
+
 /// 已解析路径的缓存。图标会在列表里被反复构建，解析一次即可。
 final Map<String, Path> _pathCache = {};
 
 Path lineIconPath(String name) => _pathCache.putIfAbsent(
   name,
-  () => parseSvgFragment(kIcons[name] ?? kIcons['more']!),
+  () => parseSvgFragment(
+    kChromeIcons[name] ?? kIcons[name] ?? kIcons['more']!,
+  ),
 );
 
 /// 按渲染尺寸反算线宽，目标是**实际粗细恒定**。
@@ -163,6 +187,7 @@ class LineIcon extends StatelessWidget {
     this.size = 20,
     required this.color,
     this.strokeWidth,
+    this.semanticLabel,
   });
 
   final String name;
@@ -172,9 +197,16 @@ class LineIcon extends StatelessWidget {
   /// 视图框单位；留空按 [iconStrokeFor] 走。
   final double? strokeWidth;
 
+  /// 给读屏用的说明。
+  ///
+  /// **只给「图标就是按钮全部内容」的地方传**（返回、更多、关闭、搜索、
+  /// 删除）。旁边已经有文字的图标（列表行、图例、带文字的 tab）不要传 ——
+  /// 否则读屏会把同一件事念两遍。
+  final String? semanticLabel;
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox.square(
+    final Widget icon = SizedBox.square(
       dimension: size,
       child: CustomPaint(
         painter: _LineIconPainter(
@@ -184,6 +216,10 @@ class LineIcon extends StatelessWidget {
         ),
       ),
     );
+    if (semanticLabel == null) return icon;
+    // image: true —— 告诉读屏「这是个图形」，label 说明它代表什么。
+    // CustomPaint 本身不产生语义，不加这一层，读屏只会说「按钮」。
+    return Semantics(label: semanticLabel, image: true, child: icon);
   }
 }
 

@@ -34,7 +34,7 @@ class _CatsPageState extends State<CatsPage> {
         title: const Text('分类管理'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: AnimatedBuilder(
@@ -101,8 +101,8 @@ class _CatsPageState extends State<CatsPage> {
                                 ),
                                 trailing: IconButton(
                                   onPressed: () => _menu(context, c),
-                                  icon: const Icon(
-                                    Icons.more_horiz_rounded,
+                                  icon: const LineIcon(
+                                    'more', semanticLabel: '更多',
                                     size: 20,
                                     color: C.ink3,
                                   ),
@@ -141,7 +141,7 @@ class _CatsPageState extends State<CatsPage> {
     index: index,
     child: const Padding(
       padding: EdgeInsets.only(right: S.xs),
-      child: Icon(Icons.drag_indicator_rounded, size: 20, color: C.ink3),
+      child: LineIcon('grip', size: 20, color: C.ink3),
     ),
   );
 
@@ -427,7 +427,7 @@ class _SubCatsPageState extends State<_SubCatsPage> {
         title: Text('${widget.parent.name} · 子分类'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: AnimatedBuilder(
@@ -466,8 +466,8 @@ class _SubCatsPageState extends State<_SubCatsPage> {
                     subtitle: c.name == widget.parent.name ? '与一级同名' : null,
                     trailing: IconButton(
                       onPressed: () => _menu(context, c),
-                      icon: const Icon(
-                        Icons.more_horiz_rounded,
+                      icon: const LineIcon(
+                        'more', semanticLabel: '更多',
                         size: 20,
                         color: C.ink3,
                       ),
@@ -502,7 +502,7 @@ class _SubCatsPageState extends State<_SubCatsPage> {
     index: index,
     child: const Padding(
       padding: EdgeInsets.only(right: S.xs),
-      child: Icon(Icons.drag_indicator_rounded, size: 20, color: C.ink3),
+      child: LineIcon('grip', size: 20, color: C.ink3),
     ),
   );
 

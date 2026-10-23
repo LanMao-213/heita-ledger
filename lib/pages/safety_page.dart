@@ -211,7 +211,7 @@ class _SafetyPageState extends State<SafetyPage> {
         title: const Text('数据安全'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
         actions: [
           TextButton(
@@ -242,8 +242,8 @@ class _SafetyPageState extends State<SafetyPage> {
                     icon: 'shield',
                     title: '检查数据完整性',
                     subtitle: _checking ? '正在检查…' : '核对余额、归属期、借贷与引用',
-                    trailing: const Icon(
-                      Icons.chevron_right_rounded,
+                    trailing: const LineIcon(
+                      'chevron_right',
                       size: 20,
                       color: C.ink3,
                     ),
@@ -348,7 +348,7 @@ class _SnapshotRow extends StatelessWidget {
           '${info.reasonLabel} · ${info.contentLabel} · ${info.sizeLabel}',
       onTap: canRestore ? onRestore : null,
       trailing: PopupMenuButton<String>(
-        icon: const Icon(Icons.more_horiz_rounded, size: 20, color: C.ink3),
+        icon: const LineIcon('more', semanticLabel: '更多', size: 20, color: C.ink3),
         padding: EdgeInsets.zero,
         onSelected: (v) {
           switch (v) {

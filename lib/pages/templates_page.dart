@@ -111,7 +111,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
         title: const Text('记账模板'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: AnimatedBuilder(
@@ -209,8 +209,8 @@ class _TemplateRow extends StatelessWidget {
                 child: const Padding(
                   // 左右 6 是拖拽手柄图标的固定内缩，不是节奏间距，保留原值
                   padding: EdgeInsets.symmetric(horizontal: 6),
-                  child: Icon(
-                    Icons.drag_indicator_rounded,
+                  child: LineIcon(
+                    'grip',
                     size: 20,
                     color: C.ink3,
                   ),
@@ -250,8 +250,8 @@ class _TemplateRow extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onMore,
-                icon: const Icon(
-                  Icons.more_horiz_rounded,
+                icon: const LineIcon(
+                  'more', semanticLabel: '更多',
                   size: 20,
                   color: C.ink3,
                 ),
@@ -402,7 +402,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
         title: Text(_isNew ? '新建模板' : '编辑模板'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context, false),
-          icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
         actions: [
           TextButton(

@@ -17,6 +17,7 @@ import 'package:ledger/data/backup_service.dart';
 import 'package:ledger/data/cycle.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
+import 'package:ledger/design/icons.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/design/tokens.dart';
 import 'package:ledger/pages/safety_page.dart';
@@ -89,6 +90,12 @@ Future<void> _shot(WidgetTester tester, String path) async {
     print('截图 $path (${image.width}x${image.height})');
   });
 }
+
+/// 界面件换成自绘图标后，按名字找，不再绑定 Material 的 IconData。
+Finder _lineIcon(String name) => find.byWidgetPredicate(
+  (w) => w is LineIcon && w.name == name,
+  description: 'LineIcon($name)',
+);
 
 void main() {
   setUpAll(() async {
@@ -185,7 +192,7 @@ void main() {
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_22_debts.png');
     expect(tester.takeException(), isNull, reason: '往来页有布局溢出');
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
+    await tester.tap(_lineIcon('arrow_left').first);
     await tester.pumpAndSettle();
 
     // ---- 我的 ----
@@ -233,9 +240,9 @@ void main() {
     await _shot(tester, 'build/visual/shot_17_subcats.png');
     expect(tester.takeException(), isNull, reason: '子分类页有布局溢出');
     // 这两页用的是自绘返回按钮，tester.pageBack() 找不到系统返回键
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
+    await tester.tap(_lineIcon('arrow_left').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
+    await tester.tap(_lineIcon('arrow_left').first);
     await tester.pumpAndSettle();
 
     // ---- 模板管理 ----
@@ -249,10 +256,10 @@ void main() {
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_7_template_editor.png');
     expect(tester.takeException(), isNull, reason: '模板编辑页有布局溢出');
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.tap(_lineIcon('arrow_left'));
     await tester.pumpAndSettle();
     // 回到「我的」
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.tap(_lineIcon('arrow_left'));
     await tester.pumpAndSettle();
 
     // ---- 记一笔面板 ----
@@ -341,7 +348,7 @@ void main() {
     // 先点遮罩把记一笔关掉（面板占了下半屏，顶部遮罩还能点到）
     await tester.tapAt(const Offset(195, 60));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.tune_rounded));
+    await tester.tap(find.byTooltip('筛选'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     await _shot(tester, 'build/visual/shot_8_filter_sheet.png');
     expect(tester.takeException(), isNull, reason: '筛选面板有布局溢出');

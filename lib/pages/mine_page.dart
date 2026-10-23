@@ -507,8 +507,8 @@ class MinePage extends StatelessWidget {
                           '${a.includeInTotal ? '' : ' · 不计入净资产'}',
                       trailing: IconButton(
                         onPressed: () => _accountSheet(context, a),
-                        icon: const Icon(
-                          Icons.more_horiz_rounded,
+                        icon: const LineIcon(
+                          'more', semanticLabel: '更多',
                           size: 20,
                           color: C.ink3,
                         ),
@@ -677,7 +677,7 @@ class MinePage extends StatelessWidget {
                 title: l.name,
                 subtitle: l.id == s.ledgerId ? '当前账本' : null,
                 trailing: l.id == s.ledgerId
-                    ? const Icon(Icons.check_rounded, size: 20, color: C.ink)
+                    ? const LineIcon('check', size: 20, color: C.ink)
                     : null,
                 onTap: () async {
                   Navigator.pop(ctx);

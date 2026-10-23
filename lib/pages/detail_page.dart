@@ -6,6 +6,7 @@ import '../data/models.dart';
 import '../data/repo.dart';
 import '../design/hairline.dart';
 import '../design/haptics.dart';
+import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
@@ -245,8 +246,8 @@ class _TopBar extends StatelessWidget {
           if (s.ledgers.length > 1)
             GestureDetector(
               onTap: () => _pickLedger(context),
-              child: const Icon(
-                Icons.expand_more_rounded,
+              child: const LineIcon(
+                'chevron_down',
                 size: 18,
                 color: C.ink3,
               ),
@@ -255,8 +256,8 @@ class _TopBar extends StatelessWidget {
           IconButton(
             onPressed: () => _openFilter(context),
             tooltip: '筛选',
-            icon: Icon(
-              Icons.tune_rounded,
+            icon: LineIcon(
+              'filter',
               size: 20,
               color: s.filtering ? C.ink : C.ink2,
             ),
@@ -264,7 +265,7 @@ class _TopBar extends StatelessWidget {
           ),
           IconButton(
             onPressed: () => _search(context),
-            icon: const Icon(Icons.search_rounded, size: 20, color: C.ink2),
+            icon: const LineIcon('search', semanticLabel: '搜索', size: 20, color: C.ink2),
             splashRadius: 20,
           ),
           const SizedBox(width: S.sm),
@@ -298,7 +299,7 @@ class _TopBar extends StatelessWidget {
                 icon: l.icon,
                 title: l.name,
                 trailing: l.id == s.ledgerId
-                    ? const Icon(Icons.check_rounded, size: 20, color: C.ink)
+                    ? const LineIcon('check', size: 20, color: C.ink)
                     : null,
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -368,14 +369,14 @@ class _SearchDelegate extends SearchDelegate<String> {
     if (query.isNotEmpty)
       IconButton(
         onPressed: () => query = '',
-        icon: const Icon(Icons.close_rounded),
+        icon: const LineIcon('close', size: 22, color: C.ink2, semanticLabel: '关闭'),
       ),
   ];
 
   @override
   Widget? buildLeading(BuildContext context) => IconButton(
     onPressed: () => close(context, ''),
-    icon: const Icon(Icons.arrow_back_rounded),
+    icon: const LineIcon('arrow_left', size: 22, color: C.ink, semanticLabel: '返回'),
   );
 
   @override
@@ -439,7 +440,7 @@ class _MoreHint extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 2),
-              const Icon(Icons.chevron_right_rounded, size: 18, color: C.ink2),
+              const LineIcon('chevron_right', size: 18, color: C.ink2),
             ],
           ),
         ),

@@ -587,7 +587,7 @@ class _RecordSheetState extends State<RecordSheet> {
                 title: a.name,
                 subtitle: Fmt.yuan(a.balanceCents),
                 trailing: a.id == _accountId
-                    ? const Icon(Icons.check_rounded, size: 20, color: C.ink)
+                    ? const LineIcon('check', size: 20, color: C.ink)
                     : null,
                 onTap: () {
                   Navigator.pop(ctx);
@@ -1343,8 +1343,8 @@ class _CategoryNoteRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.keyboard_arrow_right_rounded,
+                const LineIcon(
+                  'chevron_right',
                   size: 20,
                   color: C.ink3,
                 ),
@@ -1434,8 +1434,8 @@ class _DetailBlock extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Icon(
-                  open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                LineIcon(
+                  open ? 'chevron_up' : 'chevron_down',
                   size: 18,
                   color: C.ink3,
                 ),

@@ -79,7 +79,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 打开筛选面板
-    await tester.tap(find.byIcon(Icons.tune_rounded));
+    await tester.tap(find.byTooltip('筛选'));
     await tester.pumpAndSettle();
     expect(find.byType(CategoryGrid), findsOneWidget);
     // 还没选条件时按钮是禁用的

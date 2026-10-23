@@ -54,7 +54,7 @@ class _RecurringPageState extends State<RecurringPage> {
         title: const Text('周期账单'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: _loading
@@ -371,8 +371,8 @@ class _RuleCard extends StatelessWidget {
               await Repo.deleteRecurring(rule.id);
               await onChanged();
             },
-            icon: const Icon(
-              Icons.delete_outline_rounded,
+            icon: const LineIcon(
+              'trash', semanticLabel: '删除',
               size: 19,
               color: C.ink3,
             ),

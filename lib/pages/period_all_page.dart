@@ -4,6 +4,7 @@ import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
 import '../design/hairline.dart';
+import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
@@ -112,7 +113,7 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
         title: const Text('本期全览'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: Column(

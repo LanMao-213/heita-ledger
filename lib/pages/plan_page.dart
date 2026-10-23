@@ -92,8 +92,8 @@ class _DebtsCard extends StatelessWidget {
               Expanded(
                 child: Text('往来：记借出/借入后，在这里看谁欠谁多少', style: T.body2),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
+              const LineIcon(
+                'chevron_right',
                 size: 20,
                 color: C.ink3,
               ),
@@ -122,8 +122,8 @@ class _DebtsCard extends StatelessWidget {
                     style: T.caption.copyWith(color: C.ink2),
                   ),
                 const SizedBox(width: S.xs),
-                const Icon(
-                  Icons.chevron_right_rounded,
+                const LineIcon(
+                  'chevron_right',
                   size: 20,
                   color: C.ink3,
                 ),
