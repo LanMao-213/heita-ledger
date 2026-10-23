@@ -262,7 +262,7 @@ class CatRankRow extends StatelessWidget {
             const SizedBox(width: S.md),
             Text(
               Fmt.money(stat.totalCents),
-              style: T.amountSm.copyWith(fontSize: 13.5),
+              style: T.amountXs,
             ),
           ],
         ),

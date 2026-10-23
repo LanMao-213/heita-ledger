@@ -156,7 +156,7 @@ class _MiniFigure extends StatelessWidget {
       children: [
         Text(label, style: T.caption),
         const SizedBox(height: 2),
-        Text(Fmt.money(cents), style: T.amount.copyWith(fontSize: 18)),
+        Text(Fmt.money(cents), style: T.amount),
       ],
     );
   }
@@ -221,11 +221,11 @@ class _TotalBudgetCard extends StatelessWidget {
               children: [
                 Text(
                   Fmt.money(s.expenseCents),
-                  style: T.hero.copyWith(fontSize: 30),
+                  style: T.hero,
                 ),
                 Text(
                   '  /  ${Fmt.money(cap)}',
-                  style: T.body2.copyWith(fontSize: 14),
+                  style: T.body2,
                 ),
               ],
             ),
@@ -255,12 +255,12 @@ class _TotalBudgetCard extends StatelessWidget {
                 if (over)
                   Text(
                     '超支 ${Fmt.money(s.overBudgetCents)}',
-                    style: T.amountSm.copyWith(color: C.over, fontSize: 13.5),
+                    style: T.amountXs.copyWith(color: C.over),
                   )
                 else
                   Text(
                     '剩余 ${Fmt.money(s.budgetLeftCents)}',
-                    style: T.amountSm.copyWith(fontSize: 13.5),
+                    style: T.amountXs,
                   ),
               ],
             ),
@@ -493,8 +493,7 @@ class _BudgetRow extends StatelessWidget {
                 // 读不出哪个是花掉的、哪个是上限
                 Text(
                   Fmt.money(stat.spentCents),
-                  style: T.amountSm.copyWith(
-                    fontSize: T.body2.fontSize,
+                  style: T.amountXs.copyWith(
                     color: stat.over ? C.over : C.ink,
                   ),
                 ),

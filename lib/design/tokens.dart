@@ -326,6 +326,18 @@ abstract final class T {
     color: C.ink,
     fontFeatures: [FontFeature.tabularFigures()],
   );
+
+  /// 金额（最小号）：列表行尾、副数值、预算条旁边的余额。
+  ///
+  /// 原来这些位置写成 `amountSm.copyWith(fontSize: 13.5)` —— 13.5 是个
+  /// 既不在字阶里、也不在金额档里的数，5 处各写一遍。补这一档，是为了
+  /// 「小号金额」有名字可叫，而不是每次去改一个魔法数。
+  static const amountXs = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: C.ink,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
 }
 
 /// 全局主题。

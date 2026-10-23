@@ -181,7 +181,7 @@ class SummaryCard extends StatelessWidget {
             // 新的从下方滑上来、旧的往上淡出，眼睛能跟上数字是怎么变的。
             child: AnimatedMoney(
               text: Fmt.money(expense),
-              style: T.hero.copyWith(fontSize: 34),
+              style: T.hero,
             ),
           ),
           const SizedBox(height: S.md),
@@ -405,10 +405,7 @@ class _HeroStat extends StatelessWidget {
           child: Text(
             value,
             maxLines: 1,
-            style: T.amountSm.copyWith(
-              fontSize: T.section.fontSize,
-              fontWeight: FontWeight.w500,
-            ),
+            style: T.amount.copyWith(fontWeight: FontWeight.w500),
           ),
         ),
       ],

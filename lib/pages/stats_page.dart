@@ -155,6 +155,9 @@ class _StatsPageState extends State<StatsPage> {
                           const SizedBox(height: 2),
                           Text(
                             Fmt.compact(total),
+                            // 刻意 20：环形直径只有 128，hero(34) 会把
+                            // 圆心撑满、和环相撞；20 是「卡片内次级大数字」
+                            // 的唯一可取档，别当成漂移收掉。
                             style: T.hero.copyWith(fontSize: 20),
                           ),
                         ],
@@ -461,7 +464,7 @@ class _MonthlyTrend extends StatelessWidget {
                       r.$1.length == 7
                           ? '${int.parse(r.$1.substring(5))}月'
                           : r.$1.substring(5),
-                      style: T.caption.copyWith(fontSize: 10.5),
+                      style: T.overline.copyWith(letterSpacing: 0),
                     ),
                   ],
                 ),
@@ -484,7 +487,7 @@ class _MonthlyTrend extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 5),
-      Text(label, style: T.caption.copyWith(fontSize: 11.5)),
+      Text(label, style: T.overline.copyWith(letterSpacing: 0)),
     ],
   );
 
@@ -528,7 +531,7 @@ class _AccountsCard extends StatelessWidget {
                   children: [
                     Text(
                       Fmt.money(s.netWorthWithDebtCents),
-                      style: T.amountSm.copyWith(fontSize: 14),
+                      style: T.amountXs,
                     ),
                     // 与「我的」页同一口径：账户余额 + 应收 − 应付
                     if (s.receivableCents > 0 || s.payableCents > 0)
@@ -557,14 +560,13 @@ class _AccountsCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       a.name,
-                      style: T.body.copyWith(fontSize: 14),
+                      style: T.body,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Text(
                     Fmt.money(a.balanceCents),
-                    style: T.amountSm.copyWith(
-                      fontSize: T.body2.fontSize,
+                    style: T.amountXs.copyWith(
                       color: a.balanceCents < 0 ? C.over : C.ink,
                     ),
                   ),

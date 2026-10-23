@@ -267,6 +267,8 @@ class _CatWheelSheetState extends State<_CatWheelSheet> {
     return Text(
       text,
       style: TextStyle(
+        // 滚轮是「控件」不是「文字」：18/16.5 这组差值是选中项的放大比例，
+        // 关系是相对的（选中比未选中大 1.5），不参与字阶。
         fontSize: selected ? 18 : 16.5,
         fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
         color: color,

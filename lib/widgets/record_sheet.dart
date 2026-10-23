@@ -1225,6 +1225,8 @@ class _AmountDisplay extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
+                // 刻意比 hero(34) 大一档：这一屏只有「金额」一个主角，
+                // 键盘占了下半屏，数字不够大就会显得空。别收成 34。
                 child: Text(amountText, style: T.hero.copyWith(fontSize: 44)),
               ),
             ),

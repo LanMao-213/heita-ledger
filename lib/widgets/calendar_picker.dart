@@ -322,7 +322,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
               for (final w in const ['日', '一', '二', '三', '四', '五', '六'])
                 Expanded(
                   child: Center(
-                    child: Text(w, style: T.caption.copyWith(fontSize: 11)),
+                    child: Text(w, style: T.overline),
                   ),
                 ),
             ],

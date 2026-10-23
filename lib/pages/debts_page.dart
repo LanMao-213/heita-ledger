@@ -134,7 +134,7 @@ class _Figure extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           Fmt.money(cents),
-          style: T.amount.copyWith(fontSize: 22, color: C.ink),
+          style: T.amount,
         ),
       ],
     );
@@ -247,7 +247,7 @@ class _PersonRow extends StatelessWidget {
               children: [
                 Text(
                   amount,
-                  style: T.amount.copyWith(fontSize: 16, color: C.ink),
+                  style: T.amount,
                 ),
                 const SizedBox(height: 2),
                 Text(label, style: T.caption.copyWith(color: C.ink3)),
@@ -411,7 +411,6 @@ class _DebtRow extends StatelessWidget {
                 Text(
                   dimmed ? '已结清' : Fmt.money(debt.remainingCents),
                   style: T.amount.copyWith(
-                    fontSize: T.section.fontSize,
                     color: dimmed ? C.ink3 : C.ink,
                   ),
                 ),
@@ -725,6 +724,8 @@ class _RepaySheetState extends State<_RepaySheet> {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
             ],
+            // 刻意用 26（不是金额档）：这是**正在输入**的数字，比列表里的
+            // 金额大一档才看得出「我在填这个」。别当成漂移收掉。
             style: T.amount.copyWith(fontSize: 26),
             decoration: const InputDecoration(
               prefixText: '¥ ',

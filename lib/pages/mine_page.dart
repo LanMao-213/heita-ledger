@@ -927,7 +927,7 @@ class _NetWorthCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             Fmt.yuan(s.netWorthWithDebtCents),
-            style: T.hero.copyWith(fontSize: 32),
+            style: T.hero,
           ),
           // 借出/借入：账户余额只反映现金，这里把应收应付补上，
           // 否则借出 5000 会看起来像「钱少了 5000」
@@ -953,7 +953,7 @@ class _NetWorthCard extends StatelessWidget {
                     const Spacer(),
                     Text(
                       Fmt.yuan(a.balanceCents),
-                      style: T.amountSm.copyWith(fontSize: 13.5),
+                      style: T.amountXs,
                     ),
                   ],
                 ),
