@@ -13,7 +13,7 @@ import 'package:flutter/material.dart';
 /// - 加上几乎没有动效，状态变化全是 0ms 硬切，所以整体观感「僵硬」。
 ///
 /// 这一轮的修正原则：**用「面」分界，不用「线」分界。**
-/// - 把 `bg` 压到 `#F5F2EA`，让 `cardBg`(白) 与它拉开到 1.12:1 —— 卡片第一次
+/// - 把 `bg` 压到 `#F3F4F7`，让 `cardBg`(白) 与它拉开到 1.12:1 —— 卡片第一次
 ///   真的「浮」起来了，不再依赖描边告诉用户边界在哪；
 /// - 补齐中间面：`heroBg`(压下去) / `bg2`(键帽) / `bg3`，四档明度递进；
 /// - 新增 [E] 三档柔和投影，替代「描边当边界」的旧做法；
@@ -34,90 +34,91 @@ import 'package:flutter/material.dart';
 abstract final class C {
   /// 主文字 / 强调（对 [bg] 15.5:1）
   ///
-  /// 「纸墨」的墨：不是纯黑，压一点暖调（`#1C1A17`），纯黑压在纸白上会发冷。
-  static const ink = Color(0xFF1C1A17);
+  /// 「纸墨」的墨：不是纯黑，压一点暖调（`#14161A`），纯黑压在纸白上会发冷。
+  static const ink = Color(0xFF14161A);
 
   /// 次要文字（对 [bg] 6.6:1）
-  static const ink2 = Color(0xFF5B554D);
+  static const ink2 = Color(0xFF5C626B);
 
   /// 辅助文字（对 [bg] 5.1:1）
   ///
   /// 12px 的 `caption` 在用这个色，必须过 AA（4.5:1）。旧色板这里是 `#9AA0A8`，
   /// 白底上只有 2.6:1 —— 那是既有缺陷，这一轮一并修掉。
-  static const ink3 = Color(0xFF6D655B);
+  static const ink3 = Color(0xFF656A75);
 
   /// 占位 / 弱分割：不承担可读性，只要求比 [bg2] 深一点看得出来
-  static const ink4 = Color(0xFFACA69E);
+  static const ink4 = Color(0xFFBFC4CC);
 
   /// 轮盘类选择器的选中行遮罩（墨 6%）
-  static const inkWash = Color(0x0F1C1A17);
+  static const inkWash = Color(0x0F14161A);
 
-  /// 页面底 = 纸白
+  /// 页面底 = 冷浅灰
   ///
-  /// 比旧值（`#FBFAF7`）压深一档：旧的底与白卡只差 1.06:1，等于没有层级，
-  /// 卡片只能靠描边撑边界。现在与 [cardBg] 拉开到 1.12:1，卡是真的浮起来的。
-  static const bg = Color(0xFFF5F2EA);
+  /// 与 [cardBg]（纯白）拉开约 1.13:1 —— 层级靠**明度差**，不靠投影。
+  /// 这是 iOS grouped 的做法：底色比卡暗一档，卡自然成立，不需要浮起来。
+  static const bg = Color(0xFFF3F4F7);
 
   /// **卡内的次级面**：输入底、未选中的胶囊、数字键帽、小图标底。
   ///
   /// 两条约束同时成立才行：
   /// ① 比 [cardBg] 深 —— 卡面是纯白，同色的话「未选中」这一档会整片消失；
   /// ② 比 [bg] 深 —— 键帽必须比抽屉的面沉下去，反过来会像键浮在面上。
-  static const bg2 = Color(0xFFE4DED0);
+  static const bg2 = Color(0xFFE8EAF0);
 
   /// 更弱的面：比 [bg] 深一点点，比 [bg2] 浅
-  static const bg3 = Color(0xFFEDE8DF);
+  static const bg3 = Color(0xFFF6F7FA);
 
   /// 1px 描边（对 [cardBg] 1.30:1）
   ///
-  /// ⚠️ 新界面的边界**优先用 [E] 的投影，不优先用描边**。这一轮把绝大多数
-  /// 容器的描边去掉了，只保留真正需要「切断」的地方（表头、输入框、分段控件）。
-  static const line = Color(0xFFE6E1D7);
+  /// ⚠️ 边界靠「底色差 + 1px 描边」，**不再用投影**。
+  /// 上一版把描边几乎全去掉、用柔和投影分界；这一版反过来 —— 投影去掉，
+  /// 卡面靠底色差立起来，必要时用这 1px 收边。
+  static const line = Color(0xFFE2E5EA);
 
   /// 稍强的分隔
-  static const line2 = Color(0xFFD5CDBC);
+  static const line2 = Color(0xFFCFD4DB);
 
   /// 超支警示（对 [bg] 5.5:1）
   ///
   /// 唯一保留色相的位置：超支必须一眼能认出来，用墨色分级做不到这件事。
   /// 压到接近砖红，仍然落在暖色系里，不会把纸墨调子打断。
-  static const over = Color(0xFFB13521);
+  static const over = Color(0xFFB0302A);
 
   /// 超支警示 · 压在深色块上时用（深底上 [over] 会糊）
-  static const overD = Color(0xFFC46556);
+  static const overD = Color(0xFFC0625A);
 
   /// 原型里手机机身外的舞台底色，仅调试用
-  static const stage = Color(0xFFDBD8D1);
+  static const stage = Color(0xFFD8DBE1);
 
   /// 强调色：进度条填充、光标、选中指示。
   ///
   /// 纸墨原则：不引入装饰色，强调 = 主文字色。要「显得重要」靠层级和留白，
   /// 不靠加一个颜色。
-  static const accent = Color(0xFF1C1A17);
+  static const accent = Color(0xFF14161A);
 
   /// 压在 [accent] 上的字色
   static const onAccent = Color(0xFFFFFFFF);
 
   /// 选中胶囊 / 标签底
-  static const accentSoft = Color(0xFFEEEAE3);
+  static const accentSoft = Color(0xFFEEF0F4);
 
   /// 「今天」那个圆点的底色：默认是主文字色（墨底白字）
-  static const todayMark = Color(0xFF1C1A17);
+  static const todayMark = Color(0xFF14161A);
 
   /// 压在 [todayMark] 上的字色
   static const onTodayMark = Color(0xFFFFFFFF);
 
   /// 选中行的整行染色
-  static const accentWash = Color(0xFFF2F0EB);
+  static const accentWash = Color(0xFFF0F2F5);
 
   /// 卡片投影（墨 5%）—— 与 [E.low] 同值，留给还在用旧写法的调用点
-  static const cardShadow = Color(0x0D1C1A17);
+  static const cardShadow = Color(0x0D14161A);
 
   /// 底部面板的拖拽柄 / 分块底 / 进度条轨道
-  static const handle = Color(0xFFE9E5DC);
+  static const handle = Color(0xFFE7EAF0);
 
   /// 概览卡的描边：只在概览卡真的需要边界时才用
-  static const heroEdge = Color(0xFFD8D0C1);
+  static const heroEdge = Color(0xFFD8DDE5);
 
   /// **浮起来**的卡片（明细日卡、往来卡、SectionCard、抽屉、对话框）。
   ///
@@ -125,76 +126,63 @@ abstract final class C {
   /// 再由 [E.low] 把边缘柔化，不靠描边。
   static const cardBg = Color(0xFFFFFFFF);
 
-  /// **压下去**的概览卡：比 [bg] 深，且必须与 [cardBg] 不同，
-  /// 否则「汇总区压下、记录卡浮上」的层级就没了。
-  static const heroBg = Color(0xFFECE7DE);
+  /// **压下去**的概览卡。
+  ///
+  /// 必须比 [bg] 明显深一档（约 1.07:1），否则在浅灰底上「这块是不是卡」
+  /// 会读不出来 —— 上一轮的暖米底与概览卡差 1.12:1，直接套用冷灰后
+  /// 只差 1.02:1，第一版渲染出来概览卡像是不存在。
+  static const heroBg = Color(0xFFE8EBF1);
 }
 
-/// 投影 —— 新界面的主要分界手段。
+/// 投影 —— **已全部归零**。
 ///
-/// 三档都是「大 blur + 小 offset + 低透明」：模糊半径远大于位移，
-/// 所以影子是「贴着卡片晕开」而不是「卡片后面拖一条黑边」。
-/// 用墨色（不是纯黑）投影，免得把暖调的画面压灰。
+/// 上一版把柔和投影当作主要分界手段（大 blur + 小 offset + 墨 5%）。
+/// 这一版改成 iOS grouped 的做法：底色比卡暗一档，卡面自己就立住了，
+/// 再加一层投影只会让画面发雾、显软。
+///
+/// 字段保留（值都是空数组）是为了不动调用点 —— 以后若某个浮层确实需要
+/// 离开页面（比如 FAB、底部抽屉），再给它单独一档，而不是整站都铺。
 abstract final class E {
   static const none = <BoxShadow>[];
-
-  /// 卡片：blur 10 / 位移 2 / 墨 5%
-  static const low = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x0D1C1A17),
-      blurRadius: 10,
-      offset: Offset(0, 2),
-    ),
-  ];
-
-  /// 底部抽屉、对话框：blur 20 / 位移 6 / 墨 7%
-  static const mid = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x121C1A17),
-      blurRadius: 20,
-      offset: Offset(0, 6),
-    ),
-  ];
-
-  /// 悬浮按钮、跟随滚浮动的元素：blur 28 / 位移 10 / 墨 10%
-  static const high = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x1A1C1A17),
-      blurRadius: 28,
-      offset: Offset(0, 10),
-    ),
-  ];
+  static const low = none;
+  static const mid = none;
+  static const high = none;
 }
 
 /// 图表色阶：按重要度从强到弱（越靠前越主要）。
 ///
-/// 暖灰十档，与 [C] 同一族：第一档就是主文字色，最后一档是最浅的纸灰。
+/// 中性灰十档，与 [C] 同一族：第一档就是主文字色，最后一档是最浅的分隔灰。
 /// 相邻两档靠**明度**分，不靠色相 —— 饼图切片的颜色只是「区分」，不是「分类」，
 /// 用彩色会让人以为颜色本身有含义。
 const List<Color> kChart = [
-  Color(0xFF1C1A17),
-  Color(0xFF322F2B),
-  Color(0xFF47443F),
-  Color(0xFF5D5952),
-  Color(0xFF726E66),
-  Color(0xFF88837A),
-  Color(0xFF9D988E),
-  Color(0xFFB3ADA1),
-  Color(0xFFC8C2B5),
-  Color(0xFFDED7C9),
+  Color(0xFF14161A),
+  Color(0xFF2E3238),
+  Color(0xFF454A52),
+  Color(0xFF5C626B),
+  Color(0xFF737A84),
+  Color(0xFF8B929C),
+  Color(0xFFA3AAB4),
+  Color(0xFFBBC2CB),
+  Color(0xFFD2D8E0),
+  Color(0xFFE8ECF2),
 ];
 
 /// 圆角。
 ///
 /// 整体比旧值（9/13/16/20）放大一档：圆角越大，矩形的「盒子感」越弱。
 /// 卡片级别请用 [Shape.squircle] 拿连续圆角，而不是 [BorderRadius.circular]。
+/// 圆角 —— 这一版整体收紧一档。
+///
+/// 上一版是 20 / 24 / 30（偏「软」，接近圆润的卡片风）。iOS 的实际取值
+/// 小得多：设置页的卡 10、按钮 8~12、大面板 16~20。圆角一大，界面会
+/// 显得"胖"，这也是「不像 iOS」的第二个来源。
 abstract final class R {
-  static const xs = 8.0;   // 小标签、角标
-  static const sm = 12.0;  // 按钮、芯片、图标底
-  static const md = 16.0;  // 行内块、输入框
-  static const card = 20.0; // 卡片
-  static const lg = 24.0;  // 大卡、对话框
-  static const sheet = 30.0; // 底部抽屉顶部两角
+  static const xs = 8.0;    // 小标签、角标
+  static const sm = 10.0;   // 按钮、芯片、图标底
+  static const md = 12.0;   // 行内块、输入框
+  static const card = 14.0; // 卡片
+  static const lg = 18.0;   // 大卡、对话框
+  static const sheet = 22.0; // 底部抽屉顶部两角
   static const pill = 999.0;
 }
 

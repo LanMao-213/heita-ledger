@@ -60,58 +60,61 @@ void main() {
       expect(C.heroBg, isNot(C.cardBg), reason: '概览卡 ≠ 明细卡');
       expect(C.bg2, isNot(C.cardBg), reason: '卡内次级面 ≠ 卡面');
       expect(C.bg2, isNot(C.bg), reason: '输入底 ≠ 页面底');
-      // 纸墨版把概览卡和卡内次级面拆成了两个值（旧色板两者都是 #F4F5F6）：
+      // 概览卡与卡内次级面是两个值（几乎同亮度，但不同族，便于各自微调）：
       // 概览卡要读起来是「压下去的纸」，次级面要读起来是「沉下去的槽」。
       expect(C.heroBg, isNot(C.bg2), reason: '概览卡 ≠ 卡内次级面');
       expect(C.heroEdge, isNot(C.line), reason: '概览卡描边与普通描边不同族就没必要拆');
     });
   });
 
-  group('纸墨色板的值被钉死', () {
+  group('色板的值被钉死', () {
     test('24 个颜色 token 与十档色阶', () {
-      // 换单套色板时把「两套三元表达式」换成了字面量。这组断言是那句话的证据：
-      // 只要有一个值被顺手改掉，肉眼看不见的那点色差会在这里先红。
-      expect(C.ink, const Color(0xFF1C1A17));
-      expect(C.ink2, const Color(0xFF5B554D));
-      expect(C.ink3, const Color(0xFF6D655B));
-      expect(C.ink4, const Color(0xFFACA69E));
-      expect(C.inkWash, const Color(0x0F1C1A17));
-      expect(C.bg, const Color(0xFFF5F2EA));
-      expect(C.bg2, const Color(0xFFE4DED0));
-      expect(C.bg3, const Color(0xFFEDE8DF));
-      expect(C.line, const Color(0xFFE6E1D7));
-      expect(C.line2, const Color(0xFFD5CDBC));
-      expect(C.over, const Color(0xFFB13521));
-      expect(C.overD, const Color(0xFFC46556));
-      expect(C.stage, const Color(0xFFDBD8D1));
+      // 这组断言的作用是「改色必须是有意识的」：值被顺手改掉时先在这里红。
+      //
+      // 2026-10-23 整体换板（暖米「纸墨」→ 中性冷灰，对齐 iOS grouped）：
+      // 底色 #F5F2EA→#F3F4F7、墨 #1C1A17→#14161A、圆角 20/24/30→14/18/22、
+      // 投影全部归零。下面这组期望值是那次换板后的新基线。
+      expect(C.ink, const Color(0xFF14161A));
+      expect(C.ink2, const Color(0xFF5C626B));
+      expect(C.ink3, const Color(0xFF656A75));
+      expect(C.ink4, const Color(0xFFBFC4CC));
+      expect(C.inkWash, const Color(0x0F14161A));
+      expect(C.bg, const Color(0xFFF3F4F7));
+      expect(C.bg2, const Color(0xFFE8EAF0));
+      expect(C.bg3, const Color(0xFFF6F7FA));
+      expect(C.line, const Color(0xFFE2E5EA));
+      expect(C.line2, const Color(0xFFCFD4DB));
+      expect(C.over, const Color(0xFFB0302A));
+      expect(C.overD, const Color(0xFFC0625A));
+      expect(C.stage, const Color(0xFFD8DBE1));
       // 强调色 === 主文字色（纸墨原则：不引入装饰色）
       expect(C.accent, C.ink, reason: '强调色 = 主文字色');
       // 压在深色块上的字必须是纯白：纸白 #F5F2EA 压上去会脏，且对比度略低
       expect(C.onAccent, const Color(0xFFFFFFFF));
       // 旧色板里 accentSoft / accentWash / bg2 三个都是 #EFEBE3，互相钉死会掩盖
       // 单值漂移（改一个等于改三个）；这一版三者互不相同，各自钉自己的值。
-      expect(C.accentSoft, const Color(0xFFEEEAE3));
-      expect(C.accentWash, const Color(0xFFF2F0EB));
+      expect(C.accentSoft, const Color(0xFFEEF0F4));
+      expect(C.accentWash, const Color(0xFFF0F2F5));
       expect(C.todayMark, C.ink);
       expect(C.onTodayMark, const Color(0xFFFFFFFF));
-      expect(C.cardShadow, const Color(0x0D1C1A17));
-      expect(C.handle, const Color(0xFFE9E5DC));
-      expect(C.heroEdge, const Color(0xFFD8D0C1));
-      // 白卡压纸白底（1.12:1），靠明度差 + 投影分开（D-10）
+      expect(C.cardShadow, const Color(0x0D14161A));
+      expect(C.handle, const Color(0xFFE7EAF0));
+      expect(C.heroEdge, const Color(0xFFD8DDE5));
+      // 白卡压浅灰底（约 1.13:1），靠明度差分开 —— 不再用投影
       expect(C.cardBg, const Color(0xFFFFFFFF));
-      expect(C.heroBg, const Color(0xFFECE7DE));
-      // 图表色阶：暖灰十档，越靠前越主要
+      expect(C.heroBg, const Color(0xFFE8EBF1));
+      // 图表色阶：中性灰十档，越靠前越主要
       expect(kChart, const [
-        Color(0xFF1C1A17),
-        Color(0xFF322F2B),
-        Color(0xFF47443F),
-        Color(0xFF5D5952),
-        Color(0xFF726E66),
-        Color(0xFF88837A),
-        Color(0xFF9D988E),
-        Color(0xFFB3ADA1),
-        Color(0xFFC8C2B5),
-        Color(0xFFDED7C9),
+        Color(0xFF14161A),
+        Color(0xFF2E3238),
+        Color(0xFF454A52),
+        Color(0xFF5C626B),
+        Color(0xFF737A84),
+        Color(0xFF8B929C),
+        Color(0xFFA3AAB4),
+        Color(0xFFBBC2CB),
+        Color(0xFFD2D8E0),
+        Color(0xFFE8ECF2),
       ]);
       expect(kChart.length, 10, reason: '饼图切片按十档循环');
     });
