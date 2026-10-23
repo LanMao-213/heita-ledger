@@ -137,6 +137,25 @@ class Pacing {
     return d > 0 ? d : 0;
   }
 
+  /// 只在**有新增信息**时给一句话：已经结束、按现在的速度会超。
+  ///
+  /// 正常状态返回 null；已经超支也返回 null —— 卡片上那行已经用红字写了
+  /// 「超支 833.00」，再补一句「已超支」就是同一件事说两遍，还白占一块灰底。
+  String? get alert {
+    if (!hasBudget) return null;
+    if (finished) {
+      return leftCents >= 0
+          ? '$label已结束，还剩 ${Fmt.money(leftCents)}'
+          : '$label已结束，超支 ${Fmt.money(overCents)}';
+    }
+    if (leftCents < 0) return null;
+    if (projectedOverCents > 0 && perDayRealCents > perDayBudgetCents) {
+      // 不重复「每天控制在 X 以内」—— 上方的「每天可花」就是那个数
+      return '按现在的节奏会超 ${Fmt.money(projectedOverCents)}';
+    }
+    return null;
+  }
+
   /// 一句人话。四种状态，读完就知道下一步该干嘛。
   String get sentence {
     if (!hasBudget) {

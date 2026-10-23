@@ -271,28 +271,46 @@ class _TotalBudgetCard extends StatelessWidget {
               children: [
                 Text('还剩 ${pacing.remainDays} 天', style: T.caption),
                 const Spacer(),
-                Text(
-                  '每天可花 ${Fmt.money(pacing.canSpendPerDayCents)}',
-                  style: T.caption.copyWith(
-                    color: C.ink,
-                    fontWeight: FontWeight.w600,
+                // 已经超支时这个数必然是 0.00 —— 一个恒为 0 的数字不是信息
+                if (pacing.canSpendPerDayCents > 0)
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(text: '每天可花 ', style: T.caption),
+                        TextSpan(
+                          text: Fmt.money(pacing.canSpendPerDayCents),
+                          style: T.amountSm,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
-            const SizedBox(height: S.md),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(S.md),
-              decoration: BoxDecoration(
-                color: C.bg3,
-                borderRadius: BorderRadius.circular(R.sm),
+            // 只在**有新增信息**时出现（已结束 / 按现在节奏会超）。
+            // 原来这里常驻一块灰底文案，把上面「剩余 X」「每天可花 Y」
+            // 原样复述一遍 —— 同一组数字说两遍，还多占 60dp 高度。
+            if (pacing.alert != null) ...[
+              const SizedBox(height: S.md),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LineIcon(
+                    'info',
+                    size: 15,
+                    color: over ? C.over : C.ink3,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      pacing.alert!,
+                      style: T.body2.copyWith(
+                        color: over ? C.over : C.ink2,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: Text(
-                pacing.sentence,
-                style: T.caption.copyWith(height: 1.6),
-              ),
-            ),
+            ],
           ],
         ],
       ),
@@ -340,11 +358,29 @@ class _CategoryBudgets extends StatelessWidget {
       );
     }
 
+    // 分成两组：设了额度的看进度，没设额度的直接可以点去设。
+    // 原来混在一张列表里，没额度的只有「未设预算」四个字，既没有进度
+    // 也没有动作 —— 而花得最多的分类往往正在这一组里（房租这类）。
+    final budgeted = rows.where((b) => b.budgetCents > 0).toList();
+    final unbudgeted = rows.where((b) => b.budgetCents <= 0).toList();
+
     return SectionCard(
       padding: const EdgeInsets.symmetric(vertical: S.sm),
       child: Column(
         children: [
-          for (final b in rows) _BudgetRow(stat: b),
+          for (final b in budgeted)
+            _BudgetRow(stat: b, onTap: () => _editBudget(context, b)),
+          if (budgeted.isNotEmpty && unbudgeted.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: S.lg),
+              child: Divider(
+                height: 1,
+                thickness: hairlineOf(context),
+                color: C.line,
+              ),
+            ),
+          for (final b in unbudgeted)
+            _UnbudgetedRow(stat: b, onTap: () => _editBudget(context, b)),
           Divider(height: 1, thickness: hairlineOf(context), color: C.line),
           Align(
             alignment: Alignment.centerLeft,
@@ -363,6 +399,25 @@ class _CategoryBudgets extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// 点已设额度的行 → 直接改这一类的额度（不用先逛选择器）。
+  Future<void> _editBudget(BuildContext context, BudgetStat b) async {
+    final s = Store.i;
+    final v = await _askAmount(
+      context,
+      title: '${b.name} 的预算',
+      initial: b.budgetCents,
+    );
+    if (v == null) return;
+    await Repo.setBudget(
+      ledgerId: s.ledgerId,
+      periodStart: s.cycleFrom,
+      categoryId: b.categoryId,
+      amountCents: v,
+    );
+    await s.afterBudgetChange();
+    if (context.mounted) showToast(context, v <= 0 ? '已清除' : '已更新');
   }
 
   Future<void> _addCategoryBudget(BuildContext context) async {
@@ -408,45 +463,47 @@ class _CategoryBudgets extends StatelessWidget {
 }
 
 class _BudgetRow extends StatelessWidget {
-  const _BudgetRow({required this.stat});
+  const _BudgetRow({required this.stat, required this.onTap});
 
   final BudgetStat stat;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final hasBudget = stat.budgetCents > 0;
-    final ratio = hasBudget ? stat.ratio : 0.0;
+    final ratio = stat.ratio;
 
-    return Padding(
-      // 列表卡的左右内边距是 0，左右 16 由行自己补，才和别的内容卡对齐
-      padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.md),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              LineIcon(stat.icon, size: 18, color: C.ink2),
-              const SizedBox(width: S.md),
-              Text(
-                stat.name,
-                style: T.body.copyWith(fontWeight: FontWeight.w500),
-              ),
-              const Spacer(),
-              if (hasBudget)
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        // 列表卡的左右内边距是 0，左右 16 由行自己补，才和别的内容卡对齐
+        padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.md),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                LineIcon(stat.icon, size: 18, color: C.ink2),
+                const SizedBox(width: S.md),
                 Text(
-                  '${Fmt.money(stat.spentCents)} / ${Fmt.money(stat.budgetCents)}',
+                  stat.name,
+                  style: T.body.copyWith(fontWeight: FontWeight.w500),
+                ),
+                const Spacer(),
+                // 已用是主角、额度是参照：原来两个数字同字号同灰度，
+                // 读不出哪个是花掉的、哪个是上限
+                Text(
+                  Fmt.money(stat.spentCents),
                   style: T.amountSm.copyWith(
                     fontSize: T.body2.fontSize,
                     color: stat.over ? C.over : C.ink,
                   ),
-                )
-              else
+                ),
                 Text(
-                  '${Fmt.money(stat.spentCents)}  ·  未设预算',
+                  ' / ${Fmt.money(stat.budgetCents)}',
                   style: T.caption,
                 ),
-            ],
-          ),
-          if (hasBudget) ...[
+              ],
+            ),
             const SizedBox(height: S.sm),
             Bar(ratio: ratio, over: stat.over, height: 5),
             if (stat.over) ...[
@@ -466,7 +523,45 @@ class _BudgetRow extends StatelessWidget {
               ),
             ],
           ],
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 未设额度：一行，点一下就能设。
+///
+/// 不把这行做「灰」—— 待设额度的常常是花得最多的分类，
+/// 把最大的支出画成禁用态，方向正好反了。
+class _UnbudgetedRow extends StatelessWidget {
+  const _UnbudgetedRow({required this.stat, required this.onTap});
+
+  final BudgetStat stat;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 11),
+        child: Row(
+          children: [
+            LineIcon(stat.icon, size: 18, color: C.ink2),
+            const SizedBox(width: S.md),
+            Expanded(
+              child: Text(
+                stat.name,
+                style: T.body,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(Fmt.money(stat.spentCents), style: T.amountSm),
+            const SizedBox(width: S.sm),
+            Text('设额度', style: T.caption),
+          ],
+        ),
       ),
     );
   }
