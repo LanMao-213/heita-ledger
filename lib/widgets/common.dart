@@ -462,6 +462,7 @@ class SettingRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.danger = false,
+    this.showChevron = true,
   });
 
   final String icon;
@@ -474,6 +475,10 @@ class SettingRow extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool danger;
+
+  /// 行尾那颗 ›。设置页里它表示「进入下一页」，在**动作菜单**里没有下一页，
+  /// 画出来会让人以为点完还要再跳一层 —— 那些地方传 false。
+  final bool showChevron;
 
   @override
   Widget build(BuildContext context) {
@@ -507,7 +512,7 @@ class SettingRow extends StatelessWidget {
             ),
             if (trailing != null)
               trailing!
-            else if (onTap != null)
+            else if (onTap != null && showChevron)
               const LineIcon('chevron_right', size: 20, color: C.ink3),
           ],
         ),

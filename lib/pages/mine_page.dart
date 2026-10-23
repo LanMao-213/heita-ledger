@@ -562,6 +562,7 @@ class MinePage extends StatelessWidget {
               icon: 'tpl',
               title: '编辑资料',
               subtitle: '名称 · 类型 · 余额校准',
+              showChevron: false,
               onTap: () {
                 Navigator.pop(ctx);
                 _accountSheet(context, a);
@@ -572,6 +573,7 @@ class MinePage extends StatelessWidget {
               title: '删除账户',
               subtitle: '余额和记录会转到一个你指定的账户',
               danger: true,
+              showChevron: false,
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDeleteAccount(context, a);
@@ -617,7 +619,7 @@ class MinePage extends StatelessWidget {
               Text(
                 empty
                     ? '这个账户没有余额，也没有记录。'
-                    : '它名下的余额和记录会一起并到下面这个账户：',
+                    : '余额和记录会并到这个账户：',
                 style: T.body2,
               ),
               if (!empty) ...[
@@ -640,8 +642,7 @@ class MinePage extends StatelessWidget {
                 ),
                 const SizedBox(height: S.md),
                 Text(
-                  '$count 笔记录会挂在目标账户名下（历史不丢）；'
-                  '${Fmt.yuan(a.balanceCents)} 的余额也一起过去。',
+                  '$count 笔记录会挂到目标账户名下，历史不丢。',
                   style: T.caption,
                 ),
               ],
