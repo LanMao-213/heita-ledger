@@ -238,38 +238,44 @@ class _TopBar extends StatelessWidget {
     final s = Store.i;
     return Padding(
       padding: const EdgeInsets.only(top: S.sm),
-      child: Row(
-        children: [
-          const SizedBox(width: S.xl),
-          Text(s.currentLedger?.name ?? '账本', style: T.title),
-          const SizedBox(width: S.sm),
-          if (s.ledgers.length > 1)
-            GestureDetector(
-              onTap: () => _pickLedger(context),
-              child: const LineIcon(
-                'chevron_down',
-                size: 18,
-                color: C.ink3,
+      child: PageHeader(
+        title: s.currentLedger?.name ?? '账本',
+        // 账本名右侧的切换箭头：它不是「更多动作」，是标题的一部分
+        titleSuffix: s.ledgers.length > 1
+            ? GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _pickLedger(context),
+                child: const Padding(
+                  padding: EdgeInsets.only(left: S.sm),
+                  child: LineIcon('chevron_down', size: 18, color: C.ink3),
+                ),
+              )
+            : null,
+        actions: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: () => _openFilter(context),
+              tooltip: '筛选',
+              icon: LineIcon(
+                'filter',
+                size: 20,
+                color: s.filtering ? C.ink : C.ink2,
               ),
+              splashRadius: 20,
             ),
-          const Spacer(),
-          IconButton(
-            onPressed: () => _openFilter(context),
-            tooltip: '筛选',
-            icon: LineIcon(
-              'filter',
-              size: 20,
-              color: s.filtering ? C.ink : C.ink2,
+            IconButton(
+              onPressed: () => _search(context),
+              icon: const LineIcon(
+                'search',
+                semanticLabel: '搜索',
+                size: 20,
+                color: C.ink2,
+              ),
+              splashRadius: 20,
             ),
-            splashRadius: 20,
-          ),
-          IconButton(
-            onPressed: () => _search(context),
-            icon: const LineIcon('search', semanticLabel: '搜索', size: 20, color: C.ink2),
-            splashRadius: 20,
-          ),
-          const SizedBox(width: S.sm),
-        ],
+          ],
+        ),
       ),
     );
   }

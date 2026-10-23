@@ -893,21 +893,13 @@ class _BrandHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 50px 的标志压在最上面、又不承担任何功能，是「装饰占着最贵的位置」。
+    // 收到 28 并进同一条页头：四页的内容起点从此对齐在同一高度。
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.lg, S.lg, S.lg, S.md),
-      child: Row(
-        children: [
-          const BrandMark(height: 50),
-          const SizedBox(width: S.md),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(kAppName, style: T.title),
-              const SizedBox(height: 2),
-              Text('记账，简单点', style: T.caption),
-            ],
-          ),
-        ],
+      padding: const EdgeInsets.only(top: S.sm),
+      child: PageHeader(
+        title: kAppName,
+        leading: const BrandMark(height: 28),
       ),
     );
   }

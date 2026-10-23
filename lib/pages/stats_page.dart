@@ -90,10 +90,10 @@ class _StatsPageState extends State<StatsPage> {
         return ListView(
           padding: const EdgeInsets.only(bottom: S.xxl),
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: S.md),
-              child: _BasisSwitch(),
-            ),
+            // 「本期 / 本月」原来独占内容区第一行（约 44dp），
+            // 而页头右侧一直空着。它是**口径切换**，属于这一页的标题层，
+            // 提到页头右侧之后，省掉一整行，区间条也上升了一层。
+            PageHeader(title: '图表', actions: _BasisSwitch()),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: S.lg),
               child: s.statBasis == StatBasis.period
@@ -289,7 +289,9 @@ class _BasisSwitch extends StatelessWidget {
           decoration: BoxDecoration(
             color: on ? C.ink : Colors.transparent,
             borderRadius: BorderRadius.circular(R.pill),
-            border: Border.all(color: on ? C.ink : C.line),
+            // 未选中用 line2：底色与页面底只差 1.05:1，line(1.05) 完全看不出
+            // 胶囊的边界，选中/未选中就只剩「有无实心」这一条线索
+            border: Border.all(color: on ? C.ink : C.line2),
           ),
           child: Text(
             label,

@@ -87,6 +87,23 @@ bool isCurrentCycle(String from, String to, {DateTime? now}) {
 String cycleLabel(String from, String to) =>
     '${shortYmd(from)} 至 ${shortYmd(to)}';
 
+/// 页头之下的**大号**区间文案：`10月1日 – 10月31日`
+///
+/// 区间文案升到 20px 之后，原来的 `10-01 至 10-31` 读起来有两个问题：
+/// ① 20px 的数字容易被当成金额或日期里的「10.01」；② 两个短横加一个「至」，
+/// 一行里三条分隔符打架。中文月日最没有歧义。
+///
+/// 跨年的一期也不带年份 —— 一年只发生一次，不值得为它给 360 天的标签都加年份。
+/// 卡内紧凑位（概览卡）仍用 [periodLabel]：那里宽度只有一行的一小截。
+String longRangeLabel(String from, String to) =>
+    '${_cnYmd(from)} – ${_cnYmd(to)}';
+
+String _cnYmd(String ymd) {
+  final p = ymd.split('-');
+  if (p.length != 3) return ymd;
+  return '${int.tryParse(p[1]) ?? 0}月${int.tryParse(p[2]) ?? 0}日';
+}
+
 /// 明细页概览卡上的文案：`10.01 至 10.31`
 ///
 /// 和 [cycleLabel] 的差别只有两处，但读起来轻很多：

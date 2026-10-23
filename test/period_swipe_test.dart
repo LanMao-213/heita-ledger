@@ -102,7 +102,10 @@ void main() {
     // 箭头已经去掉；区间用「至」
     expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
     expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
-    expect(find.text('10-15 至 11-14'), findsOneWidget);
+    // 区间文案在 2026-10-23 从小号的「10-15 至 11-14」换成了大号中文
+    // 「10月15日 – 11月14日」：升到 20px 之后，点分数字会被读成金额，
+    // 而两个短横加一个「至」在一行里是三条分隔符。见 cycle.dart#longRangeLabel。
+    expect(find.text('10月15日 – 11月14日'), findsOneWidget);
 
     // 左滑 → 下一期
     await tester.drag(find.byType(CycleBar), const Offset(-120, 0));
@@ -122,7 +125,7 @@ void main() {
     expect(next, 1, reason: '手指抖一下不该翻页');
 
     // 双击 → 回到当前
-    final label = find.text('10-15 至 11-14');
+    final label = find.text('10月15日 – 11月14日');
     await tester.tap(label);
     await tester.pump(const Duration(milliseconds: 60));
     await tester.tap(label);

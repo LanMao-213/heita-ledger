@@ -280,6 +280,18 @@ abstract final class T {
     letterSpacing: -0.2,
   );
 
+  /// 页头之下、内容之上的**主文字**：区间行（「10月1日 – 10月31日」）、
+  /// 图表环形中心这类「卡片内次级大数字」。
+  ///
+  /// 22（[title]）给页面标题，20 给这一层 —— 两级都要，只差 2px 但该差。
+  static const titleSm = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w600,
+    color: C.ink,
+    letterSpacing: -0.1,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
   static const section = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w600,

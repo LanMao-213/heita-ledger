@@ -227,8 +227,6 @@ class CycleBar extends StatelessWidget {
     required this.onNext,
     this.onTapLabel,
     this.onReset,
-    this.onDark = false,
-    this.trailing,
   });
 
   final String from;
@@ -240,40 +238,38 @@ class CycleBar extends StatelessWidget {
   /// 双击区间文案 → 回到今天所在的期
   final VoidCallback? onReset;
 
-  /// 放在深色卡里时用（首页 hero）
-  final bool onDark;
-
-  /// 右侧附加按钮（首页放「日历」入口）
-  final Widget? trailing;
-
   @override
   Widget build(BuildContext context) {
-    final label = onDark ? C.bg : C.ink;
     return SwipeFlip(
       onPrev: onPrev,
       onNext: onNext,
       onTap: onTapLabel,
       onDoubleTap: onReset,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // 标签比月份条长（「10-15 至 11-14」），窄屏或带右侧按钮时会被挤爆：
-          // 交给 Flexible + FittedBox 收字号，宁可小一点也不要黄黑条。
-          Flexible(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  cycleLabel(from, to),
-                  maxLines: 1,
-                  style: T.amountSm.copyWith(color: label),
+      // Center + Row(min)：让「10月1日 – 10月31日」和日历图案作为一个整体居中，
+      // 而不是各自被 Row 的剩余空间拉开。
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 窄屏或跨年长文案会被挤爆：交给 Flexible + FittedBox 收字号，
+            // 宁可小一点也不要黄黑条。
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(longRangeLabel(from, to), maxLines: 1, style: T.titleSm),
                 ),
               ),
             ),
-          ),
-          if (trailing != null) ...[const Spacer(), trailing!],
-        ],
+            // 日历图案贴在标签右边：表达「点这里能挑日期」，
+            // 而不是和标签并列的另一个入口。
+            if (onTapLabel != null) ...[
+              const SizedBox(width: S.xs),
+              const LineIcon('calendar', size: 18, color: C.ink3),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -366,8 +362,6 @@ class MonthBar extends StatelessWidget {
     required this.onNext,
     this.onTapLabel,
     this.onReset,
-    this.onDark = false,
-    this.trailing,
   });
 
   final String month;
@@ -378,38 +372,32 @@ class MonthBar extends StatelessWidget {
   /// 双击月份文案 → 回到本月
   final VoidCallback? onReset;
 
-  /// 放在深色卡里时用（首页 hero）：文字与箭头的对比度要跟着换
-  final bool onDark;
-
-  /// 右侧附加按钮（首页放「日历」入口）
-  final Widget? trailing;
-
   @override
   Widget build(BuildContext context) {
-    final label = onDark ? C.bg : C.ink;
     return SwipeFlip(
       onPrev: onPrev,
       onNext: onNext,
       onTap: onTapLabel,
       onDoubleTap: onReset,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Flexible(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  Fmt.monthLabel(month),
-                  maxLines: 1,
-                  style: T.amountSm.copyWith(color: label),
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(Fmt.monthLabel(month), maxLines: 1, style: T.titleSm),
                 ),
               ),
             ),
-          ),
-          if (trailing != null) ...[const Spacer(), trailing!],
-        ],
+            if (onTapLabel != null) ...[
+              const SizedBox(width: S.xs),
+              const LineIcon('calendar', size: 18, color: C.ink3),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -575,4 +563,67 @@ void showToast(BuildContext context, String message) {
         duration: const Duration(seconds: 2),
       ),
     );
+}
+
+/// 四个主 tab 共用的页头。
+///
+/// 改这一版之前，四页顶部是四种形态：明细是「账本名 + 筛选/搜索」、
+/// 图表页**直接以分段控件开头**、计划页**连标题都没有**（第一行就是区间条）、
+/// 我的页是 50px 品牌标志。同一个 App 的四页，内容起点各不相同。
+///
+/// 高度取 48 而不是 44：明细页右侧并排两个 `IconButton`，Material 的
+/// 最小点击区就是 48，压到 44 会裁掉触控范围。
+class PageHeader extends StatelessWidget {
+  const PageHeader({
+    super.key,
+    required this.title,
+    this.leading,
+    this.titleSuffix,
+    this.actions,
+  });
+
+  final String title;
+
+  /// 标题左侧（我的页的品牌标志）
+  final Widget? leading;
+
+  /// 标题紧右侧（明细页的账本切换箭头）
+  final Widget? titleSuffix;
+
+  /// 右侧动作（筛选 / 搜索 / 本期-本月切换）
+  final Widget? actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
+          const SizedBox(width: S.lg),
+          if (leading != null) ...[leading!, const SizedBox(width: S.sm)],
+          Expanded(
+            child: Row(
+              children: [
+                // 账本名是用户自己起的，可能很长：让它自己省略，
+                // 不要把右侧的按钮挤出去
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: T.title,
+                  ),
+                ),
+                ?titleSuffix,
+              ],
+            ),
+          ),
+          ?actions,
+          // 右侧留 12 而不是 8：分段胶囊这类没有自带内边距的动作，
+          // 贴到 8 会紧得像被屏幕切掉一角
+          const SizedBox(width: S.md),
+        ],
+      ),
+    );
+  }
 }
