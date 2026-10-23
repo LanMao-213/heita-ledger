@@ -74,19 +74,55 @@ Future<void> _loadChineseFont() async {
 }
 
 /// 图标字体在测试环境里不会自动加载，不补的话所有 Icon 都是方块。
+///
+/// ⚠️ 文件名是**全小写**的 `materialicons-regular.otf`。原来写成
+/// `MaterialIcons-Regular.otf`：Windows 不区分大小写，本机照样能找到，
+/// 问题一直没暴露；Linux（CI）区分大小写，永远找不到 —— 也就是说此前
+/// CI 与本机截图里的 Icon 其实一直是方块。
 Future<void> _loadIconFont() async {
-  final root = Platform.environment['FLUTTER_ROOT'] ?? r'C:\src\flutter';
-  final file = File(
-    '$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
-  );
-  if (!file.existsSync()) return;
+  // flutter test 跑在 <root>/bin/cache/artifacts/engine/<平台>/flutter_tester，
+  // 所以从 FLUTTER_ROOT 或可执行文件位置往上找都能到达 bin/cache。
+  final fr = Platform.environment['FLUTTER_ROOT'];
+  final starts = <Directory>[
+    if (fr != null) Directory(fr),
+    Directory(Platform.resolvedExecutable).parent,
+  ];
+  Directory? fontsDir;
+  for (final start in starts) {
+    var d = start;
+    for (var i = 0; i < 8; i++) {
+      final candidate = Directory('${d.path}/bin/cache/artifacts/material_fonts');
+      if (candidate.existsSync()) {
+        fontsDir = candidate;
+        break;
+      }
+      if (d.parent.path == d.path) break;
+      d = d.parent;
+    }
+    if (fontsDir != null) break;
+  }
+  final otf = fontsDir == null
+      ? null
+      : File('${fontsDir.path}/materialicons-regular.otf');
+  if (otf == null || !otf.existsSync()) {
+    // 只警告，不阻断：这个目录是 flutter 工具按需下载的，CI 上只跑
+    // `flutter test` 的话根本没有 bin/cache/artifacts/material_fonts。
+    // 图标缺字只是截图上显示成方块，Icon 的尺寸由 size 固定，不影响布局断言 ——
+    // 和中文字体不同（方块汉字的字宽会改变测量结果，那个必须 fail）。
+    // ignore: avoid_print
+    print('⚠️ 未找到 MaterialIcons 字体，截图里的 Icon 会是方块。'
+        '查找起点：${starts.map((d) => d.path).join('、')}');
+    return;
+  }
   final loader = FontLoader('MaterialIcons')
     ..addFont(
       Future.value(
-        ByteData.view(Uint8List.fromList(file.readAsBytesSync()).buffer),
+        ByteData.view(Uint8List.fromList(otf.readAsBytesSync()).buffer),
       ),
     );
   await loader.load();
+  // ignore: avoid_print
+  print('已加载图标字体：${otf.path}');
 }
 
 Future<void> _shot(WidgetTester tester, String path) async {
@@ -101,6 +137,72 @@ Future<void> _shot(WidgetTester tester, String path) async {
     // ignore: avoid_print
     print('截图 $path (${image.width}x${image.height})');
   });
+}
+
+/// 布局溢出检查。
+///
+/// 不用裸的 `expect(takeException(), isNull)`：它只留一行
+/// 「A RenderFlex overflowed by 54 pixels on the right.」，既没有 creator 链
+/// 也没有行内文字，只能靠猜（为这一行猜错过三次）。完整的 FlutterErrorDetails
+/// 也拿不到 —— binding 在 runTest 时会把 FlutterError.onError 换成自己的，
+/// 外面挂的钩子收不到。所以溢出时自己在渲染树里比对一遍。
+void _check(WidgetTester tester, String label) {
+  final err = tester.takeException();
+  if (err == null) return;
+  final detail = _overflowDetail(tester);
+  debugPrint('!!!! 溢出 @ $label：$err\n$detail');
+  fail('$label有布局溢出：$err\n$detail');
+}
+
+/// 在渲染树里找溢出的 RenderFlex：子节点实际边界超出自身 size 的就是。
+/// 顺带打出里面的文字和 widget 链，看一眼就知道是哪一行。
+String _overflowDetail(WidgetTester tester) {
+  final found = <String>[];
+  for (final ro in tester.allRenderObjects) {
+    if (ro is! RenderFlex || !ro.hasSize) continue;
+    var maxRight = 0.0;
+    var maxBottom = 0.0;
+    RenderBox? child = ro.firstChild;
+    while (child != null) {
+      if (child.hasSize) {
+        final o = child.localToGlobal(Offset.zero, ancestor: ro);
+        if (o.dx + child.size.width > maxRight) {
+          maxRight = o.dx + child.size.width;
+        }
+        if (o.dy + child.size.height > maxBottom) {
+          maxBottom = o.dy + child.size.height;
+        }
+      }
+      child = ro.childAfter(child);
+    }
+    final over = ro.direction == Axis.horizontal
+        ? maxRight - ro.size.width
+        : maxBottom - ro.size.height;
+    if (over > 0.5) {
+      found.add(
+        '多出 ${over.toStringAsFixed(1)}px「${_textsOf(ro)}」\n'
+        '  ${ro.debugCreator}',
+      );
+    }
+  }
+  return found.isEmpty ? '（没定位到，可能已不在树上）' : found.join('\n');
+}
+
+/// 取这个 RenderFlex 里的文字，认行用。
+String _textsOf(RenderFlex ro) {
+  final out = <String>[];
+  void walk(RenderObject o) {
+    if (out.length >= 3) return;
+    if (o is RenderParagraph) {
+      final t = o.text.toPlainText().replaceAll('\n', ' ');
+      if (t.trim().isNotEmpty) out.add(t.trim());
+      return;
+    }
+    o.visitChildren(walk);
+  }
+
+  walk(ro);
+  return out.join(' | ');
 }
 
 void main() {
@@ -139,7 +241,7 @@ void main() {
 
     // ---- 明细页 ----
     await _shot(tester, 'build/visual/shot_1_detail.png');
-    expect(tester.takeException(), isNull, reason: '明细页有布局溢出');
+    _check(tester, '明细页有布局溢出');
 
     // ---- 日历卡片（上下滚动，没有左右翻月）----
     await tester.tap(
@@ -152,7 +254,7 @@ void main() {
     );
     await tester.pump();
     await _shot(tester, 'build/visual/shot_14_calendar.png');
-    expect(tester.takeException(), isNull, reason: '日历卡片有布局溢出');
+    _check(tester, '日历卡片有布局溢出');
     await tester.tapAt(const Offset(195, 60));
     await tester.pumpAndSettle();
 
@@ -160,13 +262,13 @@ void main() {
     await tester.tap(find.text('图表'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_2_stats.png');
-    expect(tester.takeException(), isNull, reason: '图表页有布局溢出');
+    _check(tester, '图表页有布局溢出');
 
     // ---- 计划页 ----
     await tester.tap(find.text('计划'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_3_plan.png');
-    expect(tester.takeException(), isNull, reason: '计划页有布局溢出');
+    _check(tester, '计划页有布局溢出');
 
     // ---- 往来页（先造一条借出，否则只能截到空态）----
     await tester.runAsync(() async {
@@ -197,7 +299,7 @@ void main() {
     await tester.tap(find.text('往来'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_22_debts.png');
-    expect(tester.takeException(), isNull, reason: '往来页有布局溢出');
+    _check(tester, '往来页有布局溢出');
     await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
     await tester.pumpAndSettle();
 
@@ -205,13 +307,13 @@ void main() {
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_4_mine.png');
-    expect(tester.takeException(), isNull, reason: '我的页有布局溢出');
+    _check(tester, '我的页有布局溢出');
 
     // ---- 分类管理（一级列表）----
     await tester.tap(find.text('分类管理'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_16_cats.png');
-    expect(tester.takeException(), isNull, reason: '分类管理页有布局溢出');
+    _check(tester, '分类管理页有布局溢出');
 
     // ---- 分类管理（停用一个，看末尾的「已停用」段）----
     // 挑最后一个（「其他」），不影响后面点「餐饮」进子分类
@@ -229,7 +331,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_23_cats_archived.png');
-    expect(tester.takeException(), isNull, reason: '「已停用」段有布局溢出');
+    _check(tester, '「已停用」段有布局溢出');
     // 拍完复原，后面的截图仍按「全部分类都在」的状态走
     await tester.runAsync(() async {
       await Repo.setCategoryArchived(victim.id, archived: false);
@@ -244,7 +346,7 @@ void main() {
     await tester.tap(find.text('餐饮').first);
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_17_subcats.png');
-    expect(tester.takeException(), isNull, reason: '子分类页有布局溢出');
+    _check(tester, '子分类页有布局溢出');
     // 这两页用的是自绘返回按钮，tester.pageBack() 找不到系统返回键
     await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
     await tester.pumpAndSettle();
@@ -255,13 +357,13 @@ void main() {
     await tester.tap(find.text('记账模板'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_6_templates.png');
-    expect(tester.takeException(), isNull, reason: '模板页有布局溢出');
+    _check(tester, '模板页有布局溢出');
 
     // ---- 模板编辑页 ----
     await tester.tap(find.text('早餐'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_7_template_editor.png');
-    expect(tester.takeException(), isNull, reason: '模板编辑页有布局溢出');
+    _check(tester, '模板编辑页有布局溢出');
     await tester.tap(find.byIcon(Icons.arrow_back_rounded));
     await tester.pumpAndSettle();
     // 回到「我的」
@@ -275,20 +377,20 @@ void main() {
     await tester.tapAt(const Offset(195, 802));
     await tester.pumpAndSettle(const Duration(milliseconds: 600));
     await _shot(tester, 'build/visual/shot_5_record.png');
-    expect(tester.takeException(), isNull, reason: '记一笔面板有布局溢出');
+    _check(tester, '记一笔面板有布局溢出');
 
     // ---- 记一笔：填了金额的样子（确认键变成可用的重色块）----
     await tester.tap(find.text('1'));
     await tester.tap(find.text('2'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_15_record_filled.png');
-    expect(tester.takeException(), isNull, reason: '记一笔（有金额）有布局溢出');
+    _check(tester, '记一笔（有金额）有布局溢出');
 
     // ---- 分类 + 子分类双轮盘 ----
     await tester.tap(find.textContaining('未细分'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_11_note_wheel.png');
-    expect(tester.takeException(), isNull, reason: '双轮盘有布局溢出');
+    _check(tester, '双轮盘有布局溢出');
 
     // ---- 详情字段（出行）：默认折叠 ----
     // 左轮滚一格（餐饮 → 出行），右轮滚一格（不细分 → 公共交通）后确定
@@ -299,13 +401,13 @@ void main() {
     await tester.tap(find.text('确定'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_18_detail_folded.png');
-    expect(tester.takeException(), isNull, reason: '详情折叠态有布局溢出');
+    _check(tester, '详情折叠态有布局溢出');
 
     // ---- 详情字段（出行）：展开 ----
     await tester.tap(find.text('＋ 添加详情'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_19_detail_open.png');
-    expect(tester.takeException(), isNull, reason: '详情展开态有布局溢出');
+    _check(tester, '详情展开态有布局溢出');
 
     // ---- 详情字段（人情）：对象直接平铺 ----
     await tester.tap(find.textContaining('出行').first);
@@ -321,7 +423,7 @@ void main() {
     await tester.tap(find.text('确定'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_20_detail_inline.png');
-    expect(tester.takeException(), isNull, reason: '人情对象平铺有布局溢出');
+    _check(tester, '人情对象平铺有布局溢出');
 
     // 复位到「餐饮 / 不细分」：详情区会把面板撑高，后面的日期/账户截图要求它够短
     await tester.tap(find.textContaining('人情').first);
@@ -338,7 +440,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('record_date_chip')));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     await _shot(tester, 'build/visual/shot_12_date_picker.png');
-    expect(tester.takeException(), isNull, reason: '日期选择有布局溢出');
+    _check(tester, '日期选择有布局溢出');
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
 
@@ -346,7 +448,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('record_account_chip')));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_13_account_sheet.png');
-    expect(tester.takeException(), isNull, reason: '账户选择有布局溢出');
+    _check(tester, '账户选择有布局溢出');
     await tester.tapAt(const Offset(195, 80));
     await tester.pumpAndSettle();
 
@@ -357,7 +459,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.tune_rounded));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     await _shot(tester, 'build/visual/shot_8_filter_sheet.png');
-    expect(tester.takeException(), isNull, reason: '筛选面板有布局溢出');
+    _check(tester, '筛选面板有布局溢出');
 
     // ---- 筛选中二级分类：点「餐饮」后下面多出一排子分类 ----
     await tester.tap(
@@ -369,7 +471,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_21_filter_subcats.png');
-    expect(tester.takeException(), isNull, reason: '子分类筛选排有布局溢出');
+    _check(tester, '子分类筛选排有布局溢出');
 
     // ---- 筛选生效后的明细页 ----
     // 面板里的实时计数会走真实数据库（假时钟里 await 不到），这里直接从
@@ -388,7 +490,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_9_filter_result.png');
-    expect(tester.takeException(), isNull, reason: '筛选结果页有布局溢出');
+    _check(tester, '筛选结果页有布局溢出');
 
     // ---- 筛选空结果态 ----
     await tester.runAsync(() async {
@@ -396,7 +498,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_10_filter_empty.png');
-    expect(tester.takeException(), isNull, reason: '筛选空结果页有布局溢出');
+    _check(tester, '筛选空结果页有布局溢出');
 
     // ---- 数据安全（自动快照列表）----
     // 单测里没有 path_provider 的平台通道，快照目录指到临时目录
@@ -432,7 +534,7 @@ void main() {
     });
     await tester.pump();
     await _shot(tester, 'build/visual/shot_24_safety.png');
-    expect(tester.takeException(), isNull, reason: '数据安全页有布局溢出');
+    _check(tester, '数据安全页有布局溢出');
   });
 }
 
