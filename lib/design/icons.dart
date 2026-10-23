@@ -140,27 +140,37 @@ Path lineIconPath(String name) => _pathCache.putIfAbsent(
   () => parseSvgFragment(kIcons[name] ?? kIcons['more']!),
 );
 
+/// 按渲染尺寸反算线宽，目标是**实际粗细恒定**。
+///
+/// 旧实现是「1.5 × size/24」等比缩放：15px 的图标只有 0.94dp、40px 的有
+/// 2.50dp —— 同一套图标在模板条和空态之间重量差 2.6 倍，看起来不像一套。
+/// 现在按目标 dp 反算，15–40px 之间的重量差只有 1.36 倍。
+double iconStrokeFor(double size) {
+  final targetDp = size >= 32 ? 1.9 : 1.75;
+  // 上限 2.3（视图框单位）≈ 图形短边的 10%：再粗，16px 以下会糊成一团
+  return (targetDp * 24.0 / size).clamp(0.9, 2.3);
+}
+
 /// 线稿图标。
 ///
-/// [size] 是渲染尺寸；[strokeWidth] 是**视图框单位**下的线宽（默认 1.5）。
-/// [scaleStroke] 为 true 时线宽随 size 等比缩放 —— 这与原型里
-/// `<svg width="20" viewBox="0 0 24 24" stroke-width="1.5">` 的表现完全一致。
-/// 需要「大图标但线不变粗」时传 false。
+/// [size] 是渲染尺寸；[strokeWidth] 是**视图框单位**下的线宽，
+/// 留空则按 [iconStrokeFor] 自动取（推荐）。
+/// 只有「同一处要比邻居更重」的场合才显式传值（底栏选中态、FAB）。
 class LineIcon extends StatelessWidget {
   const LineIcon(
     this.name, {
     super.key,
     this.size = 20,
     required this.color,
-    this.strokeWidth = 1.5,
-    this.scaleStroke = true,
+    this.strokeWidth,
   });
 
   final String name;
   final double size;
   final Color color;
-  final double strokeWidth;
-  final bool scaleStroke;
+
+  /// 视图框单位；留空按 [iconStrokeFor] 走。
+  final double? strokeWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +180,7 @@ class LineIcon extends StatelessWidget {
         painter: _LineIconPainter(
           path: lineIconPath(name),
           color: color,
-          strokeWidth: scaleStroke ? strokeWidth : strokeWidth * 24.0 / size,
+          strokeWidth: strokeWidth ?? iconStrokeFor(size),
         ),
       ),
     );

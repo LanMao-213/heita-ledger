@@ -42,8 +42,15 @@ abstract final class Fmt {
   }
 
   /// 分 → 「¥1,234.56」
-  static String yuan(int cents, {bool sign = false}) =>
-      '¥${money(cents, sign: sign)}';
+  ///
+  /// 负数写成「-¥1,234.56」——符号在货币符号**之前**。旧实现是直接拼接，
+  /// 会产出「¥-134.50」，等于把负号放在了货币单位后面。
+  static String yuan(int cents, {bool sign = false}) {
+    final body = money(cents.abs());
+    if (cents < 0) return '-¥$body';
+    if (sign && cents > 0) return '+¥$body';
+    return '¥$body';
+  }
 
   /// 分 → 紧凑写法「1.2万」「3,456」，用于卡片上的大数字
   static String compact(int cents) {
@@ -53,20 +60,42 @@ abstract final class Fmt {
       final s = w.toStringAsFixed(w.abs() >= 100 ? 0 : 1);
       return '${s.endsWith('.0') ? s.substring(0, s.length - 2) : s}万';
     }
-    return money(cents, trimZero: true, sign: true);
+    // 不带强制符号：支出写「2,428.50」而不是「+2,428.50」。
+    // 环形图中心是支出合计，一个加号会让人以为它是收入或净额。
+    return money(cents, trimZero: true);
   }
 
   /// 「2026-10-16」→「10-16」
   static String md(String date) => date.length >= 10 ? date.substring(5) : date;
 
   /// 「2026-10-16」→「10月16日 周四」
-  static String friendly(String date) {
+  /// 「2026-10-23」→「10月23日 周五」
+  ///
+  /// [relative] 为 true 时，三天内改成「今天 / 昨天 / 前天」。
+  /// 只在**记账弹层的日期 chip** 用：那里用户要判断的是「这一笔算哪一天」，
+  /// 相对表达省掉一次心算。
+  /// 列表里的日期头**不用**相对表达 —— 它是分区标签，要能定位到具体哪天；
+  /// 而且回看历史时「今天」会随时间失真（三个月前的截图全是「今天」）。
+  static String friendly(String date, {bool relative = false, DateTime? now}) {
     final parts = date.split('-');
     if (parts.length != 3) return date;
     final d = DateTime.tryParse(date);
+    // 解析不了就原样给出。旧写法用 `?? 0` / `?? 1` 兜底，会把 "not-a-date"
+    // 编成「0月1日」—— 宁可显示原始串，也不要显示一个不存在的日期。
+    if (d == null) return date;
     const week = ['一', '二', '三', '四', '五', '六', '日'];
     final day = int.tryParse(parts[2]) ?? 1;
-    final wd = d == null ? '' : ' 周${week[d.weekday - 1]}';
+    final wd = ' 周${week[d.weekday - 1]}';
+    if (relative) {
+      final today = now ?? DateTime.now();
+      // 按「日历日」比较，不按 24 小时：23:50 记的账，第二天早上看是「昨天」
+      final diff = DateTime(today.year, today.month, today.day)
+          .difference(DateTime(d.year, d.month, d.day))
+          .inDays;
+      if (diff == 0) return '今天';
+      if (diff == 1) return '昨天';
+      if (diff == 2) return '前天';
+    }
     return '${int.tryParse(parts[1]) ?? 0}月$day日$wd';
   }
 

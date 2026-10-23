@@ -1075,7 +1075,7 @@ class _DebtFields extends StatelessWidget {
             decoration: InputDecoration(
               counterText: '',
               hintText: isBorrow ? '向谁借的（必填）' : '借给谁（必填）',
-              hintStyle: T.body2.copyWith(color: C.ink4),
+              hintStyle: T.body2.copyWith(color: C.ink3),
               filled: true,
               fillColor: C.bg2,
               isDense: true,
@@ -1205,7 +1205,8 @@ class _MetaRow extends StatelessWidget {
             child: _Chip(
               key: const ValueKey('record_date_chip'),
               icon: 'rec',
-              label: Fmt.friendly(date),
+              // 记账时判断的是「这一笔算哪一天」，相对表达省一次心算
+              label: Fmt.friendly(date, relative: true),
               onTap: onPickDate,
             ),
           ),
@@ -1345,7 +1346,7 @@ class _CategoryNoteRow extends StatelessWidget {
                 const Icon(
                   Icons.keyboard_arrow_right_rounded,
                   size: 20,
-                  color: C.ink4,
+                  color: C.ink3,
                 ),
               ],
             ),
@@ -1436,7 +1437,7 @@ class _DetailBlock extends StatelessWidget {
                 Icon(
                   open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
                   size: 18,
-                  color: C.ink4,
+                  color: C.ink3,
                 ),
               ],
             ),
@@ -1491,7 +1492,7 @@ class _DetailInput extends StatelessWidget {
             decoration: InputDecoration(
               counterText: '',
               hintText: field.hint,
-              hintStyle: T.caption.copyWith(color: C.ink4),
+              hintStyle: T.caption.copyWith(color: C.ink3),
               filled: true,
               fillColor: C.bg2,
               isDense: true,
@@ -1545,7 +1546,7 @@ class _NoteField extends StatelessWidget {
         decoration: InputDecoration(
           counterText: '',
           hintText: '备注（可不填）',
-          hintStyle: T.body2.copyWith(color: C.ink4),
+          hintStyle: T.body2.copyWith(color: C.ink3),
           filled: true,
           fillColor: C.bg2,
           isDense: true,

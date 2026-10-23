@@ -228,7 +228,7 @@ class _KeyCapState extends State<_KeyCap> {
       // 数字与运算符同色，靠字号区分（23 / 21）；运算符再压一档会显得「不可用」
       CalcKeyKind.digit || CalcKeyKind.operator => C.ink,
       CalcKeyKind.utility => C.ink2,
-      CalcKeyKind.confirm => _enabled ? C.onAccent : C.ink4,
+      CalcKeyKind.confirm => _enabled ? C.onAccent : C.ink3,
     };
 
     return GestureDetector(

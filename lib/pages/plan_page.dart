@@ -95,7 +95,7 @@ class _DebtsCard extends StatelessWidget {
               const Icon(
                 Icons.chevron_right_rounded,
                 size: 20,
-                color: C.ink4,
+                color: C.ink3,
               ),
             ],
           ),
@@ -125,7 +125,7 @@ class _DebtsCard extends StatelessWidget {
                 const Icon(
                   Icons.chevron_right_rounded,
                   size: 20,
-                  color: C.ink4,
+                  color: C.ink3,
                 ),
               ],
             ),

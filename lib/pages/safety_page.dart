@@ -245,7 +245,7 @@ class _SafetyPageState extends State<SafetyPage> {
                     trailing: const Icon(
                       Icons.chevron_right_rounded,
                       size: 20,
-                      color: C.ink4,
+                      color: C.ink3,
                     ),
                     onTap: _checking ? null : _runCheck,
                   ),

@@ -293,7 +293,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       _dateRow(),
                       trailing: Text(
                         _rangeLabel ?? '不限时间',
-                        style: T.caption.copyWith(color: C.ink4),
+                        style: T.caption.copyWith(color: C.ink3),
                       ),
                     ),
                   ],
@@ -373,7 +373,7 @@ class _FilterSheetState extends State<_FilterSheet> {
         if (locked)
           Padding(
             padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.xs),
-            child: Text('收入不按分类筛选', style: T.caption.copyWith(color: C.ink4)),
+            child: Text('收入不按分类筛选', style: T.caption.copyWith(color: C.ink3)),
           ),
         IgnorePointer(
           ignoring: locked,
@@ -503,7 +503,7 @@ class _FilterSheetState extends State<_FilterSheet> {
           onChanged: (_) => _scheduleCount(),
           decoration: InputDecoration.collapsed(
             hintText: hint,
-            hintStyle: T.body.copyWith(color: C.ink4),
+            hintStyle: T.body.copyWith(color: C.ink3),
           ),
         ),
       ),
@@ -580,7 +580,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                   label,
                   style: T.body.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: canApply ? C.bg : C.ink4,
+                    color: canApply ? C.bg : C.ink3,
                   ),
                 ),
               ),

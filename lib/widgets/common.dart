@@ -436,7 +436,7 @@ class EmptyHint extends StatelessWidget {
       padding: padding,
       child: Column(
         children: [
-          LineIcon(icon, size: 40, color: C.ink4),
+          LineIcon(icon, size: 40, color: C.ink3),
           const SizedBox(height: S.md),
           Text(text, style: T.body2),
           // 第二行是「下一步该干嘛」。留了开关（UiFlags.emptyHints），
@@ -508,7 +508,7 @@ class SettingRow extends StatelessWidget {
             if (trailing != null)
               trailing!
             else if (onTap != null)
-              const Icon(Icons.chevron_right_rounded, size: 20, color: C.ink4),
+              const Icon(Icons.chevron_right_rounded, size: 20, color: C.ink3),
           ],
         ),
       ),

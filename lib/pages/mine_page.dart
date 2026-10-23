@@ -255,7 +255,7 @@ class MinePage extends StatelessWidget {
             child: Text(
               '$kAppName v$kAppVersion · 本地版',
               textAlign: TextAlign.center,
-              style: T.overline.copyWith(color: C.ink4),
+              style: T.overline.copyWith(color: C.ink3),
             ),
           ),
         ],

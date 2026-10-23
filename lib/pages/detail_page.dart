@@ -393,7 +393,7 @@ class _SearchDelegate extends SearchDelegate<String> {
     ),
     inputDecorationTheme: const InputDecorationTheme(
       border: InputBorder.none,
-      hintStyle: TextStyle(color: C.ink4),
+      hintStyle: TextStyle(color: C.ink3),
     ),
   );
 }

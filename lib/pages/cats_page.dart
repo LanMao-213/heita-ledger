@@ -130,7 +130,7 @@ class _CatsPageState extends State<CatsPage> {
         backgroundColor: C.ink,
         foregroundColor: C.bg,
         elevation: 0,
-        icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
+        icon: const LineIcon('plus', size: 20, color: C.bg),
         label: const Text('新增分类', style: T.body),
       ),
     );
@@ -141,7 +141,7 @@ class _CatsPageState extends State<CatsPage> {
     index: index,
     child: const Padding(
       padding: EdgeInsets.only(right: S.xs),
-      child: Icon(Icons.drag_indicator_rounded, size: 20, color: C.ink4),
+      child: Icon(Icons.drag_indicator_rounded, size: 20, color: C.ink3),
     ),
   );
 
@@ -492,7 +492,7 @@ class _SubCatsPageState extends State<_SubCatsPage> {
         backgroundColor: C.ink,
         foregroundColor: C.bg,
         elevation: 0,
-        icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
+        icon: const LineIcon('plus', size: 20, color: C.bg),
         label: const Text('新增子分类', style: T.body),
       ),
     );
@@ -502,7 +502,7 @@ class _SubCatsPageState extends State<_SubCatsPage> {
     index: index,
     child: const Padding(
       padding: EdgeInsets.only(right: S.xs),
-      child: Icon(Icons.drag_indicator_rounded, size: 20, color: C.ink4),
+      child: Icon(Icons.drag_indicator_rounded, size: 20, color: C.ink3),
     ),
   );
 

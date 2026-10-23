@@ -87,7 +87,7 @@ class _RecurringPageState extends State<RecurringPage> {
         backgroundColor: C.ink,
         foregroundColor: C.bg,
         elevation: 0,
-        icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
+        icon: const LineIcon('plus', size: 20, color: C.bg),
         label: const Text('新建规则', style: T.body),
       ),
     );

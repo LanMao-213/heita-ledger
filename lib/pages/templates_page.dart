@@ -164,7 +164,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
         backgroundColor: C.ink,
         foregroundColor: C.bg,
         elevation: 0,
-        icon: const LineIcon('plus', size: 20, color: C.bg, strokeWidth: 1.8),
+        icon: const LineIcon('plus', size: 20, color: C.bg),
         label: const Text('新增模板', style: T.body),
       ),
     );
@@ -212,7 +212,7 @@ class _TemplateRow extends StatelessWidget {
                   child: Icon(
                     Icons.drag_indicator_rounded,
                     size: 20,
-                    color: C.ink4,
+                    color: C.ink3,
                   ),
                 ),
               ),
@@ -431,7 +431,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
               decoration: InputDecoration(
                 counterText: '',
                 hintText: '例如：早餐、房租、地铁通勤',
-                hintStyle: T.body2.copyWith(color: C.ink4),
+                hintStyle: T.body2.copyWith(color: C.ink3),
                 filled: true,
                 fillColor: C.bg2,
                 isDense: true,
@@ -606,7 +606,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
                 prefixText: '¥ ',
                 prefixStyle: T.body.copyWith(color: C.ink2),
                 hintText: '留空则每次现填',
-                hintStyle: T.body2.copyWith(color: C.ink4),
+                hintStyle: T.body2.copyWith(color: C.ink3),
                 filled: true,
                 fillColor: C.bg2,
                 isDense: true,

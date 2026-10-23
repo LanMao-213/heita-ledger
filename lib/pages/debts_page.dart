@@ -250,7 +250,7 @@ class _PersonRow extends StatelessWidget {
                   style: T.amount.copyWith(fontSize: 16, color: C.ink),
                 ),
                 const SizedBox(height: 2),
-                Text(label, style: T.caption.copyWith(color: C.ink4)),
+                Text(label, style: T.caption.copyWith(color: C.ink3)),
               ],
             ),
           ],
@@ -419,7 +419,7 @@ class _DebtRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '已还 ${Fmt.money(debt.repaidCents)}',
-                    style: T.caption.copyWith(color: C.ink4),
+                    style: T.caption.copyWith(color: C.ink3),
                   ),
                 ],
               ],

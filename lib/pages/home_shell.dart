@@ -236,7 +236,8 @@ class _TabBar extends StatelessWidget {
                 t.icon,
                 size: 22,
                 color: on ? C.ink : C.ink3,
-                strokeWidth: on ? 2.0 : 1.5,
+                // 选中再加一档线宽：颜色 + 重量同时变，才像「同一颗图标被点亮」
+                strokeWidth: on ? 2.2 : null,
               ),
             ),
             const SizedBox(height: 4),
@@ -282,12 +283,7 @@ class _TabBar extends StatelessWidget {
                 ],
               ),
               child: const Center(
-                child: LineIcon(
-                  'plus',
-                  size: 24,
-                  color: C.onAccent,
-                  strokeWidth: 1.8,
-                ),
+                child: LineIcon('plus', size: 24, color: C.onAccent),
               ),
             ),
           ),

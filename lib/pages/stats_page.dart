@@ -367,7 +367,7 @@ class _MonthlyTrend extends StatelessWidget {
           children: [
             _legend('支出', C.ink),
             const SizedBox(width: S.lg),
-            _legend('收入', C.ink4),
+            _legend('收入', C.ink3),
           ],
         ),
         const SizedBox(height: S.md),
@@ -466,7 +466,7 @@ class _AccountsCard extends StatelessWidget {
                     if (s.receivableCents > 0 || s.payableCents > 0)
                       Text(
                         '含应收 ${Fmt.money(s.receivableCents)} · 应付 ${Fmt.money(s.payableCents)}',
-                        style: T.caption.copyWith(color: C.ink4),
+                        style: T.caption.copyWith(color: C.ink3),
                       ),
                   ],
                 ),
