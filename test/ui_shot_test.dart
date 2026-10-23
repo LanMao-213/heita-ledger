@@ -302,6 +302,10 @@ void main() {
     expect(tester.takeException(), isNull, reason: '详情展开态有布局溢出');
 
     // ---- 详情字段（人情）：对象直接平铺 ----
+    // 展开详情会自动滚到底（否则新字段落在键盘下方），分类行被推出可视区
+    // —— 先收起，内容变短后滚动位置会自己回到顶部，才能点回分类行
+    await tester.tap(find.text('收起详情'));
+    await tester.pumpAndSettle();
     await tester.tap(find.textContaining('出行').first);
     await tester.pumpAndSettle();
     // 左轮从出行滚到人情（出行 → 居家 → 购物 → 健康 → 娱乐 → 人情，共 5 格）

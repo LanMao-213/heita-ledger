@@ -624,8 +624,15 @@ class _RecordSheetState extends State<RecordSheet> {
     // 只对**备注**用这个提前量：「借给谁」「出发地」这些填完还得接着按数字，
     // 键盘早收一拍反而碍事，它们仍按「输入法真的占了下半屏」判断。
     final typingNote = _noteFocus.hasFocus || (keyboard > 0 && _hasTextFocus);
+    // 写备注时把面板「钉住」。
+    //
+    // 旧行为的三个动作叠在一起：数字键盘收起（-270）、面板跟着塌、
+    // 系统键盘升起再把它顶上去 —— 看着就是「点一下备注，面板缩回去了」。
+    // 现在让它一动不动：面板保持满高、不给系统键盘让位，由键盘直接盖住
+    // 原本属于数字键盘的那块。用户看到的是「键盘换了一个」，不是布局重排。
+    final reserved = typingNote ? 0.0 : bottomInset;
     // 0.90：顶部多了「最近模板」那排之后，0.88 会把备注框切掉一条。
-    final maxH = (media.size.height - bottomInset) * 0.90;
+    final maxH = (media.size.height - reserved) * 0.90;
 
     final body = LayoutBuilder(
       builder: (context, box) {
@@ -636,9 +643,12 @@ class _RecordSheetState extends State<RecordSheet> {
         // 有分类详情时上限压到 52：详情区要多吃 40~90 的高度，而信息区里
         // 的「日期 / 账户」不能因为多填两个框就被挤出可视区。4dp 的键高差
         // 手感上几乎看不出，信息被裁掉却一眼就能看出。
+        // 详情展开时再压 4dp：展开后是最挤的一屏（备注 + 日期账户 +
+        // 两个字段 + 五排键），52 会让最后一个字段压在键盘边上。
+        // 4dp 的键高差按不出来，字段被裁一半却一眼就能看出。
         final keyH = ((box.maxHeight - 380) / 5).clamp(
           38.0,
-          _fields.isEmpty ? 56.0 : 52.0,
+          _fields.isEmpty ? 56.0 : (_detailsOpen ? 48.0 : 52.0),
         );
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -693,7 +703,11 @@ class _RecordSheetState extends State<RecordSheet> {
                 children: [
                   SingleChildScrollView(
                     controller: _scroll,
-                    padding: const EdgeInsets.only(bottom: S.sm),
+                    // 写备注时面板不让位，被键盘盖住的那段要靠底部留白补，
+                    // 否则备注框「滚到底」也还在键盘底下
+                    padding: EdgeInsets.only(
+                      bottom: typingNote ? keyboard + S.sm : S.sm,
+                    ),
                     child: Column(
                       children: [
                         if (_isLending) ...[
@@ -738,11 +752,8 @@ class _RecordSheetState extends State<RecordSheet> {
                             color: C.line,
                           ),
                         ],
-                        // 有详情字段时，备注框**提到详情前面**。
-                        // 详情区一出现就把信息区撑高，备注留在最后会被整块顶出
-                        // 可视区 —— 它不是必填项，藏起来用户就当它不存在了。
-                        // 顺序仍是「先补充说明、再日期账户」：详情本来就是
-                        // 分类的延伸，和备注挨着比隔着日期更顺。
+                        // 有详情字段时，备注框提到分类下面（它不是必填项，
+                        // 藏起来用户就当它不存在了）。
                         if (!_isLending && _fields.isNotEmpty) ...[
                           _NoteField(
                             key: _noteKey,
@@ -755,22 +766,11 @@ class _RecordSheetState extends State<RecordSheet> {
                             thickness: hairlineOf(context),
                             color: C.line,
                           ),
-                          _DetailBlock(
-                            fields: _fields,
-                            folded: _folded,
-                            open: _detailsOpen,
-                            controllers: _detailCtl,
-                            focusNodes: _detailFocus,
-                            keys: _detailKey,
-                            onToggle: () =>
-                                setState(() => _detailsOpen = !_detailsOpen),
-                          ),
-                          Divider(
-                            height: 1,
-                            thickness: hairlineOf(context),
-                            color: C.line,
-                          ),
                         ],
+                        // 日期 / 账户**必须在详情区前面**。
+                        // 原来顺序是「备注 → 详情 → 日期账户」，一展开详情，
+                        // 这两行就被顶到可视区外面 —— 而它们比详情重要得多
+                        // （出行的「出发地」可以空着，日期和账户不能空）。
                         _MetaRow(
                           date: _date,
                           onPickDate: _pickDate,
@@ -792,6 +792,49 @@ class _RecordSheetState extends State<RecordSheet> {
                             ),
                             onChanged: (v) => setState(() => _liftOverride = v),
                           ),
+                        // 详情区放最后：它展开时只会往下长，不会把上面任何
+                        // 一行挤走。
+                        if (!_isLending && _fields.isNotEmpty) ...[
+                          Divider(
+                            height: 1,
+                            thickness: hairlineOf(context),
+                            color: C.line,
+                          ),
+                          _DetailBlock(
+                            fields: _fields,
+                            folded: _folded,
+                            open: _detailsOpen,
+                            controllers: _detailCtl,
+                            focusNodes: _detailFocus,
+                            keys: _detailKey,
+                            onToggle: () {
+                              setState(() => _detailsOpen = !_detailsOpen);
+                              if (_detailsOpen) {
+                                // 展开后滚到底：否则新出现的字段会落在可视区
+                                // 下沿之外，用户以为「点了没反应」。
+                                //
+                                // 套两层 postFrame：第一帧 detail 区的尺寸还没
+                                // 进 maxScrollExtent，这时 animateTo 拿到的是
+                                // 旧值（往往是 0），等于没滚。
+                                WidgetsBinding.instance.addPostFrameCallback(
+                                  (_) {
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                      if (!_scroll.hasClients) return;
+                                      _scroll.animateTo(
+                                        _scroll.position.maxScrollExtent,
+                                        duration: const Duration(
+                                          milliseconds: 220,
+                                        ),
+                                        curve: Curves.easeOutCubic,
+                                      );
+                                    });
+                                  },
+                                );
+                              }
+                            },
+                          ),
+                        ],
                         // 借贷模式已经在上面单独放了备注框，这里不能再放一个 ——
                         // 两处都用同一个 GlobalKey，会在切换模式时报重复 key
                         if (!_isLending && _fields.isEmpty)
@@ -882,9 +925,13 @@ class _RecordSheetState extends State<RecordSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollHint());
 
     return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
+      padding: EdgeInsets.only(bottom: reserved),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxH),
+        constraints: BoxConstraints(
+          maxHeight: maxH,
+          // 钉住高度：数字键盘收起时若让面板跟着塌，就是那一下「缩回去」
+          minHeight: typingNote ? maxH : 0,
+        ),
         child: ClipRRect(
           // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
           // 留白不会跟着变白
@@ -1296,11 +1343,12 @@ class _CategoryNoteRow extends StatelessWidget {
         animation: note,
         builder: (context, _) {
           final text = note.text.trim();
-          // 副标题说清楚「这笔落在哪一层」：选了子分类就带上一级名，
-          // 只选到一级就明说未细分 —— 否则用户不知道自己记到了哪一层
-          final hint = parent != null
-              ? '${parent!.name} · 备注可不填'
-              : '未细分 · 备注可不填';
+          // 副标题只说「这笔落在哪一层」：选了子分类就带上一级名，
+          // 只选到一级就明说未细分 —— 否则用户不知道自己记到了哪一层。
+          //
+          // 不再缀「备注可不填」：下面就是备注框，自己写着「可不填」，
+          // 在这一行重复一遍只是噪音；有备注时这里显示的就是备注本身。
+          final hint = parent != null ? parent!.name : '未细分';
           return Padding(
             // 右侧原本收到 S.md(12)，是为了给行尾箭头再补 8 的间距 —— 结果
             // 箭头落在离边 20 的位置，比备注框 / 日期胶囊的右缘（16）多出 4，
