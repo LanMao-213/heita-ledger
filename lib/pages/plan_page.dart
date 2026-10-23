@@ -215,19 +215,29 @@ class _TotalBudgetCard extends StatelessWidget {
               child: Text('还没有设预算。设一个数，超支时会用红色提醒你。', style: T.body2),
             )
           else ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  Fmt.money(s.expenseCents),
-                  style: T.hero.copyWith(fontSize: 30),
-                ),
-                Text(
-                  '  /  ${Fmt.money(cap)}',
-                  style: T.body2.copyWith(fontSize: 14),
-                ),
-              ],
+            // 「已花 / 额度」这一行必须永远单行。
+            // 两个 Text 原来都是裸的：字体一换宽（CI 的 DroidSansFallback 没有
+            // 拉丁数字字形，数字按满宽方块算）就把 326 的行撑到 380，溢出 54px。
+            // 概览卡和记一笔面板早就用 FittedBox 收过同一个坑，只有这里漏了 ——
+            // 放不下时整行等比缩小，不折行、也不省略金额。
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    Fmt.money(s.expenseCents),
+                    style: T.hero.copyWith(fontSize: 30),
+                  ),
+                  Text(
+                    '  /  ${Fmt.money(cap)}',
+                    style: T.body2.copyWith(fontSize: 14),
+                  ),
+                ],
+              ),
             ),
             // 借入计入预算时，卡片上的额度直接显示成「额度 + 借入」（9000），
             // 下面小字说明这多出来的 3000 是借的 —— 借来的钱确实能花，
