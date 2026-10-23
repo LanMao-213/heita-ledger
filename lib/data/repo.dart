@@ -150,6 +150,92 @@ class Repo {
     await db.update('account', map, where: 'id = ?', whereArgs: [a.id]);
   }
 
+  /// 某账户名下的流水笔数（含转出与转入），删除前要给用户看个数。
+  static Future<int> accountTxnCount(int id) async {
+    final db = await Db.open();
+    final r = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM txn WHERE account_id = ? OR to_account_id = ?',
+      [id, id],
+    );
+    return (r.first['c'] as int?) ?? 0;
+  }
+
+  /// 删除账户，并把它的余额与流水**并入**另一个账户。
+  ///
+  /// `txn.account_id` 没有外键约束（见 db.dart），直接 DELETE 会留下指向
+  /// 不存在账户的孤儿流水 —— 明细里那几笔解析不出账户名。所以删除只有一条
+  /// 路：先合并，再删。
+  ///
+  /// 四步都在同一个事务里：
+  /// 1. 删掉 src ↔ dst 之间的转账 —— 流水迁过去之后它们会变成「自己转给自己」
+  /// 2. 流水改挂到 dst（含转入端）
+  /// 3. src 的**期初**并进 dst 的期初
+  /// 4. 删 src，并把其它表里指向它的账户位置空
+  ///
+  /// 第 3 步并的是**期初**而不是余额：流水已经迁过去了，若再并一次余额，
+  /// dst 会把 src 的流水算两遍。期初 + 流水 才是余额，这样恒等式
+  /// `余额 = 期初 + 流水合计` 在合并后继续成立。
+  static Future<void> mergeAccount({
+    required int from,
+    required int to,
+  }) async {
+    if (from == to) throw ArgumentError('不能并入自己');
+    final db = await Db.open();
+    await db.transaction((tx) async {
+      final rows = await tx.query(
+        'account',
+        where: 'id IN (?, ?)',
+        whereArgs: [from, to],
+      );
+      Map<String, Object?>? src;
+      for (final r in rows) {
+        if (r['id'] == from) src = r;
+      }
+      if (src == null) throw StateError('账户不存在');
+
+      // 1. 双方之间的转账：迁移后会成为自转账，直接删
+      await tx.delete(
+        'txn',
+        where: "type = 'transfer' AND ((account_id = ? AND to_account_id = ?) "
+            'OR (account_id = ? AND to_account_id = ?))',
+        whereArgs: [from, to, to, from],
+      );
+      // 2. 流水改挂
+      await tx.update(
+        'txn',
+        {'account_id': to},
+        where: 'account_id = ?',
+        whereArgs: [from],
+      );
+      await tx.update(
+        'txn',
+        {'to_account_id': to},
+        where: 'to_account_id = ?',
+        whereArgs: [from],
+      );
+      // 3. 期初并入（余额随之增加同样的数，恒等式不破）
+      final opening = (src['opening_cents'] as int?) ?? 0;
+      final balance = (src['balance_cents'] as int?) ?? 0;
+      await tx.rawUpdate(
+        'UPDATE account SET opening_cents = opening_cents + ?, '
+        'balance_cents = balance_cents + ? WHERE id = ?',
+        [opening, balance, to],
+      );
+      // 4. 删除 + 其它表置空（模板/定期/借贷里的账户只是「默认记到哪」，
+      //    账户没了就回到未选，不跟着迁移 —— 那些是未来的计划，不是历史）
+      await tx.delete('account', where: 'id = ?', whereArgs: [from]);
+      for (final table in ['recurring', 'txn_template', 'debt']) {
+        await tx.update(
+          table,
+          {'account_id': null},
+          where: 'account_id = ?',
+          whereArgs: [from],
+        );
+      }
+    });
+  }
+
+  /// 删除一个**没有流水、余额为 0** 的账户。有数据时必须走 [mergeAccount]。
   static Future<void> deleteAccount(int id) async {
     final db = await Db.open();
     await db.delete('account', where: 'id = ?', whereArgs: [id]);

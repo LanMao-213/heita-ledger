@@ -488,55 +488,190 @@ class MinePage extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        builder: (ctx2, controller) => Column(
-          children: [
-            const SheetHeader(title: '账户管理'),
-            Expanded(
-              child: ListView(
-                controller: controller,
-                children: [
-                  for (final a in Store.i.accounts)
-                    SettingRow(
-                      icon: a.icon,
-                      title: a.name,
-                      subtitle:
-                          '${a.kind.label} · ${Fmt.yuan(a.balanceCents)}'
-                          '${a.includeInTotal ? '' : ' · 不计入净资产'}',
-                      trailing: IconButton(
-                        onPressed: () => _accountSheet(context, a),
-                        icon: const LineIcon(
-                          'more', semanticLabel: '更多',
-                          size: 20,
-                          color: C.ink3,
+      builder: (ctx) => AnimatedBuilder(
+        // 删除/合并后会改 Store.i.accounts，列表要跟着重建
+        animation: Store.i,
+        builder: (ctx, _) => DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          builder: (ctx2, controller) => Column(
+            children: [
+              const SheetHeader(title: '账户管理'),
+              Expanded(
+                child: ListView(
+                  controller: controller,
+                  children: [
+                    for (final a in Store.i.accounts)
+                      SettingRow(
+                        icon: a.icon,
+                        title: a.name,
+                        subtitle:
+                            '${a.kind.label} · ${Fmt.yuan(a.balanceCents)}'
+                            '${a.includeInTotal ? '' : ' · 不计入净资产'}',
+                        // 行本身也能点开菜单：目标小、又在底部弹层里，
+                        // 只靠右边那颗 ⋯ 容易点空
+                        onTap: () => _accountMenu(context, a),
+                        trailing: IconButton(
+                          onPressed: () => _accountMenu(context, a),
+                          icon: const LineIcon(
+                            'more', semanticLabel: '更多',
+                            size: 20,
+                            color: C.ink3,
+                          ),
                         ),
                       ),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.all(S.lg),
-                    child: OutlinedButton.icon(
-                      onPressed: () => _accountSheet(context, null),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(46),
-                        side: const BorderSide(color: C.line2),
-                        foregroundColor: C.ink,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(R.md),
+                    Padding(
+                      padding: const EdgeInsets.all(S.lg),
+                      child: OutlinedButton.icon(
+                        onPressed: () => _accountSheet(context, null),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(46),
+                          side: const BorderSide(color: C.line2),
+                          foregroundColor: C.ink,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(R.md),
+                          ),
                         ),
+                        icon: const LineIcon('plus', size: 18, color: C.ink),
+                        label: const Text('新增账户'),
                       ),
-                      icon: const LineIcon('plus', size: 18, color: C.ink),
-                      label: const Text('新增账户'),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 账户的二级菜单：编辑 / 删除。
+  ///
+  /// 原来那颗 ⋯ 点下去直接跳「编辑账户」，名字叫「更多」、行为却是编辑 ——
+  /// 想删账户的人在弹层里翻不到入口，只能以为它不能删。
+  static Future<void> _accountMenu(BuildContext context, Account a) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SheetHeader(title: a.name),
+            SettingRow(
+              icon: 'tpl',
+              title: '编辑资料',
+              subtitle: '名称 · 类型 · 余额校准',
+              onTap: () {
+                Navigator.pop(ctx);
+                _accountSheet(context, a);
+              },
+            ),
+            SettingRow(
+              icon: 'trash',
+              title: '删除账户',
+              subtitle: '余额和记录会转到一个你指定的账户',
+              danger: true,
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeleteAccount(context, a);
+              },
+            ),
+            const SizedBox(height: S.md),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 删除账户：余额与流水一并并入另一个账户。
+  ///
+  /// 直接删会留下孤儿流水（`txn.account_id` 没有外键），所以凡是有余额或
+  /// 有记录的账户，都必须先选一个「倒去哪」。
+  static Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    Account a,
+  ) async {
+    final s = Store.i;
+    final others = s.accounts.where((x) => x.id != a.id).toList();
+    final count = await Repo.accountTxnCount(a.id);
+    if (!context.mounted) return;
+
+    final empty = count == 0 && a.balanceCents == 0;
+    // 唯一账户且有数据：没法合并，只能先建一个
+    if (!empty && others.isEmpty) {
+      showToast(context, '这是唯一的账户，先新建一个账户再删');
+      return;
+    }
+
+    var target = others.isEmpty ? null : others.first.id;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text('删除「${a.name}」？', style: T.section),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                empty
+                    ? '这个账户没有余额，也没有记录。'
+                    : '它名下的余额和记录会一起并到下面这个账户：',
+                style: T.body2,
+              ),
+              if (!empty) ...[
+                const SizedBox(height: S.md),
+                DropdownButtonFormField<int>(
+                  initialValue: target,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: '并到',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final o in others)
+                      DropdownMenuItem(
+                        value: o.id,
+                        child: Text('${o.name} · ${Fmt.yuan(o.balanceCents)}'),
+                      ),
+                  ],
+                  onChanged: (v) => setLocal(() => target = v),
+                ),
+                const SizedBox(height: S.md),
+                Text(
+                  '$count 笔记录会挂在目标账户名下（历史不丢）；'
+                  '${Fmt.yuan(a.balanceCents)} 的余额也一起过去。',
+                  style: T.caption,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消', style: TextStyle(color: C.ink2)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('删除', style: TextStyle(color: C.over)),
             ),
           ],
         ),
       ),
     );
+
+    if (ok != true || !context.mounted) return;
+    if (empty) {
+      await Repo.deleteAccount(a.id);
+    } else {
+      if (target == null) return;
+      await Repo.mergeAccount(from: a.id, to: target!);
+    }
+    await s.afterAccountChange();
+    if (context.mounted) {
+      showToast(context, empty ? '已删除' : '已删除，余额和记录已并入目标账户');
+    }
   }
 
   static Future<void> _accountSheet(BuildContext context, Account? acc) async {
