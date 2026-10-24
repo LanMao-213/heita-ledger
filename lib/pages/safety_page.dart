@@ -7,6 +7,7 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
+import '../widgets/menu.dart';
 import '../widgets/restore_flow.dart';
 
 /// 数据安全：自动快照的查看 / 恢复 / 清理。
@@ -99,27 +100,14 @@ class _SafetyPageState extends State<SafetyPage> {
   }
 
   Future<void> _delete(SnapshotInfo info) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('删除这份快照？', style: T.section),
-        content: Text(
-          '${info.reasonLabel} · ${info.timeLabel}\n${info.contentLabel}',
-          style: T.body2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消', style: TextStyle(color: C.ink2)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('删除', style: TextStyle(color: C.over)),
-          ),
-        ],
-      ),
+    final ok = await showAppConfirm(
+      context,
+      title: '删除这份快照？',
+      message: '${info.reasonLabel} · ${info.timeLabel}\n${info.contentLabel}',
+      confirmLabel: '删除',
+      danger: true,
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await BackupService.deleteSnapshot(info.path);
       await _load();
@@ -148,51 +136,38 @@ class _SafetyPageState extends State<SafetyPage> {
   }
 
   Future<void> _showReport(IntegrityReport report) async {
-    final fix = await showDialog<bool>(
+    final fix = await showAppDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          report.ok ? '数据正常' : '发现 ${report.issues.length} 项问题',
-          style: T.section,
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(report.summary, style: T.caption),
-              if (!report.ok) const SizedBox(height: S.md),
-              for (final issue in report.issues)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: S.sm),
-                  child: Text(
-                    '${issue.kind.label}：${issue.detail}',
-                    style: T.body2,
-                  ),
-                ),
-              if (report.hasFixable) ...[
-                const SizedBox(height: S.sm),
-                Text(
-                  '「重算余额」按「期初 + 流水合计」把余额改回来，'
-                  '不会动期初值（你手填的那个基准）。',
-                  style: T.caption,
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('关闭', style: TextStyle(color: C.ink2)),
-          ),
-          if (report.hasFixable)
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('重算余额', style: TextStyle(color: C.ink)),
+      title: report.ok ? '数据正常' : '发现 ${report.issues.length} 项问题',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(report.summary, style: T.caption),
+          if (!report.ok) const SizedBox(height: S.md),
+          for (final issue in report.issues)
+            Padding(
+              padding: const EdgeInsets.only(bottom: S.sm),
+              child: Text(
+                '${issue.kind.label}：${issue.detail}',
+                style: T.body2,
+              ),
             ),
+          if (report.hasFixable) ...[
+            const SizedBox(height: S.sm),
+            Text(
+              '「重算余额」按「期初 + 流水合计」把余额改回来，'
+              '不会动期初值（你手填的那个基准）。',
+              style: T.caption,
+            ),
+          ],
         ],
       ),
+      actions: [
+        const DialogAction(label: '关闭', value: false),
+        if (report.hasFixable)
+          const DialogAction(label: '重算余额', value: true, strong: true),
+      ],
     );
     if (fix != true) return;
 
@@ -347,28 +322,39 @@ class _SnapshotRow extends StatelessWidget {
       subtitle:
           '${info.reasonLabel} · ${info.contentLabel} · ${info.sizeLabel}',
       onTap: canRestore ? onRestore : null,
-      trailing: PopupMenuButton<String>(
-        icon: LineIcon('more', semanticLabel: '更多', size: 20, color: C.ink3),
+      trailing: IconButton(
         padding: EdgeInsets.zero,
-        onSelected: (v) {
-          switch (v) {
-            case 'restore':
-              onRestore?.call();
-            case 'share':
-              onShare();
-            case 'delete':
-              onDelete();
-          }
-        },
-        itemBuilder: (_) => [
-          if (canRestore)
-            const PopupMenuItem(value: 'restore', child: Text('用它恢复')),
-          const PopupMenuItem(value: 'share', child: Text('导出这一份')),
-          PopupMenuItem(
-            value: 'delete',
-            child: Text('删除', style: TextStyle(color: C.over)),
-          ),
-        ],
+        constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+        onPressed: () => showMenuSheet<void>(
+          context: context,
+          title: info.timeLabel,
+          subtitle: '${info.reasonLabel} · ${info.contentLabel}',
+          groups: [
+            MenuGroup(
+              actions: [
+                if (canRestore)
+                  MenuAction(
+                    icon: 'shield',
+                    title: '用它恢复',
+                    subtitle: '会先给当前数据留一份快照，再整库替换',
+                    onTap: onRestore,
+                  ),
+                MenuAction(
+                  icon: 'upload',
+                  title: '导出这一份',
+                  onTap: onShare,
+                ),
+                MenuAction(
+                  icon: 'trash',
+                  title: '删除',
+                  danger: true,
+                  onTap: onDelete,
+                ),
+              ],
+            ),
+          ],
+        ),
+        icon: LineIcon('more', semanticLabel: '更多', size: 20, color: C.ink3),
       ),
     );
   }

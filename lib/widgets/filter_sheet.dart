@@ -9,7 +9,7 @@ import '../data/repo.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
-import 'common.dart';
+import 'menu.dart';
 import 'pickers.dart';
 
 /// 打开筛选面板。
@@ -263,45 +263,39 @@ class _FilterSheetState extends State<_FilterSheet> {
       padding: EdgeInsets.only(bottom: insets),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxH),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SheetHeader(
-              title: '筛选',
-              action: TextButton(
-                onPressed: _reset,
-                child: Text(
-                  '重置',
-                  style: T.body2,
-                ),
-              ),
+        child: SheetShell(
+          title: '筛选',
+          action: TextButton(
+            onPressed: _reset,
+            child: Text(
+              '重置',
+              style: T.body2,
             ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: S.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _block('类型', _typeRow()),
-                    // 转账没有分类，这一块直接不出现 —— 留着会让人以为能筛
-                    if (_type != TxnType.transfer)
-                      _block('分类', _categoryBlock(s)),
-                    _block('账户', _accountBlock(s)),
-                    _block('金额（元）', _amountRow()),
-                    _block(
-                      '时间',
-                      _dateRow(),
-                      trailing: Text(
-                        _rangeLabel ?? '不限时间',
-                        style: T.caption.copyWith(color: C.ink3),
-                      ),
+          ),
+          bottom: _footer(),
+          child: Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: S.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _block('类型', _typeRow()),
+                  // 转账没有分类，这一块直接不出现 —— 留着会让人以为能筛
+                  if (_type != TxnType.transfer) _block('分类', _categoryBlock(s)),
+                  _block('账户', _accountBlock(s)),
+                  _block('金额（元）', _amountRow()),
+                  _block(
+                    '时间',
+                    _dateRow(),
+                    trailing: Text(
+                      _rangeLabel ?? '不限时间',
+                      style: T.caption.copyWith(color: C.ink3),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            _footer(),
-          ],
+          ),
         ),
       ),
     );

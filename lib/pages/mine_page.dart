@@ -12,6 +12,7 @@ import '../design/palette.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
+import '../widgets/menu.dart';
 import '../widgets/restore_flow.dart';
 import '../widgets/theme_sheet.dart';
 import 'cats_page.dart';
@@ -313,28 +314,13 @@ class MinePage extends StatelessWidget {
     if (day == null || day == s.cycleStartDay) return;
     if (!context.mounted) return;
 
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: C.bg,
-        title: const Text('改账单日？'),
-        content: const Text(
-          '会按新的账单日重算全部记账算在哪一期，并把已有预算挪到新的期上。'
+    final ok = await showAppConfirm(
+      context,
+      title: '改账单日？',
+      message: '会按新的账单日重算全部记账算在哪一期，并把已有预算挪到新的期上。'
           '金额一笔都不会动，变的只是「算在哪一期」。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
     );
-    if (ok != true) return;
+    if (!ok) return;
 
     await s.applyCycleStartDay(day);
     if (context.mounted) showToast(context, '账单日已改为 $day 号');
@@ -375,33 +361,25 @@ class MinePage extends StatelessWidget {
       if (context.mounted) showToast(context, '导入失败：$e');
       return;
     }
-    if (result == null) return; // 用户取消了
+    final done = result;
+    if (done == null) return; // 用户取消了
     await s.afterTxnChange();
     if (!context.mounted) return;
 
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('导入完成', style: T.section),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(result!.summary, style: T.body),
-            if (result.problems.isNotEmpty) ...[
-              const SizedBox(height: S.md),
-              Text('有 ${result.problems.length} 行没能导入：', style: T.caption),
-              const SizedBox(height: S.xs),
-              for (final p in result.problems.take(6))
-                Text('· $p', style: T.caption),
-            ],
+    await showAppNotice(
+      context,
+      title: '导入完成',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(done.summary, style: T.body),
+          if (done.problems.isNotEmpty) ...[
+            const SizedBox(height: S.md),
+            Text('有 ${done.problems.length} 行没能导入：', style: T.caption),
+            const SizedBox(height: S.xs),
+            for (final p in done.problems.take(6)) Text('· $p', style: T.caption),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('知道了', style: TextStyle(color: C.ink)),
-          ),
         ],
       ),
     );
@@ -444,28 +422,15 @@ class MinePage extends StatelessWidget {
   // ------------------------------------------------------------------ 清空
 
   static Future<void> _wipe(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('清空全部数据？', style: T.section),
-        content: Text(
-          '所有账目、账户、分类、目标都会被删除，恢复成刚装好的样子。\n\n'
+    final ok = await showAppConfirm(
+      context,
+      title: '清空全部数据？',
+      message: '所有账目、账户、分类、目标都会被删除，恢复成刚装好的样子。\n\n'
           '清空前会自动存一份快照，后悔了可以从「我的 → 数据安全」里找回来。',
-          style: T.body2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消', style: TextStyle(color: C.ink2)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('确认清空', style: TextStyle(color: C.over)),
-          ),
-        ],
-      ),
+      confirmLabel: '确认清空',
+      danger: true,
     );
-    if (ok != true || !context.mounted) return;
+    if (!ok || !context.mounted) return;
 
     // 先留快照再清：清空是单向门，1.4.1 就栽在「不可逆 + 静默失败」上。
     // 留不下就**不清**，和「从备份恢复」的策略保持一致 —— 宁可这次没清成，
@@ -485,30 +450,22 @@ class MinePage extends StatelessWidget {
       await Db.wipeAllData();
       await Store.i.reboot();
       if (!context.mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('已清空', style: T.section),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('账目、账户、分类都已恢复成刚装好的样子。', style: T.body2),
-              const SizedBox(height: S.md),
-              Text('清空前的数据已存到：', style: T.caption),
-              const SizedBox(height: S.xs),
-              Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
-              const SizedBox(height: S.sm),
-              Text(
-                '要找回来的话，去「我的 → 数据安全」用这份快照恢复。',
-                style: T.caption,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('知道了', style: TextStyle(color: C.ink)),
+      await showAppNotice(
+        context,
+        title: '已清空',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('账目、账户、分类都已恢复成刚装好的样子。', style: T.body2),
+            const SizedBox(height: S.md),
+            Text('清空前的数据已存到：', style: T.caption),
+            const SizedBox(height: S.xs),
+            Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
+            const SizedBox(height: S.sm),
+            Text(
+              '要找回来的话，去「我的 → 数据安全」用这份快照恢复。',
+              style: T.caption,
             ),
           ],
         ),
@@ -524,58 +481,65 @@ class MinePage extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (ctx) => AnimatedBuilder(
         // 删除/合并后会改 Store.i.accounts，列表要跟着重建
         animation: Store.i,
         builder: (ctx, _) => DraggableScrollableSheet(
           expand: false,
           initialChildSize: 0.6,
-          builder: (ctx2, controller) => Column(
-            children: [
-              const SheetHeader(title: '账户管理'),
-              Expanded(
-                child: ListView(
-                  controller: controller,
-                  children: [
-                    for (final a in Store.i.accounts)
-                      SettingRow(
-                        icon: a.icon,
-                        title: a.name,
-                        subtitle:
-                            '${a.kind.label} · ${Fmt.yuan(a.balanceCents)}'
-                            '${a.includeInTotal ? '' : ' · 不计入净资产'}',
-                        // 行本身也能点开菜单：目标小、又在底部弹层里，
-                        // 只靠右边那颗 ⋯ 容易点空
-                        onTap: () => _accountMenu(context, a),
-                        trailing: IconButton(
-                          onPressed: () => _accountMenu(context, a),
-                          icon: LineIcon(
-                            'more', semanticLabel: '更多',
-                            size: 20,
-                            color: C.ink3,
+          builder: (ctx2, controller) => SheetShell(
+            title: '账户管理',
+            child: Expanded(
+              child: ListView(
+                controller: controller,
+                padding: const EdgeInsets.only(bottom: S.lg),
+                children: [
+                  MenuGroup(
+                    children: [
+                      for (final a in Store.i.accounts)
+                        MenuTile(
+                          action: MenuAction(
+                            icon: a.icon,
+                            title: a.name,
+                            subtitle:
+                                '${a.kind.label} · ${Fmt.yuan(a.balanceCents)}'
+                                '${a.includeInTotal ? '' : ' · 不计入净资产'}',
+                            // 不关这一层：账户菜单是叠在它上面的另一层，
+                            // 关掉就回不到列表了
+                            popFirst: false,
+                            // 行本身也能点开菜单：目标小、又在底部弹层里，
+                            // 只靠右边那颗 ⋯ 容易点空
+                            onTap: () => _accountMenu(context, a),
+                            trailing: IconButton(
+                              onPressed: () => _accountMenu(context, a),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 32,
+                                height: 32,
+                              ),
+                              icon: LineIcon(
+                                'more', semanticLabel: '更多',
+                                size: 20,
+                                color: C.ink3,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.all(S.lg),
-                      child: OutlinedButton.icon(
-                        onPressed: () => _accountSheet(context, null),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(46),
-                          side: BorderSide(color: C.line2),
-                          foregroundColor: C.ink,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(R.md),
-                          ),
+                      MenuTile(
+                        action: MenuAction(
+                          icon: 'plus',
+                          title: '新增账户',
+                          popFirst: false,
+                          onTap: () => _accountSheet(context, null),
                         ),
-                        icon: LineIcon('plus', size: 18, color: C.ink),
-                        label: const Text('新增账户'),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -587,38 +551,28 @@ class MinePage extends StatelessWidget {
   /// 原来那颗 ⋯ 点下去直接跳「编辑账户」，名字叫「更多」、行为却是编辑 ——
   /// 想删账户的人在弹层里翻不到入口，只能以为它不能删。
   static Future<void> _accountMenu(BuildContext context, Account a) async {
-    await showModalBottomSheet<void>(
+    await showMenuSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SheetHeader(title: a.name),
-            SettingRow(
+      title: a.name,
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(
               icon: 'tpl',
               title: '编辑资料',
               subtitle: '名称 · 类型 · 余额校准',
-              showChevron: false,
-              onTap: () {
-                Navigator.pop(ctx);
-                _accountSheet(context, a);
-              },
+              onTap: () => _accountSheet(context, a),
             ),
-            SettingRow(
+            MenuAction(
               icon: 'trash',
               title: '删除账户',
               subtitle: '余额和记录会转到一个你指定的账户',
               danger: true,
-              showChevron: false,
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmDeleteAccount(context, a);
-              },
+              onTap: () => _confirmDeleteAccount(context, a),
             ),
-            const SizedBox(height: S.md),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -643,12 +597,14 @@ class MinePage extends StatelessWidget {
     }
 
     var target = others.isEmpty ? null : others.first.id;
-    final ok = await showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Text('删除「${a.name}」？', style: T.section),
-          content: Column(
+      title: '删除「${a.name}」？',
+      content: StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final cur =
+              others.where((o) => o.id == target).firstOrNull;
+          return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -660,21 +616,28 @@ class MinePage extends StatelessWidget {
               ),
               if (!empty) ...[
                 const SizedBox(height: S.md),
-                DropdownButtonFormField<int>(
-                  initialValue: target,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: '并到',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    for (final o in others)
-                      DropdownMenuItem(
-                        value: o.id,
-                        child: Text('${o.name} · ${Fmt.yuan(o.balanceCents)}'),
-                      ),
-                  ],
-                  onChanged: (v) => setLocal(() => target = v),
+                PickField(
+                  label: '并到',
+                  valueText: cur == null
+                      ? ''
+                      : '${cur.name} · ${Fmt.yuan(cur.balanceCents)}',
+                  onTap: () async {
+                    final v = await showPickSheet<int>(
+                      context: ctx,
+                      title: '并到哪个账户',
+                      options: [
+                        for (final o in others)
+                          PickOption(
+                            value: o.id,
+                            icon: o.icon,
+                            title: o.name,
+                            subtitle: Fmt.yuan(o.balanceCents),
+                          ),
+                      ],
+                      current: target,
+                    );
+                    if (v != null) setLocal(() => target = v);
+                  },
                 ),
                 const SizedBox(height: S.md),
                 Text(
@@ -683,19 +646,13 @@ class MinePage extends StatelessWidget {
                 ),
               ],
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('取消', style: TextStyle(color: C.ink2)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('删除', style: TextStyle(color: C.over)),
-            ),
-          ],
-        ),
+          );
+        },
       ),
+      actions: const [
+        DialogAction(label: '取消', value: false),
+        DialogAction(label: '删除', value: true, danger: true),
+      ],
     );
 
     if (ok != true || !context.mounted) return;
@@ -719,80 +676,72 @@ class MinePage extends StatelessWidget {
     var kind = acc?.kind ?? AccountKind.cash;
     var include = acc?.includeInTotal ?? true;
 
-    final ok = await showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Text(acc == null ? '新增账户' : '编辑账户', style: T.section),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      title: acc == null ? '新增账户' : '编辑账户',
+      content: StatefulBuilder(
+        builder: (ctx, setLocal) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: nameCtl,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: '账户名称'),
+            ),
+            const SizedBox(height: S.md),
+            TextField(
+              controller: balCtl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                hintText: '当前余额（元）',
+                helperText: '记一笔时会自动增减',
+              ),
+            ),
+            const SizedBox(height: S.md),
+            Wrap(
+              spacing: S.sm,
+              runSpacing: S.sm,
               children: [
-                TextField(
-                  controller: nameCtl,
-                  autofocus: true,
-                  decoration: const InputDecoration(hintText: '账户名称'),
-                ),
-                const SizedBox(height: S.md),
-                TextField(
-                  controller: balCtl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                for (final k in AccountKind.values)
+                  ChoiceChip(
+                    label: Text(
+                      k.label,
+                      style: T.caption,
+                    ),
+                    selected: kind == k,
+                    onSelected: (_) => setLocal(() => kind = k),
+                    backgroundColor: C.bg2,
+                    selectedColor: C.ink,
+                    labelStyle: T.caption.copyWith(
+                      color: kind == k ? C.bg : C.ink2,
+                    ),
+                    side: BorderSide.none,
+                    showCheckmark: false,
                   ),
-                  decoration: const InputDecoration(
-                    hintText: '当前余额（元）',
-                    helperText: '记一笔时会自动增减',
-                  ),
-                ),
-                const SizedBox(height: S.md),
-                Wrap(
-                  spacing: S.sm,
-                  runSpacing: S.sm,
-                  children: [
-                    for (final k in AccountKind.values)
-                      ChoiceChip(
-                        label: Text(
-                          k.label,
-                          style: T.caption,
-                        ),
-                        selected: kind == k,
-                        onSelected: (_) => setLocal(() => kind = k),
-                        backgroundColor: C.bg2,
-                        selectedColor: C.ink,
-                        labelStyle: T.caption.copyWith(
-                          color: kind == k ? C.bg : C.ink2,
-                        ),
-                        side: BorderSide.none,
-                        showCheckmark: false,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: S.sm),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  value: include,
-                  onChanged: (v) => setLocal(() => include = v),
-                  activeThumbColor: C.ink,
-                  title: Text('计入净资产', style: T.body2),
-                ),
               ],
             ),
-          ),
-          actions: [
-            if (acc != null)
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text('删除', style: TextStyle(color: C.over)),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('保存', style: TextStyle(color: C.ink)),
+            const SizedBox(height: S.sm),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: include,
+              onChanged: (v) => setLocal(() => include = v),
+              title: Text('计入净资产', style: T.body2),
             ),
           ],
         ),
       ),
+      actions: [
+        if (acc != null)
+          // ⚠️ 这颗「删除」带回的是 false，和「取消」一样 —— 也就是说它
+          // 按下去什么也不做（删账户走账户菜单里的那条）。行为原样保留，
+          // 但要删请走菜单；这里留着是为了不让老用户找不到位置。
+          const DialogAction(label: '删除', value: false, danger: true),
+        const DialogAction(label: '保存', value: true, strong: true),
+      ],
     );
     if (ok != true) return;
 
@@ -836,89 +785,67 @@ class MinePage extends StatelessWidget {
 
   static Future<void> _manageLedgers(BuildContext context) async {
     final s = Store.i;
-    await showModalBottomSheet<void>(
+    await showMenuSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SheetHeader(title: '账本管理'),
+      title: '账本管理',
+      groups: [
+        MenuGroup(
+          actions: [
             for (final l in s.ledgers)
-              SettingRow(
+              MenuAction(
                 icon: l.icon,
                 title: l.name,
                 subtitle: l.id == s.ledgerId ? '当前账本' : null,
-                trailing: l.id == s.ledgerId
-                    ? LineIcon('check', size: 20, color: C.ink)
-                    : null,
+                checked: l.id == s.ledgerId,
                 onTap: () async {
-                  Navigator.pop(ctx);
                   final added = await s.switchLedger(l.id);
                   if (added > 0 && context.mounted) {
                     showToast(context, '已补记 $added 笔周期账单');
                   }
                 },
               ),
-            Padding(
-              padding: const EdgeInsets.all(S.lg),
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  final ctl = TextEditingController();
-                  final name = await showDialog<String>(
-                    context: context,
-                    builder: (dctx) => AlertDialog(
-                      title: Text('新建账本', style: T.section),
-                      content: TextField(
-                        controller: ctl,
-                        autofocus: true,
-                        maxLength: 12,
-                        decoration: const InputDecoration(
-                          hintText: '例如：装修账本',
-                          counterText: '',
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dctx),
-                          child: Text(
-                            '取消',
-                            style: TextStyle(color: C.ink2),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(dctx, ctl.text.trim()),
-                          child: Text(
-                            '创建',
-                            style: TextStyle(color: C.ink),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (name == null || name.isEmpty) return;
-                  final id = await Repo.insertLedger(Ledger(id: 0, name: name));
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  final added = await s.switchLedger(id);
-                  if (added > 0 && context.mounted) {
-                    showToast(context, '已补记 $added 笔周期账单');
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(46),
-                  side: BorderSide(color: C.line2),
-                  foregroundColor: C.ink,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(R.md),
-                  ),
-                ),
-                icon: LineIcon('plus', size: 18, color: C.ink),
-                label: const Text('新建账本'),
-              ),
+            MenuAction(
+              icon: 'plus',
+              title: '新建账本',
+              onTap: () => _newLedger(context),
             ),
           ],
         ),
-      ),
+      ],
     );
+  }
+
+  /// 新建账本：问名字 → 建 → 切过去。
+  static Future<void> _newLedger(BuildContext context) async {
+    final s = Store.i;
+    final ctl = TextEditingController();
+    final name = await showAppDialog<String>(
+      context: context,
+      title: '新建账本',
+      content: TextField(
+        controller: ctl,
+        autofocus: true,
+        maxLength: 12,
+        decoration: const InputDecoration(
+          hintText: '例如：装修账本',
+          counterText: '',
+        ),
+      ),
+      actions: [
+        const DialogAction(label: '取消'),
+        DialogAction(
+          label: '创建',
+          valueOf: () => ctl.text.trim(),
+          strong: true,
+        ),
+      ],
+    );
+    if (name == null || name.isEmpty) return;
+    final id = await Repo.insertLedger(Ledger(id: 0, name: name));
+    final added = await s.switchLedger(id);
+    if (added > 0 && context.mounted) {
+      showToast(context, '已补记 $added 笔周期账单');
+    }
   }
 }
 
@@ -1001,71 +928,45 @@ class _CycleDaySheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: C.bg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
-      ),
-      padding: const EdgeInsets.only(top: S.md, bottom: S.lg),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: C.line,
-              borderRadius: BorderRadius.circular(R.xs),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
-            child: Row(
-              children: [
-                Text('账单日', style: T.section),
-                const Spacer(),
-                Text('1–31 号，短月自动取月末', style: T.caption),
-              ],
-            ),
-          ),
-          Padding(
-            // 与上面「账单日」标题行同是 16，两者左右对齐
-            padding: const EdgeInsets.symmetric(horizontal: S.lg),
-            child: GridView.count(
-              crossAxisCount: 7,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 6,
-              crossAxisSpacing: 6,
-              children: [
-                for (var d = 1; d <= 31; d++)
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => Navigator.pop(context, d),
-                    child: Container(
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: d == current ? C.ink : Colors.transparent,
-                        border: Border.all(
-                          color: d == current ? C.ink : C.line,
-                        ),
-                        borderRadius: BorderRadius.circular(R.sm),
-                      ),
-                      child: Text(
-                        '$d',
-                        style: T.body.copyWith(
-                          color: d == current ? C.bg : C.ink,
-                          fontWeight: d == current
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                        ),
-                      ),
+    return SheetShell(
+      title: '账单日',
+      subtitle: '1–31 号，短月自动取月末',
+      child: Padding(
+        // 与上面「账单日」标题行同是 16，两者左右对齐
+        padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.lg),
+        child: GridView.count(
+          crossAxisCount: 7,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 6,
+          crossAxisSpacing: 6,
+          children: [
+            for (var d = 1; d <= 31; d++)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.pop(context, d),
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: d == current ? C.ink : Colors.transparent,
+                    border: Border.all(
+                      color: d == current ? C.ink : C.line,
+                    ),
+                    borderRadius: BorderRadius.circular(R.sm),
+                  ),
+                  child: Text(
+                    '$d',
+                    style: T.body.copyWith(
+                      color: d == current ? C.bg : C.ink,
+                      fontWeight: d == current
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                     ),
                   ),
-              ],
-            ),
-          ),
-        ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

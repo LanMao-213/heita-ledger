@@ -13,6 +13,7 @@ import '../design/tokens.dart';
 import '../store.dart';
 import 'common.dart';
 import 'calc_keypad.dart';
+import 'menu.dart';
 import 'picker_wheels.dart';
 
 /// 保存成功后带出来的信息，给「已记账 · 10-01 至 10-31」这类提示用。
@@ -359,34 +360,23 @@ class _RecordSheetState extends State<RecordSheet> {
     final catName = Store.i.categoryOf(_categoryId)?.name ?? '模板';
     final ctl = TextEditingController(text: catName);
 
-    final ok = await showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('存为模板', style: T.section),
-        content: SizedBox(
-          width: 320,
-          child: TextField(
-            controller: ctl,
-            autofocus: true,
-            maxLength: 8,
-            style: T.body,
-            decoration: const InputDecoration(
-              hintText: '模板名称',
-              counterText: '',
-            ),
-          ),
+      title: '存为模板',
+      content: TextField(
+        controller: ctl,
+        autofocus: true,
+        maxLength: 8,
+        style: T.body,
+        decoration: const InputDecoration(
+          hintText: '模板名称',
+          counterText: '',
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消', style: TextStyle(color: C.ink2)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('保存', style: TextStyle(color: C.ink)),
-          ),
-        ],
       ),
+      actions: const [
+        DialogAction(label: '取消', value: false),
+        DialogAction(label: '保存', value: true, strong: true),
+      ],
     );
 
     final name = ctl.text.trim();
@@ -571,34 +561,25 @@ class _RecordSheetState extends State<RecordSheet> {
     setState(() => _dueDate = Fmt.date(picked));
   }
 
-  void _pickAccount() {
+  Future<void> _pickAccount() async {
     final s = Store.i;
     if (s.accounts.isEmpty) return;
-    showModalBottomSheet<void>(
+    final picked = await showPickSheet<int>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SheetHeader(title: '选择账户'),
-            for (final a in s.accounts)
-              SettingRow(
-                icon: a.icon,
-                title: a.name,
-                subtitle: Fmt.yuan(a.balanceCents),
-                trailing: a.id == _accountId
-                    ? LineIcon('check', size: 20, color: C.ink)
-                    : null,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  setState(() => _accountId = a.id);
-                },
-              ),
-            const SizedBox(height: S.md),
-          ],
-        ),
-      ),
+      title: '选择账户',
+      options: [
+        for (final a in s.accounts)
+          PickOption(
+            value: a.id,
+            icon: a.icon,
+            title: a.name,
+            subtitle: Fmt.yuan(a.balanceCents),
+          ),
+      ],
+      current: _accountId,
     );
+    if (picked == null || !mounted) return;
+    setState(() => _accountId = picked);
   }
 
   @override

@@ -6,6 +6,7 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
+import '../widgets/menu.dart';
 import '../widgets/picker_wheels.dart';
 
 /// 分类显示名：子分类带上父级，「正餐」单看不知道属于餐饮
@@ -113,117 +114,128 @@ class _RecurringPageState extends State<RecurringPage> {
       'yearly': '每年',
     };
 
-    final ok = await showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      title: rule == null ? '新建周期账单' : '编辑规则',
+      content: StatefulBuilder(
         builder: (ctx, setLocal) {
           final cats = type.isIncome ? s.incomeCats : s.expenseCats;
-          return AlertDialog(
-            title: Text(rule == null ? '新建周期账单' : '编辑规则', style: T.section),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SegTabs(
-                    value: type,
-                    onChanged: (t) => setLocal(() {
-                      type = t;
-                      categoryId = null;
-                    }),
-                  ),
-                  const SizedBox(height: S.md),
-                  TextField(
-                    controller: amountCtl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      prefixText: '¥ ',
-                      hintText: '金额',
-                    ),
-                  ),
-                  const SizedBox(height: S.md),
-                  TextField(
-                    controller: noteCtl,
-                    decoration: const InputDecoration(hintText: '备注，如「房租」'),
-                  ),
-                  const SizedBox(height: S.md),
-                  // 分类用和「记一笔」同一个双轮盘：周期账单也要能挂到
-                  // 「居家 / 房租房贷」这种子分类，否则每月自动补记的那笔
-                  // 永远停在父级，明细里看不出具体是什么
-                  InkWell(
-                    onTap: () async {
-                      final pick = await showCategoryWheel(
-                        context,
-                        cats: cats,
-                        childrenOf: s.childrenOf,
-                        selectedCategoryId: categoryId,
-                      );
-                      if (pick == null) return;
-                      setLocal(() => categoryId = pick.txnCategoryId);
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(labelText: '分类'),
-                      child: Text(_catLabel(s, categoryId), style: T.body),
-                    ),
-                  ),
-                  const SizedBox(height: S.md),
-                  DropdownButtonFormField<String>(
-                    initialValue: freq,
-                    decoration: const InputDecoration(labelText: '重复'),
-                    items: [
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SegTabs(
+                value: type,
+                onChanged: (t) => setLocal(() {
+                  type = t;
+                  categoryId = null;
+                }),
+              ),
+              const SizedBox(height: S.md),
+              TextField(
+                controller: amountCtl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  prefixText: '¥ ',
+                  hintText: '金额',
+                ),
+              ),
+              const SizedBox(height: S.md),
+              TextField(
+                controller: noteCtl,
+                decoration: const InputDecoration(hintText: '备注，如「房租」'),
+              ),
+              const SizedBox(height: S.md),
+              // 分类用和「记一笔」同一个双轮盘：周期账单也要能挂到
+              // 「居家 / 房租房贷」这种子分类，否则每月自动补记的那笔
+              // 永远停在父级，明细里看不出具体是什么
+              InkWell(
+                onTap: () async {
+                  final pick = await showCategoryWheel(
+                    context,
+                    cats: cats,
+                    childrenOf: s.childrenOf,
+                    selectedCategoryId: categoryId,
+                  );
+                  if (pick == null) return;
+                  setLocal(() => categoryId = pick.txnCategoryId);
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(labelText: '分类'),
+                  child: Text(_catLabel(s, categoryId), style: T.body),
+                ),
+              ),
+              const SizedBox(height: S.md),
+              PickField(
+                label: '重复',
+                valueText: freqLabels[freq] ?? freq,
+                onTap: () async {
+                  final picked = await showPickSheet<String>(
+                    context: ctx,
+                    title: '多久记一次',
+                    options: [
                       for (final e in freqLabels.entries)
-                        DropdownMenuItem(value: e.key, child: Text(e.value)),
+                        PickOption(value: e.key, icon: 'rec', title: e.value),
                     ],
-                    onChanged: (v) => setLocal(() => freq = v ?? 'monthly'),
-                  ),
-                  const SizedBox(height: S.md),
-                  InkWell(
-                    onTap: () async {
-                      final now = DateTime.now();
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.tryParse(nextDate) ?? now,
-                        firstDate: DateTime(now.year - 3),
-                        lastDate: DateTime(now.year + 5),
-                        locale: const Locale('zh', 'CN'),
-                      );
-                      if (picked != null) {
-                        setLocal(() => nextDate = Fmt.date(picked));
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(labelText: '下次记账日'),
-                      child: Text(nextDate, style: T.body),
-                    ),
-                  ),
-                  const SizedBox(height: S.md),
-                  DropdownButtonFormField<int>(
-                    initialValue: accountId,
-                    decoration: const InputDecoration(labelText: '账户'),
-                    items: [
+                    current: freq,
+                  );
+                  if (picked == null) return;
+                  setLocal(() => freq = picked);
+                },
+              ),
+              const SizedBox(height: S.md),
+              InkWell(
+                onTap: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.tryParse(nextDate) ?? now,
+                    firstDate: DateTime(now.year - 3),
+                    lastDate: DateTime(now.year + 5),
+                    locale: const Locale('zh', 'CN'),
+                  );
+                  if (picked != null) {
+                    setLocal(() => nextDate = Fmt.date(picked));
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(labelText: '下次记账日'),
+                  child: Text(nextDate, style: T.body),
+                ),
+              ),
+              const SizedBox(height: S.md),
+              PickField(
+                label: '账户',
+                valueText: s.accountOf(accountId)?.name ?? '',
+                onTap: () async {
+                  final picked = await showPickSheet<int>(
+                    context: ctx,
+                    title: '用哪个账户',
+                    options: [
                       for (final a in s.accounts)
-                        DropdownMenuItem(value: a.id, child: Text(a.name)),
+                        PickOption(
+                          value: a.id,
+                          icon: a.icon,
+                          title: a.name,
+                          subtitle: Fmt.yuan(a.balanceCents),
+                        ),
                     ],
-                    onChanged: (v) => setLocal(() => accountId = v),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text('取消', style: TextStyle(color: C.ink2)),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text('保存', style: TextStyle(color: C.ink)),
+                    current: accountId,
+                  );
+                  if (picked == null) return;
+                  setLocal(() => accountId = picked);
+                },
               ),
             ],
           );
         },
       ),
+      actions: const [
+        DialogAction(label: '取消', value: false),
+        DialogAction(label: '保存', value: true, strong: true),
+      ],
     );
 
     if (ok != true) return;
@@ -352,24 +364,14 @@ class _RuleCard extends StatelessWidget {
           ),
           IconButton(
             onPressed: () async {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: Text('删除这条规则？', style: T.section),
-                  content: Text('已经补记过的账目不会受影响。', style: T.body2),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: Text('取消', style: TextStyle(color: C.ink2)),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: Text('删除', style: TextStyle(color: C.over)),
-                    ),
-                  ],
-                ),
+              final ok = await showAppConfirm(
+                context,
+                title: '删除这条规则？',
+                message: '已经补记过的账目不会受影响。',
+                confirmLabel: '删除',
+                danger: true,
               );
-              if (ok != true) return;
+              if (!ok) return;
               await Repo.deleteRecurring(rule.id);
               await onChanged();
             },

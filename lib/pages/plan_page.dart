@@ -9,6 +9,7 @@ import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/calendar_picker.dart';
 import '../widgets/common.dart';
+import '../widgets/menu.dart';
 import 'debts_page.dart';
 
 /// 计划页 = 预算 + 储蓄目标。
@@ -423,30 +424,13 @@ class _CategoryBudgets extends StatelessWidget {
 
   Future<void> _addCategoryBudget(BuildContext context) async {
     final s = Store.i;
-    final cat = await showModalBottomSheet<Category>(
+    final cat = await showPickSheet<Category>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SheetHeader(title: '选择分类'),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final c in s.expenseCats)
-                    SettingRow(
-                      icon: c.icon,
-                      title: c.name,
-                      onTap: () => Navigator.pop(ctx, c),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: S.md),
-          ],
-        ),
-      ),
+      title: '选择分类',
+      options: [
+        for (final c in s.expenseCats)
+          PickOption(value: c, icon: c.icon, title: c.name),
+      ],
     );
     if (cat == null || !context.mounted) return;
 
@@ -635,65 +619,57 @@ class _Goals extends StatelessWidget {
       'coin',
     ];
 
-    final ok = await showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Text(goal == null ? '新建储蓄目标' : '编辑目标', style: T.section),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: nameCtl,
-                decoration: const InputDecoration(hintText: '目标名称'),
-              ),
-              const SizedBox(height: S.md),
-              TextField(
-                controller: targetCtl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(hintText: '目标金额（元）'),
-              ),
-              const SizedBox(height: S.lg),
-              Wrap(
-                spacing: S.sm,
-                runSpacing: S.sm,
-                children: [
-                  for (final k in iconChoices)
-                    GestureDetector(
-                      onTap: () => setLocal(() => icon = k),
-                      child: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: icon == k ? C.ink : C.bg2,
-                          borderRadius: BorderRadius.circular(R.sm),
-                        ),
-                        child: Center(
-                          child: LineIcon(
-                            k,
-                            size: 19,
-                            color: icon == k ? C.bg : C.ink2,
-                          ),
+      title: goal == null ? '新建储蓄目标' : '编辑目标',
+      content: StatefulBuilder(
+        builder: (ctx, setLocal) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: nameCtl,
+              decoration: const InputDecoration(hintText: '目标名称'),
+            ),
+            const SizedBox(height: S.md),
+            TextField(
+              controller: targetCtl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(hintText: '目标金额（元）'),
+            ),
+            const SizedBox(height: S.lg),
+            Wrap(
+              spacing: S.sm,
+              runSpacing: S.sm,
+              children: [
+                for (final k in iconChoices)
+                  GestureDetector(
+                    onTap: () => setLocal(() => icon = k),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: icon == k ? C.ink : C.bg2,
+                        borderRadius: BorderRadius.circular(R.sm),
+                      ),
+                      child: Center(
+                        child: LineIcon(
+                          k,
+                          size: 19,
+                          color: icon == k ? C.bg : C.ink2,
                         ),
                       ),
                     ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('取消', style: TextStyle(color: C.ink2)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('保存', style: TextStyle(color: C.ink)),
+                  ),
+              ],
             ),
           ],
         ),
       ),
+      actions: const [
+        DialogAction(label: '取消', value: false),
+        DialogAction(label: '保存', value: true, strong: true),
+      ],
     );
 
     if (ok != true) return;
@@ -861,45 +837,38 @@ class _GoalCard extends StatelessWidget {
 
   Future<void> _menu(BuildContext context) async {
     final s = Store.i;
-    await showModalBottomSheet<void>(
+    await showMenuSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SheetHeader(title: goal.name),
-            SettingRow(
+      title: goal.name,
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(
               icon: 'tpl',
               title: '编辑',
-              onTap: () {
-                Navigator.pop(ctx);
-                _Goals._edit(context, goal);
-              },
+              onTap: () => _Goals._edit(context, goal),
             ),
-            SettingRow(
+            MenuAction(
               icon: 'download',
               title: '取出全部',
               subtitle: Fmt.money(goal.savedCents),
               onTap: () async {
-                Navigator.pop(ctx);
                 await Repo.addFunds(goal.id, -goal.savedCents);
                 await s.afterGoalChange();
               },
             ),
-            SettingRow(
+            MenuAction(
               icon: 'more',
               title: '删除目标',
               danger: true,
               onTap: () async {
-                Navigator.pop(ctx);
                 await Repo.deleteGoal(goal.id);
                 await s.afterGoalChange();
               },
             ),
-            const SizedBox(height: S.md),
           ],
         ),
-      ),
+      ],
     );
   }
 }
@@ -915,30 +884,22 @@ Future<int?> _askAmount(
   final ctl = TextEditingController(
     text: initial <= 0 ? '' : (initial / 100).toStringAsFixed(0),
   );
-  final ok = await showDialog<bool>(
+  final ok = await showAppDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title, style: T.section),
-      content: TextField(
-        controller: ctl,
-        autofocus: true,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(
-          prefixText: '¥ ',
-          hintText: '0（留空或 0 表示清除）',
-        ),
+    title: title,
+    content: TextField(
+      controller: ctl,
+      autofocus: true,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        prefixText: '¥ ',
+        hintText: '0（留空或 0 表示清除）',
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text('取消', style: TextStyle(color: C.ink2)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text('确定', style: TextStyle(color: C.ink)),
-        ),
-      ],
     ),
+    actions: const [
+      DialogAction(label: '取消', value: false),
+      DialogAction(label: '确定', value: true, strong: true),
+    ],
   );
   if (ok != true) return null;
   return Fmt.parseCents(ctl.text);

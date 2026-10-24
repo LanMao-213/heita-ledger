@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../data/models.dart';
 import '../design/hairline.dart';
 import '../design/tokens.dart';
-import 'common.dart';
+import 'menu.dart';
 
 /// 双轮盘的选择结果。
 ///
@@ -114,12 +114,56 @@ class _CatWheelSheetState extends State<_CatWheelSheet> {
     final subs = _subsOf(_catIndex);
     final subLabels = [_noSub, for (final s in subs) s.name];
 
-    return SafeArea(
-      top: false,
+    return SheetShell(
+      title: '选择分类',
+      bottom: Padding(
+        padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.md),
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  height: 46,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(R.md),
+                    border: Border.all(color: C.line2),
+                  ),
+                  child: Text('取消', style: T.body2.copyWith(color: C.ink2)),
+                ),
+              ),
+            ),
+            const SizedBox(width: S.sm),
+            Expanded(
+              flex: 2,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _done,
+                child: Container(
+                  height: 46,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: C.ink,
+                    borderRadius: BorderRadius.circular(R.md),
+                  ),
+                  child: Text(
+                    '确定',
+                    style: T.body.copyWith(
+                      color: C.bg,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SheetHeader(title: '选择分类'),
           // 240 / 52：原 192 / 40 的转轮在小屏上只能露出 4 行，选中行偏细、
           // 单手滚动容易滑过头。抬高到 240 后能稳定露出 5 行，指腹落点更准
           SizedBox(
@@ -189,51 +233,6 @@ class _CatWheelSheetState extends State<_CatWheelSheet> {
                 style: T.caption.copyWith(color: C.ink3),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.md),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      height: 46,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(R.md),
-                        border: Border.all(color: C.line2),
-                      ),
-                      child: Text('取消', style: T.body2.copyWith(color: C.ink2)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: S.sm),
-                Expanded(
-                  flex: 2,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _done,
-                    child: Container(
-                      height: 46,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: C.ink,
-                        borderRadius: BorderRadius.circular(R.md),
-                      ),
-                      child: Text(
-                        '确定',
-                        style: T.body.copyWith(
-                          color: C.bg,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

@@ -9,6 +9,7 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
+import '../widgets/menu.dart';
 
 /// 往来页：借出（应收）/ 借入（应付）的完整台账。
 ///
@@ -265,11 +266,9 @@ Future<void> showPersonDebtsSheet(BuildContext context, PersonDebts group) {
   final s = Store.i;
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: C.bg,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.35),
     isScrollControlled: true,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
-    ),
     builder: (ctx) => AnimatedBuilder(
       animation: s,
       builder: (ctx, _) {
@@ -284,46 +283,30 @@ Future<void> showPersonDebtsSheet(BuildContext context, PersonDebts group) {
               d,
         ];
         if (fresh.isEmpty) {
-          return SafeArea(
+          return SheetShell(
+            title: group.name,
             child: Padding(
-              padding: const EdgeInsets.all(S.xl),
+              padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
               child: Text(
                 '${group.name}的往来都结清了',
-                style: T.body.copyWith(color: C.ink2),
+                style: T.body2,
               ),
             ),
           );
         }
         final g = PersonDebts(group.name, fresh);
 
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
-                child: Row(
-                  children: [
-                    Text(group.name, style: T.section),
-                    const Spacer(),
-                    Text(
-                      g.isMixed
-                          ? '借出 ${Fmt.money(g.receivableCents)} · 借入 ${Fmt.money(g.payableCents)}'
-                          : '${g.netCents > 0 ? '应收' : '应付'} ${Fmt.money(g.netCents.abs())}',
-                      style: T.caption.copyWith(color: C.ink3),
-                    ),
-                  ],
-                ),
-              ),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.only(top: S.xs, bottom: S.md),
-                  children: [for (final d in g.debts) _DebtRow(debt: d)],
-                ),
-              ),
-            ],
+        return SheetShell(
+          title: group.name,
+          subtitle: g.isMixed
+              ? '借出 ${Fmt.money(g.receivableCents)} · 借入 ${Fmt.money(g.payableCents)}'
+              : '${g.netCents > 0 ? '应收' : '应付'} ${Fmt.money(g.netCents.abs())}',
+          child: Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(top: S.xs, bottom: S.md),
+              children: [for (final d in g.debts) _DebtRow(debt: d)],
+            ),
           ),
         );
       },
@@ -435,34 +418,22 @@ Future<void> showDebtDetail(BuildContext context, Debt debt) {
   final s = Store.i;
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: C.bg,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
-    ),
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.35),
     builder: (ctx) => AnimatedBuilder(
       animation: s,
       builder: (ctx, _) {
         // 面板开着时可能刚记完还款，重新取一次最新状态
         final d = s.debtOf(debt.id) ?? debt;
-        return SafeArea(
+        return SheetShell(
+          title: '${d.counterparty} · ${d.direction.label}',
+          subtitle: d.isClosed ? '已结清' : null,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
+            padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      '${d.counterparty} · ${d.direction.label}',
-                      style: T.section,
-                    ),
-                    const Spacer(),
-                    if (d.isClosed)
-                      Text('已结清', style: T.caption.copyWith(color: C.ink3)),
-                  ],
-                ),
-                const SizedBox(height: S.md),
                 _kv('本金', Fmt.money(d.amountCents)),
                 _kv('已还', Fmt.money(d.repaidCents)),
                 _kv('剩余', Fmt.money(d.remainingCents)),
@@ -546,34 +517,19 @@ Future<void> _confirmDeleteDebt(
   final txnCount = await Repo.debtTxnCount(d.id);
   if (!sheetContext.mounted) return;
 
-  final ok = await showDialog<bool>(
-    context: sheetContext,
-    builder: (ctx) => AlertDialog(
-      title: Text(
-        '删除「${d.counterparty} · ${d.direction.label}」？',
-        style: T.section,
-      ),
-      content: Text(
+  final ok = await showAppConfirm(
+    sheetContext,
+    title: '删除「${d.counterparty} · ${d.direction.label}」？',
+    message:
         '${Fmt.money(d.amountCents)} 这笔往来会一起删掉'
         '${txnCount > 0 ? '，还有挂在上面的 $txnCount 笔流水'
-              '${txnCount > 1 ? '（本金和各次还款）' : '（本金）'}，'
-              '账户余额跟着回滚' : ''}。'
+            '${txnCount > 1 ? '（本金和各次还款）' : '（本金）'}，'
+            '账户余额跟着回滚' : ''}。'
         '\n删掉之后没法撤销。',
-        style: T.body2,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text('取消', style: TextStyle(color: C.ink2)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text('删除', style: TextStyle(color: C.over)),
-        ),
-      ],
-    ),
+    confirmLabel: '删除',
+    danger: true,
   );
-  if (ok != true) return;
+  if (!ok) return;
 
   await Repo.deleteDebt(d.id);
   await Store.i.afterTxnChange();
@@ -597,10 +553,8 @@ Future<void> showRepaySheet(BuildContext context, Debt debt) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: C.bg,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
-    ),
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.35),
     builder: (_) => _RepaySheet(debt: debt),
   );
 }
@@ -699,96 +653,109 @@ class _RepaySheetState extends State<_RepaySheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: S.lg,
-        right: S.lg,
-        top: S.md,
-        bottom: MediaQuery.of(context).viewInsets.bottom + S.lg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('记一笔还款 · ${widget.debt.counterparty}', style: T.section),
-          const SizedBox(height: 4),
-          Text(
-            '剩余 ${Fmt.money(widget.debt.remainingCents)}',
-            style: T.caption,
-          ),
-          const SizedBox(height: S.md),
-          TextField(
-            controller: _amount,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-            ],
-            // 刻意用 26（不是金额档）：这是**正在输入**的数字，比列表里的
-            // 金额大一档才看得出「我在填这个」。别当成漂移收掉。
-            style: T.amount.copyWith(fontSize: 26),
-            decoration: const InputDecoration(
-              prefixText: '¥ ',
-              isDense: true,
-              border: UnderlineInputBorder(),
+    return SheetShell(
+      title: '记一笔还款',
+      subtitle:
+          '${widget.debt.counterparty} · 剩余 ${Fmt.money(widget.debt.remainingCents)}',
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: S.lg,
+          right: S.lg,
+          bottom: MediaQuery.of(context).viewInsets.bottom + S.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _amount,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              // 刻意用 26（不是金额档）：这是**正在输入**的数字，比列表里的
+              // 金额大一档才看得出「我在填这个」。别当成漂移收掉。
+              style: T.amount.copyWith(fontSize: 26),
+              decoration: const InputDecoration(
+                prefixText: '¥ ',
+                isDense: true,
+                border: UnderlineInputBorder(),
+              ),
             ),
-          ),
-          const SizedBox(height: S.md),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: C.ink2,
-                    side: BorderSide(color: C.line2),
-                    minimumSize: const Size(0, 44),
-                  ),
-                  onPressed: _pickDate,
-                  child: Text(Fmt.friendly(_date)),
-                ),
-              ),
-              const SizedBox(width: S.md),
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: C.ink2,
-                    side: BorderSide(color: C.line2),
-                    minimumSize: const Size(0, 44),
-                  ),
-                  onPressed: () async {
-                    final accounts = Store.i.accounts;
-                    if (accounts.isEmpty) return;
-                    final idx = accounts.indexWhere((a) => a.id == _accountId);
-                    final next = accounts[(idx + 1) % accounts.length];
-                    setState(() => _accountId = next.id);
-                  },
-                  child: Text(
-                    Store.i.accountOf(_accountId)?.name ?? '选账户',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            const SizedBox(height: S.md),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: C.ink2,
+                      side: BorderSide(color: C.line2),
+                      minimumSize: const Size(0, 44),
+                    ),
+                    onPressed: _pickDate,
+                    child: Text(Fmt.friendly(_date)),
                   ),
                 ),
-              ),
+                const SizedBox(width: S.md),
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: C.ink2,
+                      side: BorderSide(color: C.line2),
+                      minimumSize: const Size(0, 44),
+                    ),
+                    onPressed: () async {
+                      final accounts = Store.i.accounts;
+                      if (accounts.isEmpty) return;
+                      // 原来是「点一下切下一个账户」——两个账户时还行，
+                      // 四个账户就得连点四下才知道选了谁，而且中途停在哪一个
+                      // 全靠猜。换成弹层列表，一眼看全、点了就选中。
+                      final picked = await showPickSheet<int>(
+                        context: context,
+                        title: '还到哪个账户',
+                        options: [
+                          for (final a in accounts)
+                            PickOption(
+                              value: a.id,
+                              icon: a.icon,
+                              title: a.name,
+                              subtitle: Fmt.yuan(a.balanceCents),
+                            ),
+                        ],
+                        current: _accountId,
+                      );
+                      if (picked == null || !mounted) return;
+                      setState(() => _accountId = picked);
+                    },
+                    child: Text(
+                      Store.i.accountOf(_accountId)?.name ?? '选账户',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: S.sm),
+              Text(_error!, style: T.caption.copyWith(color: C.over)),
             ],
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: S.sm),
-            Text(_error!, style: T.caption.copyWith(color: C.over)),
+            const SizedBox(height: S.lg),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: C.ink,
+                  foregroundColor: C.bg,
+                  minimumSize: const Size(0, 48),
+                ),
+                onPressed: _saving ? null : _save,
+                child: Text(_saving ? '保存中…' : '确认'),
+              ),
+            ),
           ],
-          const SizedBox(height: S.lg),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: C.ink,
-                foregroundColor: C.bg,
-                minimumSize: const Size(0, 48),
-              ),
-              onPressed: _saving ? null : _save,
-              child: Text(_saving ? '保存中…' : '确认'),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

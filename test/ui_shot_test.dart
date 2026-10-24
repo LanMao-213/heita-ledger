@@ -201,6 +201,17 @@ void main() {
     await _shot(tester, 'build/visual/shot_4_mine.png');
     expect(tester.takeException(), isNull, reason: '我的页有布局溢出');
 
+    // ---- 账户管理（二级：列表弹层，行尾还挂一颗 ⋯）----
+    // 这一层是「菜单组 + 自定义行」的混排，菜单件改版后要亲眼确认行高与
+    // 分割线没错位，所以单独留一张。
+    await tester.tap(find.text('账户管理'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_25_accounts_sheet.png');
+    expect(tester.takeException(), isNull, reason: '账户管理弹层有布局溢出');
+    // 点空白处关掉，回到我的页
+    await tester.tapAt(const Offset(195, 80));
+    await tester.pumpAndSettle();
+
     // ---- 分类管理（一级列表）----
     await tester.tap(find.text('分类管理'));
     await tester.pumpAndSettle();

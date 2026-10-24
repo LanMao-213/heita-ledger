@@ -8,6 +8,7 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
+import '../widgets/menu.dart';
 
 /// 分类管理（两级）。
 ///
@@ -171,48 +172,38 @@ class _CatsPageState extends State<CatsPage> {
 
   Future<void> _menu(BuildContext context, Category c) async {
     final n = Store.i.childrenOf(c.id).length;
-    await showModalBottomSheet<void>(
+    await showMenuSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SheetHeader(title: c.name),
-            SettingRow(
+      title: c.name,
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(
               icon: 'tpl',
               title: '编辑名称与图标',
-              onTap: () {
-                Navigator.pop(ctx);
-                _edit(context, c);
-              },
+              onTap: () => _edit(context, c),
             ),
-            SettingRow(
+            MenuAction(
               icon: 'plus',
               title: '新增子分类',
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => _SubCatsPage(
-                      parent: c,
-                      onAdd: (ctx) => _edit(ctx, null, parent: c),
-                      onEdit: (ctx, cat) => _edit(ctx, cat),
-                    ),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => _SubCatsPage(
+                    parent: c,
+                    onAdd: (ctx) => _edit(ctx, null, parent: c),
+                    onEdit: (ctx, cat) => _edit(ctx, cat),
                   ),
-                );
-              },
+                ),
+              ),
             ),
-            SettingRow(
+            MenuAction(
               icon: 'eye',
               title: '停用',
               // 停用不是删除：流水还指着这个分类，明细里照常显示
               subtitle: '从记账选择器和预算里收起来，历史记录照常显示，随时可恢复',
-              onTap: () async {
-                Navigator.pop(ctx);
-                await _setArchived(c, archived: true);
-              },
+              onTap: () => _setArchived(c, archived: true),
             ),
-            SettingRow(
+            MenuAction(
               icon: 'more',
               title: '删除',
               // 一级分类带着子分类一起删，文案必须说清楚，否则用户以为只删了一层
@@ -221,47 +212,32 @@ class _CatsPageState extends State<CatsPage> {
                   : '连同 $n 个子分类一起删除；历史记录会变成「未分类」，不会被删掉',
               danger: true,
               onTap: () async {
-                Navigator.pop(ctx);
                 final ok = await _confirmDelete(context, c, subCount: n);
-                if (ok != true) return;
+                if (!ok) return;
                 await Repo.deleteCategory(c.id);
                 await Store.i.afterCategoryChange();
                 if (context.mounted) showToast(context, '已删除');
               },
             ),
-            const SizedBox(height: S.md),
           ],
         ),
-      ),
+      ],
     );
   }
 
-  Future<bool?> _confirmDelete(
+  Future<bool> _confirmDelete(
     BuildContext context,
     Category c, {
     int subCount = 0,
   }) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('删除「${c.name}」？', style: T.section),
-        content: Text(
-          subCount > 0
-              ? '它的 $subCount 个子分类会一起删掉。历史记录不会消失，会显示为「未分类」。'
-              : '这个分类下的历史记录不会消失，会显示为「未分类」。',
-          style: T.body2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消', style: TextStyle(color: C.ink2)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('删除', style: TextStyle(color: C.over)),
-          ),
-        ],
-      ),
+    return showAppConfirm(
+      context,
+      title: '删除「${c.name}」？',
+      message: subCount > 0
+          ? '它的 $subCount 个子分类会一起删掉。历史记录不会消失，会显示为「未分类」。'
+          : '这个分类下的历史记录不会消失，会显示为「未分类」。',
+      confirmLabel: '删除',
+      danger: true,
     );
   }
 
@@ -278,84 +254,63 @@ class _CatsPageState extends State<CatsPage> {
 
     final choices = iconChoices(type);
 
-    final ok = await showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Text(
-            cat == null
-                ? (parent == null ? '新增分类' : '新增子分类')
-                : '编辑分类',
-            style: T.section,
-          ),
-          content: SizedBox(
-            width: 320,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (parent != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: S.sm),
-                    child: Text('属于「${parent.name}」', style: T.caption),
-                  ),
-                TextField(
-                  controller: nameCtl,
-                  autofocus: true,
-                  maxLength: 8,
-                  decoration: const InputDecoration(
-                    hintText: '分类名称',
-                    counterText: '',
-                  ),
-                ),
-                const SizedBox(height: S.md),
-                SizedBox(
-                  height: 168,
-                  child: GridView.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 6,
-                          mainAxisSpacing: S.sm,
-                          crossAxisSpacing: S.sm,
-                        ),
-                    itemCount: choices.length,
-                    itemBuilder: (c2, i) {
-                      final k = choices[i];
-                      final on = k == icon;
-                      return GestureDetector(
-                        onTap: () => setLocal(() => icon = k),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: on ? C.ink : C.bg2,
-                            borderRadius: BorderRadius.circular(R.sm),
-                          ),
-                          child: Center(
-                            child: LineIcon(
-                              k,
-                              size: 19,
-                              color: on ? C.bg : C.ink2,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+      title: cat == null ? (parent == null ? '新增分类' : '新增子分类') : '编辑分类',
+      content: StatefulBuilder(
+        builder: (ctx, setLocal) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (parent != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: S.sm),
+                child: Text('属于「${parent.name}」', style: T.caption),
+              ),
+            TextField(
+              controller: nameCtl,
+              autofocus: true,
+              maxLength: 8,
+              decoration: const InputDecoration(
+                hintText: '分类名称',
+                counterText: '',
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('取消', style: TextStyle(color: C.ink2)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('保存', style: TextStyle(color: C.ink)),
+            const SizedBox(height: S.md),
+            SizedBox(
+              height: 168,
+              child: GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 6,
+                  mainAxisSpacing: S.sm,
+                  crossAxisSpacing: S.sm,
+                ),
+                itemCount: choices.length,
+                itemBuilder: (c2, i) {
+                  final k = choices[i];
+                  final on = k == icon;
+                  return GestureDetector(
+                    onTap: () => setLocal(() => icon = k),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: on ? C.ink : C.bg2,
+                        borderRadius: BorderRadius.circular(R.sm),
+                      ),
+                      child: Center(
+                        child: LineIcon(k, size: 19, color: on ? C.bg : C.ink2),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
       ),
+      actions: const [
+        DialogAction(label: '取消', value: false),
+        DialogAction(label: '保存', value: true, strong: true),
+      ],
     );
 
     if (ok != true) return;
@@ -525,73 +480,45 @@ class _SubCatsPageState extends State<_SubCatsPage> {
   }
 
   Future<void> _menu(BuildContext context, Category c) async {
-    await showModalBottomSheet<void>(
+    await showMenuSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SheetHeader(title: c.name),
-            SettingRow(
+      title: c.name,
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(
               icon: 'tpl',
               title: '编辑名称与图标',
-              onTap: () {
-                Navigator.pop(ctx);
-                widget.onEdit(context, c);
-              },
+              onTap: () => widget.onEdit(context, c),
             ),
-            SettingRow(
+            MenuAction(
               icon: 'eye',
               title: '停用',
               subtitle: '从记账选择器和预算里收起来，历史记录照常显示，随时可恢复',
-              onTap: () async {
-                Navigator.pop(ctx);
-                await _setArchived(c, archived: true);
-              },
+              onTap: () => _setArchived(c, archived: true),
             ),
-            SettingRow(
+            MenuAction(
               icon: 'more',
               title: '删除',
               subtitle: '该子分类下的记录会变成「未分类」，不会被删掉',
               danger: true,
               onTap: () async {
-                Navigator.pop(ctx);
-                final ok = await showDialog<bool>(
-                  context: context,
-                  builder: (d) => AlertDialog(
-                    title: Text('删除「${c.name}」？', style: T.section),
-                    content: Text(
-                      '这个子分类下的记录不会消失，会显示为「未分类」。',
-                      style: T.body2,
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(d, false),
-                        child: Text(
-                          '取消',
-                          style: TextStyle(color: C.ink2),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(d, true),
-                        child: Text(
-                          '删除',
-                          style: TextStyle(color: C.over),
-                        ),
-                      ),
-                    ],
-                  ),
+                final ok = await showAppConfirm(
+                  context,
+                  title: '删除「${c.name}」？',
+                  message: '这个子分类下的记录不会消失，会显示为「未分类」。',
+                  confirmLabel: '删除',
+                  danger: true,
                 );
-                if (ok != true) return;
+                if (!ok) return;
                 await Repo.deleteCategory(c.id);
                 await Store.i.afterCategoryChange();
                 if (context.mounted) showToast(context, '已删除');
               },
             ),
-            const SizedBox(height: S.md),
           ],
         ),
-      ),
+      ],
     );
   }
 }

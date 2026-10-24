@@ -13,6 +13,7 @@ import '../widgets/common.dart';
 import '../widgets/detail/summary_card.dart';
 import '../widgets/detail/txn_row.dart';
 import '../widgets/filter_sheet.dart';
+import '../widgets/menu.dart';
 import 'period_all_page.dart';
 
 /// 明细页（首页）：按周期看每一笔。
@@ -293,22 +294,18 @@ class _TopBar extends StatelessWidget {
 
   Future<void> _pickLedger(BuildContext context) async {
     final s = Store.i;
-    await showModalBottomSheet<void>(
+    await showMenuSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SheetHeader(title: '切换账本'),
+      title: '切换账本',
+      groups: [
+        MenuGroup(
+          actions: [
             for (final l in s.ledgers)
-              SettingRow(
+              MenuAction(
                 icon: l.icon,
                 title: l.name,
-                trailing: l.id == s.ledgerId
-                    ? LineIcon('check', size: 20, color: C.ink)
-                    : null,
+                checked: l.id == s.ledgerId,
                 onTap: () async {
-                  Navigator.pop(ctx);
                   // 切过去的账本可能欠着好几期周期账单，补记是 switchLedger 做的，
                   // 这里只负责说出来
                   final added = await s.switchLedger(l.id);
@@ -317,10 +314,9 @@ class _TopBar extends StatelessWidget {
                   }
                 },
               ),
-            const SizedBox(height: S.md),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -339,25 +335,23 @@ class _TopBar extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (ctx) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.7,
-        builder: (ctx2, controller) => Column(
-          children: [
-            SheetHeader(
-              title: '搜索「$keyword」 · ${hits.length}${truncated ? '+' : ''} 条',
-            ),
-            Expanded(
-              child: hits.isEmpty
-                  ? const EmptyHint(text: '没有找到匹配的记录')
-                  : ListView.builder(
-                      controller: controller,
-                      itemCount: hits.length,
-                      itemBuilder: (c, i) =>
-                          TxnRow(txn: hits[i], showDate: true),
-                    ),
-            ),
-          ],
+        builder: (ctx2, controller) => SheetShell(
+          title: '搜索「$keyword」',
+          subtitle: '${hits.length}${truncated ? '+' : ''} 条',
+          child: Expanded(
+            child: hits.isEmpty
+                ? const EmptyHint(text: '没有找到匹配的记录')
+                : ListView.builder(
+                    controller: controller,
+                    itemCount: hits.length,
+                    itemBuilder: (c, i) => TxnRow(txn: hits[i], showDate: true),
+                  ),
+          ),
         ),
       ),
     );

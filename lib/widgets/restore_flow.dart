@@ -4,6 +4,7 @@ import '../data/backup_service.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import 'common.dart';
+import 'menu.dart';
 
 /// 覆盖式恢复的统一流程：**二次确认 → 先留快照 → 写入 → 结果弹窗**。
 ///
@@ -22,40 +23,32 @@ Future<bool> runRestoreFlow(
   String? sourceLabel,
 }) async {
   // 1. 二次确认 —— 覆盖式写入，必须让人看清拿什么换什么
-  final ok = await showDialog<bool>(
+  final ok = await showAppDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('覆盖当前数据？', style: T.section),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (sourceLabel != null) ...[
-            Text('来源：$sourceLabel', style: T.caption),
-            const SizedBox(height: S.xs),
-          ],
-          Text('这份备份里有：', style: T.caption),
+    title: '覆盖当前数据？',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (sourceLabel != null) ...[
+          Text('来源：$sourceLabel', style: T.caption),
           const SizedBox(height: S.xs),
-          Text(summary.text, style: T.body),
-          const SizedBox(height: S.md),
-          Text(
-            '恢复会覆盖当前的全部数据。覆盖前会自动存一份当前数据的快照，'
-            '万一恢复错了还能从「数据安全」里再导回来。',
-            style: T.body2,
-          ),
         ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text('取消', style: TextStyle(color: C.ink2)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text('覆盖并恢复', style: TextStyle(color: C.over)),
+        Text('这份备份里有：', style: T.caption),
+        const SizedBox(height: S.xs),
+        Text(summary.text, style: T.body),
+        const SizedBox(height: S.md),
+        Text(
+          '恢复会覆盖当前的全部数据。覆盖前会自动存一份当前数据的快照，'
+          '万一恢复错了还能从「数据安全」里再导回来。',
+          style: T.body2,
         ),
       ],
     ),
+    actions: const [
+      DialogAction(label: '取消', value: false),
+      DialogAction(label: '覆盖并恢复', value: true, danger: true),
+    ],
   );
   if (ok != true || !context.mounted) return false;
 
@@ -73,32 +66,24 @@ Future<bool> runRestoreFlow(
     final counts = await BackupService.restore(payload);
     await Store.i.reloadAfterRestore();
     if (!context.mounted) return true;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('恢复完成', style: T.section),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${counts['txn'] ?? 0} 笔记录 · ${counts['account'] ?? 0} 个账户 · '
-              '${counts['category'] ?? 0} 个分类',
-              style: T.body,
-            ),
-            const SizedBox(height: S.md),
-            Text('覆盖前的数据已存到：', style: T.caption),
-            const SizedBox(height: S.xs),
-            Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
-            const SizedBox(height: S.sm),
-            Text('如果这次恢复的结果不对，去「我的 → 数据安全」用这份快照再导回来。', style: T.caption),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('知道了', style: TextStyle(color: C.ink)),
+    await showAppNotice(
+      context,
+      title: '恢复完成',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${counts['txn'] ?? 0} 笔记录 · ${counts['account'] ?? 0} 个账户 · '
+            '${counts['category'] ?? 0} 个分类',
+            style: T.body,
           ),
+          const SizedBox(height: S.md),
+          Text('覆盖前的数据已存到：', style: T.caption),
+          const SizedBox(height: S.xs),
+          Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
+          const SizedBox(height: S.sm),
+          Text('如果这次恢复的结果不对，去「我的 → 数据安全」用这份快照再导回来。', style: T.caption),
         ],
       ),
     );

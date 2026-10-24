@@ -8,6 +8,7 @@ import '../../design/tokens.dart';
 import '../../pages/debts_page.dart';
 import '../../store.dart';
 import '../common.dart';
+import '../menu.dart';
 import '../record_sheet.dart';
 
 /// 单条交易。点按进入编辑，长按删除。
@@ -137,31 +138,19 @@ class TxnRow extends StatelessWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('删除这笔记录？', style: T.section),
-        // 与列表同一口径：标题是分类名，备注只作补充。
-        // 旧版拿备注当标题，出现的是「删除这笔记录？午饭」，看不出删的是哪一类。
-        content: Text(
+    final ok = await showAppConfirm(
+      context,
+      title: '删除这笔记录？',
+      // 与列表同一口径：分类名在前，备注只作补充。
+      // 旧版拿备注当标题，出现的是「删除这笔记录？午饭」，看不出删的是哪一类。
+      message:
           '${Store.i.categoryOf(txn.categoryId)?.name ?? '未分类'}'
           ' · ${Fmt.money(txn.signedCents, sign: true)}'
           '${txn.note.isEmpty ? '' : '\n${txn.note}'}',
-          style: T.body2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消', style: TextStyle(color: C.ink2)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('删除', style: TextStyle(color: C.over)),
-          ),
-        ],
-      ),
+      confirmLabel: '删除',
+      danger: true,
     );
-    if (ok != true) return;
+    if (!ok) return;
     await Store.i.deleteTxn(txn);
     Haptics.warn();
     if (context.mounted) showToast(context, '已删除');

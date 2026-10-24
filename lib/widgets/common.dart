@@ -509,7 +509,12 @@ class SettingRow extends StatelessWidget {
   }
 }
 
-/// 底部弹出面板的把手 + 标题
+/// 底部弹出面板的把手 + 标题（**嵌入版**）。
+///
+/// 弹层自己画面的时候（记一笔的面板是卡面 + 自己算的圆角，见
+/// `record_sheet.dart`）用这个：只给把手和标题，外层容器还是调用方的。
+/// 其余弹层一律用 `menu.dart` 的 [SheetShell]，把手宽高（36×4）与这里一致，
+/// 免得两种把手在屏幕上差 2px。
 class SheetHeader extends StatelessWidget {
   const SheetHeader({super.key, required this.title, this.action});
 
@@ -522,7 +527,7 @@ class SheetHeader extends StatelessWidget {
       children: [
         const SizedBox(height: S.md),
         Container(
-          width: 38,
+          width: 36,
           height: 4,
           decoration: BoxDecoration(
             color: C.line2,

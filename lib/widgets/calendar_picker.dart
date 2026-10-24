@@ -257,12 +257,13 @@ class _CalendarPickerState extends State<_CalendarPicker> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // 把手与 SheetShell 同宽（36×4）：弹层的把手全站一个尺寸
             Container(
-              width: 38,
+              width: 36,
               height: 4,
               decoration: BoxDecoration(
                 color: C.line2,
-                borderRadius: BorderRadius.circular(R.xs),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
             _stickyHead(),

@@ -7,6 +7,7 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
+import '../widgets/menu.dart';
 import '../widgets/picker_wheels.dart';
 
 /// 记账模板管理。
@@ -33,59 +34,43 @@ class _TemplatesPageState extends State<TemplatesPage> {
   }
 
   Future<void> _menu(TxnTemplate t) async {
-    await showModalBottomSheet<void>(
+    await showMenuSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SheetHeader(title: t.name),
-            SettingRow(
+      title: t.name,
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(
               icon: 'tpl',
               title: '编辑',
-              onTap: () {
-                Navigator.pop(ctx);
-                _openEditor(t);
-              },
+              onTap: () => _openEditor(t),
             ),
-            SettingRow(
+            MenuAction(
               icon: 'more',
               title: '删除',
               subtitle: '已经记下的账目不受影响',
               danger: true,
               onTap: () async {
-                Navigator.pop(ctx);
                 final ok = await _confirmDelete(t);
-                if (ok != true) return;
+                if (!ok) return;
                 await Repo.deleteTemplate(t.id);
                 await Store.i.afterTemplateChange();
                 if (mounted) showToast(context, '已删除');
               },
             ),
-            const SizedBox(height: S.md),
           ],
         ),
-      ),
+      ],
     );
   }
 
-  Future<bool?> _confirmDelete(TxnTemplate t) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('删除「${t.name}」？', style: T.section),
-        content: Text('用这个模板记过的账目会保留，只是以后不再出现在列表里。', style: T.body2),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消', style: TextStyle(color: C.ink2)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('删除', style: TextStyle(color: C.over)),
-          ),
-        ],
-      ),
+  Future<bool> _confirmDelete(TxnTemplate t) {
+    return showAppConfirm(
+      context,
+      title: '删除「${t.name}」？',
+      message: '用这个模板记过的账目会保留，只是以后不再出现在列表里。',
+      confirmLabel: '删除',
+      danger: true,
     );
   }
 

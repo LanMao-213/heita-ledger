@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../design/icons.dart';
 import '../design/palette.dart';
 import '../design/tokens.dart';
+import 'menu.dart';
 
 /// 主题选择弹层（我的 → 偏好 → 主题）。
 ///
@@ -34,61 +35,27 @@ class _ThemeSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        decoration: BoxDecoration(
-          color: C.bg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
-        ),
-        padding: const EdgeInsets.only(top: S.md, bottom: S.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: C.line,
-                borderRadius: BorderRadius.circular(R.xs),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.sm),
-              child: Row(
+    return SheetShell(
+      title: '主题',
+      subtitle: '切换后立刻生效',
+      // ⚠️ 这里用 SingleChildScrollView + Column，不用 ListView.separated：
+      // 弹层有最大高度（约屏高的 9/16），ListView 只会构建可见的那几行 ——
+      // 第六套就不是「滚一下能看到」，而是根本没被创建。套数以后还会加。
+      child: Flexible(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              MenuGroup(
+                // 缩略图 56 + 间距 12 + 卡内左内距 14
+                indent: 82,
                 children: [
-                  Text('主题', style: T.section),
-                  const Spacer(),
-                  Text('切换后立刻生效', style: T.caption),
+                  for (final p in kPalettes)
+                    _ThemeRow(palette: p, selected: p.id == current),
                 ],
               ),
-            ),
-            // ⚠️ 这里用 SingleChildScrollView + Column，不用 ListView.separated：
-            // 弹层有最大高度（约屏高的 9/16），ListView 只会构建可见的那几行 ——
-            // 第六套就不是「滚一下能看到」，而是根本没被创建。套数以后还会加。
-            Flexible(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (var i = 0; i < kPalettes.length; i++) ...[
-                      if (i > 0)
-                        Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: C.line,
-                          indent: 76,
-                        ),
-                      _ThemeRow(
-                        palette: kPalettes[i],
-                        selected: kPalettes[i].id == current,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -106,7 +73,7 @@ class _ThemeRow extends StatelessWidget {
     return InkWell(
       onTap: () => Navigator.pop(context, palette.id),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 11),
+        padding: const EdgeInsets.fromLTRB(S.lg, 13, S.lg, 13),
         child: Row(
           children: [
             _PaletteChip(palette: palette),

@@ -445,8 +445,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 弹窗必须写清对方/方向/金额，以及**实际**会连带删掉几笔流水
-    final dialog = find.byType(AlertDialog);
+    // 弹窗必须写清对方/方向/金额，以及**实际**会连带删掉几笔流水。
+    // 对话框统一走 widgets/menu.dart 的 showAppDialog（骨架是 Dialog），
+    // 不再按 AlertDialog 找。
+    final dialog = find.byType(Dialog);
     expect(
       find.descendant(of: dialog, matching: find.textContaining('张三')),
       findsOneWidget,

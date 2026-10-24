@@ -261,8 +261,10 @@ void main() {
     await tester.longPress(find.byType(TxnRow));
     await tester.pumpAndSettle();
 
-    // 列表行本身也显示备注，所以只在对话框里断言，避免把行内文字算进来
-    final dialog = find.byType(AlertDialog);
+    // 列表行本身也显示备注，所以只在对话框里断言，避免把行内文字算进来。
+    // 对话框现在统一走 widgets/menu.dart 的 showAppConfirm（骨架是 Dialog，
+    // 不再是 AlertDialog）—— 找 Dialog，两类对话框都能命中。
+    final dialog = find.byType(Dialog);
     expect(dialog, findsOneWidget);
     expect(
       find.descendant(of: dialog, matching: find.textContaining('餐饮')),
