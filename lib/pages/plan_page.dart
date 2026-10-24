@@ -753,12 +753,23 @@ class _GoalCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            goal.name,
-                            style: T.body.copyWith(fontWeight: FontWeight.w600),
+                          // ⚠️ 名字必须收口：这一行只有约 190dp（360dp 屏，
+                          // 扣掉图标 38 + 间距 12 + 「存一笔」按钮），中文超过
+                          // 12 个字就会把 Row 撑爆 —— 实测 25 字溢出 236px，
+                          // 卡片右侧直接挂黄黑条纹。全页其他地方（往来/明细/
+                          // 统计/模板）都做了 ellipsis，只有这里漏了。
+                          Expanded(
+                            child: Text(
+                              goal.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style:
+                                  T.body.copyWith(fontWeight: FontWeight.w600),
+                            ),
                           ),
                           if (goal.done) ...[
                             const SizedBox(width: S.sm),
+                            // 徽章不吃弹性：名字再长也先把「已达成」留住
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
@@ -777,8 +788,11 @@ class _GoalCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 2),
+                      // 金额同理：七位数 × 两段会把这一行撑出去
                       Text(
                         '${Fmt.money(goal.savedCents)} / ${Fmt.money(goal.targetCents)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: T.caption,
                       ),
                     ],
@@ -807,11 +821,20 @@ class _GoalCard extends StatelessWidget {
                   '${(goal.progress * 100).toStringAsFixed(1)}%',
                   style: T.caption,
                 ),
-                const Spacer(),
-                if (goal.dueMonth != null)
-                  Text('目标 ${Fmt.monthLabel(goal.dueMonth!)}', style: T.caption)
-                else
-                  Text('还差 ${Fmt.money(goal.remainCents)}', style: T.caption),
+                const SizedBox(width: S.sm),
+                // 右边这行同样要收口（原来用 Spacer，金额一大照样溢出）。
+                // Expanded + 右对齐，短文本时跟原来的 Spacer 视觉一致。
+                Expanded(
+                  child: Text(
+                    goal.dueMonth != null
+                        ? '目标 ${Fmt.monthLabel(goal.dueMonth!)}'
+                        : '还差 ${Fmt.money(goal.remainCents)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: T.caption,
+                  ),
+                ),
               ],
             ),
           ],
