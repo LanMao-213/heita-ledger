@@ -19,6 +19,7 @@ import 'package:ledger/design/palette.dart';
 import 'package:ledger/design/theme_ctrl.dart';
 import 'package:ledger/design/tokens.dart';
 import 'package:ledger/widgets/menu.dart';
+import 'package:ledger/widgets/theme_sheet.dart';
 
 final _shotKey = GlobalKey();
 
@@ -93,11 +94,19 @@ void main() {
       await tester.pumpAndSettle();
       await _shot(tester, 'build/visual/menu3-${p.id.name}.png');
       expect(tester.takeException(), isNull, reason: '${p.name} 三级确认框有布局溢出');
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+
+      // ---- 二级：主题选择（行里嵌缩略图，分割线缩进要跟着让开）----
+      await tester.tap(find.text('打开主题'));
+      await tester.pumpAndSettle();
+      await _shot(tester, 'build/visual/menu2-theme-${p.id.name}.png');
+      expect(tester.takeException(), isNull, reason: '${p.name} 主题弹层有布局溢出');
     });
   }
 }
 
-/// 宿主页：只有一颗按钮，按下去弹二级菜单。
+/// 宿主页：两颗按钮，分别弹二级菜单（普通型 / 带缩略图型）。
 class _Host extends StatelessWidget {
   const _Host();
 
@@ -106,50 +115,69 @@ class _Host extends StatelessWidget {
     return Scaffold(
       backgroundColor: C.bg,
       body: Center(
-        child: FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: C.ink,
-            foregroundColor: C.bg,
-          ),
-          onPressed: () => showMenuSheet<void>(
-            context: context,
-            title: '招商银行',
-            subtitle: '储蓄卡 · ¥12,340.00',
-            groups: [
-              MenuGroup(
-                actions: [
-                  MenuAction(
-                    icon: 'tpl',
-                    title: '编辑资料',
-                    subtitle: '名称 · 类型 · 余额校准',
-                    onTap: () {},
-                  ),
-                  MenuAction(
-                    icon: 'download',
-                    title: '取出全部',
-                    subtitle: Fmt.yuan(1234000),
-                    onTap: () {},
-                  ),
-                  MenuAction(
-                    icon: 'trash',
-                    title: '删除账户',
-                    subtitle: '余额和记录会转到一个你指定的账户',
-                    danger: true,
-                    onTap: () => showAppConfirm(
-                      context,
-                      title: '删除「招商银行」？',
-                      message: '余额和记录会并到另一个账户，32 笔记录会挂到目标账户名下，历史不丢。',
-                      confirmLabel: '删除',
-                      danger: true,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          child: const Text('打开二级菜单'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _launcher(context, '打开二级菜单', () => _accountMenu(context)),
+            const SizedBox(height: S.md),
+            _launcher(
+              context,
+              '打开主题',
+              () => showThemeSheet(context, current: ThemeCtrl.i.id),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _launcher(BuildContext context, String label, VoidCallback onTap) {
+    return FilledButton(
+      style: FilledButton.styleFrom(
+        backgroundColor: C.ink,
+        foregroundColor: C.bg,
+      ),
+      onPressed: onTap,
+      child: Text(label),
+    );
+  }
+
+  Future<void> _accountMenu(BuildContext context) {
+    return showMenuSheet<void>(
+      context: context,
+      title: '招商银行',
+      subtitle: '储蓄卡 · ¥12,340.00',
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(
+              icon: 'tpl',
+              title: '编辑资料',
+              subtitle: '名称 · 类型 · 余额校准',
+              onTap: () {},
+            ),
+            MenuAction(
+              icon: 'download',
+              title: '取出全部',
+              subtitle: Fmt.yuan(1234000),
+              onTap: () {},
+            ),
+            MenuAction(
+              icon: 'trash',
+              title: '删除账户',
+              subtitle: '余额和记录会转到一个你指定的账户',
+              danger: true,
+              onTap: () => showAppConfirm(
+                context,
+                title: '删除「招商银行」？',
+                message: '余额和记录会并到另一个账户，32 笔记录会挂到目标账户名下，历史不丢。',
+                confirmLabel: '删除',
+                danger: true,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
