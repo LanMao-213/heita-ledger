@@ -45,9 +45,20 @@ app.*.map.json
 /android/app/release
 
 # 签名文件：泄露等于别人能给这个 App 出升级包
+# 下面这批格式一起挡住 —— 换签名商/换机器时最容易顺手拷进来
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.pem
+*.p8
+*.der
+*.mobileprovision
 **/key.properties
+
+# 三方服务的配置文件：里面带 API key / 项目号，提交即泄露
+google-services.json
+GoogleService-Info.plist
 
 # 本机数据与导出：仓库已公开，这些一旦提交就是把真实账目公开
 # （App 的备份是 JSON、导出是 xlsx、库是 sqlite；拷进来调试时别顺手提交）
