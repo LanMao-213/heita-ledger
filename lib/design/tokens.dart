@@ -360,11 +360,38 @@ ThemeData buildAppTheme() {
 
   return base.copyWith(
     scaffoldBackgroundColor: p.bg,
+    // ⚠️ 这里要覆盖的远比「primary / surface」多。只覆盖这两个的话，
+    // Material 组件里凡是取 `surfaceContainer*`、`outline`、`secondary`、
+    // `inverseSurface` 的面就都还是 M3 的默认色 —— 亮色板下那套默认色是
+    // **带紫的灰**（surfaceContainer #F3EDF7 / outline #79747E / secondary
+    // #625B71），在中性灰、暖米、泽金、圣地四套里一眼就看得出「这块不是
+    // 我们家的颜色」。已踩到的：Switch 轨道、PopupMenu 弹出菜单。
+    //
+    // 规则：凡是 Material 默认从 colorScheme 派生、且我们界面上真的会用到
+    // 的面，一律换成色板里的对应 token；用不到的也顺手兜住，省得以后新加
+    // 组件再踩一次。
     colorScheme: base.colorScheme.copyWith(
       primary: p.ink,
       onPrimary: p.bg,
+      secondary: p.accent,
+      onSecondary: p.onAccent,
       surface: p.bg,
       onSurface: p.ink,
+      // 逐级浮起的面：底 → 纸 → 卡
+      surfaceContainerLowest: p.bg,
+      surfaceContainerLow: p.bg2,
+      surfaceContainer: p.bg2,
+      surfaceContainerHigh: p.bg2,
+      surfaceContainerHighest: p.bg2,
+      onSurfaceVariant: p.ink3,
+      outline: p.line2,
+      outlineVariant: p.line,
+      // 反色面（SnackBar / Tooltip）：墨底纸字
+      inverseSurface: p.ink,
+      onInverseSurface: p.bg,
+      // M3 会给浮起的面染一层 primary 的色调（亮色板下就是紫色调），
+      // 卡片、弹层、对话框都各自显式关掉了，这里再兜一道。
+      surfaceTint: Colors.transparent,
       error: p.over,
     ),
     dividerColor: p.line,
@@ -414,6 +441,41 @@ ThemeData buildAppTheme() {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: Shape.squircle(R.lg),
+    ),
+    // 弹出菜单（安全页备份项的「更多」）。不给的话它取 surfaceContainer，
+    // 亮色板下是 M3 的淡紫白 #F3EDF7，浮在纸墨面上像贴了块别家的纸。
+    popupMenuTheme: PopupMenuThemeData(
+      color: p.cardBg,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: Shape.squircle(R.md),
+      textStyle: T.body2.copyWith(color: p.ink),
+    ),
+    // 开关。轨道不给的话取 surfaceContainerHighest（亮色板 #E6E0E9，紫灰）。
+    // 开：轨道是墨、滑块是纸；关：轨道是次级纸面、滑块是浅墨 —— 两个状态
+    // 都靠「墨/纸」这对关系表达，不吃任何彩色。
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) return p.ink4;
+        return states.contains(WidgetState.selected) ? p.bg : p.ink3;
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) return p.bg2;
+        return states.contains(WidgetState.selected) ? p.ink : p.bg2;
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return Colors.transparent;
+        return p.line2;
+      }),
+    ),
+    // 提示条。代码里 `showToast` 已经显式给了墨底纸字，这里兜住的是将来
+    // 直接用 `ScaffoldMessenger.showSnackBar` 的地方 —— 不兜的话会拿到
+    // inverseSurface（M3 默认的深灰 #322F35），在深色板上近乎看不见。
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: p.ink,
+      contentTextStyle: T.body2.copyWith(color: p.bg),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.md)),
     ),
     // 去掉 Material 3 默认的彩色涟漪，保持纸墨的观感
     textSelectionTheme: TextSelectionThemeData(

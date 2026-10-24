@@ -71,25 +71,26 @@ void main() {
               reason: '${p.name} 概览卡要能看出是压下去的');
           expect(_contrast(p.cardBg, p.bg), greaterThanOrEqualTo(1.08),
               reason: '${p.name} 卡片要浮在页面底之上');
+          // ⚠️ 这一条曾经漏了整整一个版本：只查了「概览卡 vs 卡面」，
+          // 没查「概览卡 vs 页面底」。而概览卡真正压在上面的是页面底 ——
+          // 数学上 底/概览 = (卡/概览) ÷ (卡/底)，上面两条各压着线过，
+          // 除出来就只剩 1.04。深色两套（永夜 1.040 / 血族 1.036）因此
+          // 一直糊着，直到 2026-10-24 逐套量像素才发现。
+          expect(_contrast(p.heroBg, p.bg), greaterThanOrEqualTo(1.08),
+              reason: '${p.name} 概览卡压在页面底上要能看出边界');
           expect(_contrast(p.bg2, p.cardBg), greaterThanOrEqualTo(1.08),
               reason: '${p.name} 卡内次级面 ≠ 卡面');
           expect(_contrast(p.bg2, p.bg), greaterThanOrEqualTo(1.03),
               reason: '${p.name} 输入底 ≠ 页面底');
           expect(_contrast(p.line, p.cardBg), greaterThanOrEqualTo(1.10),
               reason: '${p.name} 描边要看得见');
-          // 深色板：概览卡比页面底更深；亮色板：概览卡比页面底更浅。
-          // 这是两种方向上各自的「压下去」，别写成同一个不等式。
-          if (p.dark) {
-            expect(p.heroBg.computeLuminance(), lessThan(p.bg.computeLuminance()),
-                reason: '${p.name} 深色板的概览卡要压到页面底之下');
-            expect(p.cardBg.computeLuminance(), greaterThan(p.bg.computeLuminance()),
-                reason: '${p.name} 深色板的卡片要比页面底亮');
-          } else {
-            expect(p.heroBg.computeLuminance(), lessThan(p.bg.computeLuminance()),
-                reason: '${p.name} 亮色板的概览卡要比页面底深');
-            expect(p.cardBg.computeLuminance(), greaterThan(p.bg.computeLuminance()),
-                reason: '${p.name} 亮色板的卡片要更亮');
-          }
+          // 两族的方向其实**相同**：概览卡都比页面底深（压下去），
+          // 卡片都比页面底亮（浮起来）。早先这里的注释写着「方向相反」，
+          // 下面两个分支却写着一模一样的不等式 —— 注释是错的，删掉分支。
+          expect(p.heroBg.computeLuminance(), lessThan(p.bg.computeLuminance()),
+              reason: '${p.name} 概览卡要压到页面底之下');
+          expect(p.cardBg.computeLuminance(), greaterThan(p.bg.computeLuminance()),
+              reason: '${p.name} 卡片要比页面底亮');
         });
 
         test('图表十档：最弱的一档也浮在卡面之上', () {

@@ -325,9 +325,11 @@ class _RuleCard extends StatelessWidget {
               ],
             ),
           ),
+          // 不写 activeThumbColor：轨道在主题里已经是墨色，滑块再给墨色就
+          // 成了一整条同色、看不出开关状态。统一走 switchTheme（开=纸滑块
+          // 压墨轨道，关=浅墨滑块压次级纸面）。
           Switch(
             value: rule.enabled,
-            activeThumbColor: C.ink,
             onChanged: (v) async {
               await Repo.updateRecurring(
                 RecurringRule(

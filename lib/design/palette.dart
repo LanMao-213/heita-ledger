@@ -235,7 +235,9 @@ const Palette _warm = Palette(
   cardShadow: Color(0x0D1C1A17),
   handle: Color(0xFFE9E5DC),
   heroEdge: Color(0xFFD8D0C1),
-  cardBg: Color(0xFFFFFFFF),
+  // 暖白而不是纯白：纯白压在米黄底上会往冷里走（白卡显得发灰发青），
+  // 一屏里就成了两族色温。B 减 9 而已，肉眼是「白得暖」而不是「白得黄」。
+  cardBg: Color(0xFFFFFDF6),
   heroBg: Color(0xFFECE7DE),
   chart: [
     Color(0xFF1C1A17),
@@ -247,7 +249,9 @@ const Palette _warm = Palette(
     Color(0xFFC9C2B0),
     Color(0xFFDCD5C4),
     Color(0xFFE9E3D5),
-    Color(0xFFF4F0E7),
+    // cardBg 由纯白改成暖白（#FFFDF6）后，这一档与卡面的差值从 1.147
+    // 掉到 1.117（阈值 1.12），所以跟着压深一阶。
+    Color(0xFFF2EDE3),
   ],
 );
 
@@ -344,6 +348,26 @@ const Palette _zeikin = Palette(
 // 深色。机构色：靛黑 #13111C + 鎏金 #C9A24B + 宝石蓝 #2E5C8A。
 // ⚠️ 深色的面关系与亮色**反过来**：底色最深，卡片高一档浮起来，
 // 键帽再高一档；概览卡要「压下去」，所以它比页面底还深。
+//
+// ## 2026-10-24 修正：概览卡对页面底只有 1.04:1，那块卡是糊的
+//
+// 亮色板里「概览卡压下去」很好做（白纸上压一层灰）。深色板照搬就出事：
+// bg 已经暗到 #0E0C14（L≈0.0056），再往下只剩纯黑，**天花板就是 1.08**。
+// 而实测只有 1.04 —— 因为「压下去」的深度被另外两条约束吃掉了一半：
+//
+//   底/概览 = (卡/概览) ÷ (卡/底)
+//
+// 上面两条各要 ≥1.10 / ≥1.08，除出来只剩 1.04。这不是某个色值写错，
+// 是三条约束在深色板这个低亮度区间里彼此挤压。泽金当时也是 1.04，
+// 诊断记录在那一套的注释里（④），但只量了亮色板，漏了深色这两套。
+//
+// 两条改动：
+// 1. `heroBg` 压到**纯黑**（深色界面里「最深」就是黑，AMOLED 上
+//    不发光与近黑之间差别比数值更大）；
+// 2. `bg` 微提一档（#0E0C14 → #100D17，肉眼分辨不出），把纯黑能给的
+//    差值从 1.081 抬到 1.091 —— 不然刚好压在阈值上，刻度一动就红。
+//
+// `onAccent` / `onTodayMark` 原本直接复用了 bg 的数值，跟着一起改。
 const Palette _tower = Palette(
   id: HeitaThemeId.tower,
   name: '黑塔 · 永夜',
@@ -354,7 +378,7 @@ const Palette _tower = Palette(
   ink3: Color(0xFFA79FBB),
   ink4: Color(0xFF6B6480),
   inkWash: Color(0x1FF1EAF8),
-  bg: Color(0xFF0E0C14),
+  bg: Color(0xFF100D17),
   bg2: Color(0xFF2A2636),
   bg3: Color(0xFF16131E),
   line: Color(0xFF2A2636),
@@ -363,16 +387,17 @@ const Palette _tower = Palette(
   overD: Color(0xFFFF8E96),
   stage: Color(0xFF07060A),
   accent: Color(0xFFD8B45C),
-  onAccent: Color(0xFF0E0C14),
+  onAccent: Color(0xFF100D17),
   accentSoft: Color(0xFF2A2636),
   todayMark: Color(0xFFD8B45C),
-  onTodayMark: Color(0xFF0E0C14),
+  onTodayMark: Color(0xFF100D17),
   accentWash: Color(0x1FD8B45C),
   cardShadow: Color(0x66000000),
   handle: Color(0xFF2A2636),
   heroEdge: Color(0xFF2A2636),
   cardBg: Color(0xFF1B1826),
-  heroBg: Color(0xFF07060A),
+  // 纯黑：概览卡是深色板里最深的一档，见文件顶部的修正说明。
+  heroBg: Color(0xFF000000),
   // 十档由最亮收到中暗。⚠️ 最后一档不能继续往下收到卡面色 #1B1826：
   // 早先第十档就是 #1B1826（与卡面 1.00:1），那一片饼图是隐形的。
   // 所以深端的终点停在 #2E2846（对卡面 1.25:1），十档亮度均匀铺开。
@@ -428,7 +453,8 @@ const Palette _holy = Palette(
   handle: Color(0xFFDFE3E9),
   heroEdge: Color(0xFFC6CCD6),
   cardBg: Color(0xFFFFFFFF),
-  heroBg: Color(0xFFDFE4EA),
+  // 对页面底只有 1.079（阈值 1.08，差 0.001）—— 只量「对卡面」时看不出来。
+  heroBg: Color(0xFFDBE0E7),
   chart: [
     Color(0xFF171B21),
     Color(0xFF2F3944),
@@ -457,7 +483,7 @@ const Palette _crimson = Palette(
   ink3: Color(0xFFB8A0A6),
   ink4: Color(0xFF7A646A),
   inkWash: Color(0x1FF7EEF0),
-  bg: Color(0xFF120A0D),
+  bg: Color(0xFF160C11),
   bg2: Color(0xFF332024),
   bg3: Color(0xFF1B1014),
   line: Color(0xFF332024),
@@ -466,16 +492,18 @@ const Palette _crimson = Palette(
   overD: Color(0xFFFF9AA6),
   stage: Color(0xFF0A0507),
   accent: Color(0xFFA6D8E8),
-  onAccent: Color(0xFF120A0D),
+  onAccent: Color(0xFF160C11),
   accentSoft: Color(0xFF332024),
   todayMark: Color(0xFFA6D8E8),
-  onTodayMark: Color(0xFF120A0D),
+  onTodayMark: Color(0xFF160C11),
   accentWash: Color(0x1FA6D8E8),
   cardShadow: Color(0x66000000),
   handle: Color(0xFF332024),
   heroEdge: Color(0xFF332024),
-  cardBg: Color(0xFF1F1418),
-  heroBg: Color(0xFF0A0507),
+  cardBg: Color(0xFF221619),
+  // 纯黑，同永夜。血族的 bg 更暗（L≈0.0038），不提底的话纯黑也只有
+  // 1.075，够不到 1.08 —— 所以这一套连 bg 一起提了两阶。
+  heroBg: Color(0xFF000000),
   // 同黑塔：深端停在 #362A2E（对卡面 1.30:1），不再往下贴到卡面色。
   chart: [
     Color(0xFFF7EEF0),
