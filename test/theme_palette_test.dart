@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ledger/design/palette.dart';
+import 'package:ledger/design/theme_ctrl.dart';
 import 'package:ledger/design/tokens.dart';
 
 /// WCAG 相对亮度对比度
@@ -22,58 +24,105 @@ double _contrast(Color a, Color b) {
 }
 
 void main() {
-  group('配色可用性（纸墨单套色板）', () {
-    test('ThemeData 是亮色的 —— 纸墨不是深色模式', () {
-      // 这一条是需求本身：「我们现在做的不是深色模式」。
-      // 之前按黑塔阵营基调（暗石底 + 骨白）做过一版，是深色的，已废弃。
-      expect(buildAppTheme().brightness, Brightness.light);
-      expect(
-        C.bg.computeLuminance(),
-        greaterThan(0.5),
-        reason: '底必须是亮的（纸白），深色模式这条会挂',
-      );
-      expect(
-        C.ink.computeLuminance(),
-        lessThan(0.2),
-        reason: '主文字必须是暗的',
-      );
-    });
+  // 这套测试自己会换主题，跑完把单例还原 —— 每个测试文件是独立 isolate，
+  // 所以还原只是对本文件内部负责。
+  final boot = ThemeCtrl.i.id;
 
-    test('主文字 / 超支 / 次要 / 辅助文字在底上都看得清', () {
-      expect(_contrast(C.ink, C.bg), greaterThan(7), reason: '主文字 AAA');
-      expect(_contrast(C.ink2, C.bg), greaterThan(4.5), reason: '次要文字 AA');
-      expect(_contrast(C.over, C.bg), greaterThan(4.5), reason: '超支 AA');
-      // 辅助文字是 12.5px 的 caption 在用，必须过 AA —— 旧色板这里是 2.6:1，
-      // 这一轮已经提到 5.2:1，所以下限写死 4.5（不再是当年的 2.5）。
-      expect(_contrast(C.ink3, C.bg), greaterThanOrEqualTo(4.5), reason: '辅助文字 AA');
-      expect(_contrast(C.ink3, C.cardBg), greaterThanOrEqualTo(4.5), reason: '卡片上的辅助文字 AA');
-    });
+  tearDownAll(() => ThemeCtrl.i.loadSilently(boot));
 
-    test('进度条填充与轨道的对比度 ≥ 3（图形对象的下限）', () {
-      // Bar / LinearProgressIndicator：填充 accent、轨道 handle
-      expect(_contrast(C.accent, C.handle), greaterThanOrEqualTo(3));
-    });
+  // ------------------------------------------------------------ 1 逐套体检
+  //
+  // 遍历 `kPalettes`：新增皮肤不需要为它单独写用例，改坏任何一套都会在这里红。
+  // 阈值取的是「六套里最差的那套实测值再往下留一点余量」，不是随手写的。
+  group('每一套色板都可用', () {
+    for (final p in kPalettes) {
+      group('${p.name}（${p.dark ? '深色' : '亮色'}）', () {
+        test('文字在底上、在卡上都看得清', () {
+          // 主文字 AAA（7:1）：最差的是泽金 10.89
+          expect(_contrast(p.ink, p.bg), greaterThan(7), reason: '${p.name} 主文字 AAA');
+          expect(_contrast(p.ink, p.cardBg), greaterThan(7), reason: '${p.name} 卡上主文字 AAA');
+          // 次要 / 辅助 / 超支 AA（4.5:1）：辅助文字是 12.5px 的 caption 在用
+          expect(_contrast(p.ink2, p.bg), greaterThanOrEqualTo(4.5));
+          expect(_contrast(p.ink3, p.bg), greaterThanOrEqualTo(4.5), reason: '${p.name} 辅助文字 AA');
+          expect(_contrast(p.ink3, p.cardBg), greaterThanOrEqualTo(4.5));
+          expect(_contrast(p.over, p.bg), greaterThanOrEqualTo(4.5), reason: '${p.name} 超支 AA');
+          expect(_contrast(p.over, p.cardBg), greaterThanOrEqualTo(4.5));
+        });
 
-    test('面与面之间分得开，层级不塌', () {
-      // 概览卡「压下去」、明细卡「浮上来」、卡里的胶囊再降一档（D-09）。
-      // 任意两档同色，那一层就消失了。
-      expect(C.heroBg, isNot(C.cardBg), reason: '概览卡 ≠ 明细卡');
-      expect(C.bg2, isNot(C.cardBg), reason: '卡内次级面 ≠ 卡面');
-      expect(C.bg2, isNot(C.bg), reason: '输入底 ≠ 页面底');
-      // 概览卡与卡内次级面是两个值（几乎同亮度，但不同族，便于各自微调）：
-      // 概览卡要读起来是「压下去的纸」，次级面要读起来是「沉下去的槽」。
-      expect(C.heroBg, isNot(C.bg2), reason: '概览卡 ≠ 卡内次级面');
-      expect(C.heroEdge, isNot(C.line), reason: '概览卡描边与普通描边不同族就没必要拆');
-    });
+        test('进度条填充与轨道 ≥ 3（图形对象下限）', () {
+          // Bar / LinearProgressIndicator：填充 accent、轨道 handle。
+          // 最差的是圣地 3.60（早先 #4E8FB5 只有 2.75，因此被压深过）。
+          expect(_contrast(p.accent, p.handle), greaterThanOrEqualTo(3), reason: p.name);
+          // 强调色本身压在卡面上也要看得见
+          expect(_contrast(p.accent, p.cardBg), greaterThanOrEqualTo(3), reason: p.name);
+        });
+
+        test('压在强调色 / 今日圆点上的字看得清', () {
+          // 「今天」那个圆点里是日期数字（文字），下限 4.5 不是 3。
+          expect(_contrast(p.onAccent, p.accent), greaterThanOrEqualTo(4.5), reason: p.name);
+          expect(_contrast(p.onTodayMark, p.todayMark), greaterThanOrEqualTo(4.5), reason: p.name);
+        });
+
+        test('面与面之间分得开，层级不塌', () {
+          // 概览卡「压下去」、明细卡「浮上来」、卡里的胶囊再降一档。
+          // 任意两档同色，那一层就消失了 —— 深浅两族的方向相反，
+          // 所以这里用对比度比值判定，不写死谁更亮。
+          expect(_contrast(p.heroBg, p.cardBg), greaterThanOrEqualTo(1.10),
+              reason: '${p.name} 概览卡要能看出是压下去的');
+          expect(_contrast(p.cardBg, p.bg), greaterThanOrEqualTo(1.08),
+              reason: '${p.name} 卡片要浮在页面底之上');
+          expect(_contrast(p.bg2, p.cardBg), greaterThanOrEqualTo(1.08),
+              reason: '${p.name} 卡内次级面 ≠ 卡面');
+          expect(_contrast(p.bg2, p.bg), greaterThanOrEqualTo(1.03),
+              reason: '${p.name} 输入底 ≠ 页面底');
+          expect(_contrast(p.line, p.cardBg), greaterThanOrEqualTo(1.10),
+              reason: '${p.name} 描边要看得见');
+          // 深色板：概览卡比页面底更深；亮色板：概览卡比页面底更浅。
+          // 这是两种方向上各自的「压下去」，别写成同一个不等式。
+          if (p.dark) {
+            expect(p.heroBg.computeLuminance(), lessThan(p.bg.computeLuminance()),
+                reason: '${p.name} 深色板的概览卡要压到页面底之下');
+            expect(p.cardBg.computeLuminance(), greaterThan(p.bg.computeLuminance()),
+                reason: '${p.name} 深色板的卡片要比页面底亮');
+          } else {
+            expect(p.heroBg.computeLuminance(), lessThan(p.bg.computeLuminance()),
+                reason: '${p.name} 亮色板的概览卡要比页面底深');
+            expect(p.cardBg.computeLuminance(), greaterThan(p.bg.computeLuminance()),
+                reason: '${p.name} 亮色板的卡片要更亮');
+          }
+        });
+
+        test('图表十档：最弱的一档也浮在卡面之上', () {
+          expect(p.chart.length, 10, reason: '${p.name} 饼图切片按十档循环');
+          // 最弱档贴到卡面 = 那一片饼图是隐形的（黑塔/血族早先都踩过：
+          // 第十档直接写成了 cardBg 自己，1.00:1）。
+          expect(_contrast(p.chart.last, p.cardBg), greaterThanOrEqualTo(1.12),
+              reason: '${p.name} 第十档不能贴到卡面');
+          // 最强档必须一眼是「主切片」
+          expect(_contrast(p.chart.first, p.cardBg), greaterThanOrEqualTo(3),
+              reason: '${p.name} 第一档要够重');
+          // 相邻两档要分得开，否则十档退化成五档
+          for (var i = 0; i < p.chart.length - 1; i++) {
+            expect(_contrast(p.chart[i], p.chart[i + 1]), greaterThanOrEqualTo(1.09),
+                reason: '${p.name} 第 ${i + 1} 档与第 ${i + 2} 档太接近');
+          }
+        });
+      });
+    }
   });
 
-  group('色板的值被钉死', () {
+  // ------------------------------------------------------------ 2 钉死冷灰
+  //
+  // 「改色必须是有意识的」：冷灰这一套的值被顺手改掉时先在这里红。
+  // 多套皮肤之后仍然保留钉值 —— 遍历测试只能证明「可用」，证明不了「没被改」。
+  group('中性冷灰的值被钉死', () {
+    setUp(() => ThemeCtrl.i.loadSilently(HeitaThemeId.cold));
+
     test('24 个颜色 token 与十档色阶', () {
-      // 这组断言的作用是「改色必须是有意识的」：值被顺手改掉时先在这里红。
-      //
       // 2026-10-23 整体换板（暖米「纸墨」→ 中性冷灰，对齐 iOS grouped）：
-      // 底色 #F5F2EA→#F3F4F7、墨 #1C1A17→#14161A、圆角 20/24/30→14/18/22、
-      // 投影全部归零。下面这组期望值是那次换板后的新基线。
+      // 底色 #F5F2EA→#F3F4F7、墨 #1C1A17→#14161A、投影全部归零。
+      // 下面这组期望值是那次换板后的基线；2026-10-24 起它们不再是唯一一套，
+      // 但冷灰自己的值仍然不许漂移。
       expect(C.ink, const Color(0xFF14161A));
       expect(C.ink2, const Color(0xFF5C626B));
       expect(C.ink3, const Color(0xFF656A75));
@@ -87,12 +136,10 @@ void main() {
       expect(C.over, const Color(0xFFB0302A));
       expect(C.overD, const Color(0xFFC0625A));
       expect(C.stage, const Color(0xFFD8DBE1));
-      // 强调色 === 主文字色（纸墨原则：不引入装饰色）
+      // 强调色 === 主文字色（冷灰原则：不引入装饰色）
       expect(C.accent, C.ink, reason: '强调色 = 主文字色');
-      // 压在深色块上的字必须是纯白：纸白 #F5F2EA 压上去会脏，且对比度略低
+      // 压在深色块上的字必须是纯白
       expect(C.onAccent, const Color(0xFFFFFFFF));
-      // 旧色板里 accentSoft / accentWash / bg2 三个都是 #EFEBE3，互相钉死会掩盖
-      // 单值漂移（改一个等于改三个）；这一版三者互不相同，各自钉自己的值。
       expect(C.accentSoft, const Color(0xFFEEF0F4));
       expect(C.accentWash, const Color(0xFFF0F2F5));
       expect(C.todayMark, C.ink);
@@ -100,7 +147,6 @@ void main() {
       expect(C.cardShadow, const Color(0x0D14161A));
       expect(C.handle, const Color(0xFFE7EAF0));
       expect(C.heroEdge, const Color(0xFFD8DDE5));
-      // 白卡压浅灰底（约 1.13:1），靠明度差分开 —— 不再用投影
       expect(C.cardBg, const Color(0xFFFFFFFF));
       expect(C.heroBg, const Color(0xFFE8EBF1));
       // 图表色阶：中性灰十档，越靠前越主要
@@ -117,6 +163,70 @@ void main() {
         Color(0xFFE8ECF2),
       ]);
       expect(kChart.length, 10, reason: '饼图切片按十档循环');
+      // 描边与概览卡描边是两族（同为冷灰但不同值，便于各自微调）
+      expect(C.heroEdge, isNot(C.line));
+    });
+
+    test('ThemeData 跟着色板走：冷灰是亮色', () {
+      expect(buildAppTheme().brightness, Brightness.light);
+    });
+  });
+
+  // ------------------------------------------------------------ 3 换肤生效
+  group('换肤', () {
+    test('出厂默认是黑塔·永夜，且 ThemeData 是深色的', () {
+      // 需求本身：App 叫「黑塔消费日记」，默认给黑塔那一套。
+      expect(kDefaultTheme, HeitaThemeId.tower);
+      ThemeCtrl.i.loadSilently(kDefaultTheme);
+      expect(ThemeCtrl.i.dark, isTrue);
+      expect(buildAppTheme().brightness, Brightness.dark);
+    });
+
+    test('C.xxx 是运行时 getter：换 id 后取到的是新色板的色', () {
+      ThemeCtrl.i.loadSilently(HeitaThemeId.cold);
+      final cold = C.bg;
+      ThemeCtrl.i.loadSilently(HeitaThemeId.tower);
+      final tower = C.bg;
+      expect(cold, isNot(tower), reason: '换肤后底色必须变');
+      expect(tower, paletteOf(HeitaThemeId.tower).bg);
+      expect(kChart, paletteOf(HeitaThemeId.tower).chart, reason: '图表色阶也跟着换');
+    });
+
+    test('ThemeCtrl.apply 会通知监听者（换肤靠它触发整树重建）', () {
+      ThemeCtrl.i.loadSilently(HeitaThemeId.cold);
+      var fired = 0;
+      void onFire() => fired++;
+      ThemeCtrl.i.addListener(onFire);
+      addTearDown(() => ThemeCtrl.i.removeListener(onFire));
+
+      ThemeCtrl.i.apply(HeitaThemeId.tower);
+      expect(fired, 1);
+      // 同一个 id 再 apply 一次不该多通知一次
+      ThemeCtrl.i.apply(HeitaThemeId.tower);
+      expect(fired, 1);
+    });
+
+    test('持久化字符串 ↔ id 双向对得上；认不出的值回落到出厂默认', () {
+      for (final t in HeitaThemeId.values) {
+        expect(themeIdFromString(t.name), t);
+      }
+      expect(themeIdFromString(null), kDefaultTheme);
+      expect(themeIdFromString(''), kDefaultTheme);
+      expect(themeIdFromString('nonsense'), kDefaultTheme);
+      // 老版本没有 ui.theme 这个键 → 也是出厂默认（黑塔·永夜），不是冷灰
+      expect(themeIdFromString(null), HeitaThemeId.tower);
+    });
+
+    test('每套色板都有名字、副标题和完整十档（少一档就是运行时空色）', () {
+      expect(kPalettes.length, HeitaThemeId.values.length,
+          reason: '加皮肤时枚举和色板表要一起加');
+      for (final t in HeitaThemeId.values) {
+        final p = paletteOf(t);
+        expect(p.id, t);
+        expect(p.name, isNotEmpty);
+        expect(p.subtitle, isNotEmpty);
+        expect(p.chart.length, 10);
+      }
     });
   });
 }

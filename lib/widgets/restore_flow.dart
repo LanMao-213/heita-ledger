@@ -25,7 +25,7 @@ Future<bool> runRestoreFlow(
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('覆盖当前数据？', style: T.section),
+      title: Text('覆盖当前数据？', style: T.section),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,11 +34,11 @@ Future<bool> runRestoreFlow(
             Text('来源：$sourceLabel', style: T.caption),
             const SizedBox(height: S.xs),
           ],
-          const Text('这份备份里有：', style: T.caption),
+          Text('这份备份里有：', style: T.caption),
           const SizedBox(height: S.xs),
           Text(summary.text, style: T.body),
           const SizedBox(height: S.md),
-          const Text(
+          Text(
             '恢复会覆盖当前的全部数据。覆盖前会自动存一份当前数据的快照，'
             '万一恢复错了还能从「数据安全」里再导回来。',
             style: T.body2,
@@ -48,11 +48,11 @@ Future<bool> runRestoreFlow(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('取消', style: TextStyle(color: C.ink2)),
+          child: Text('取消', style: TextStyle(color: C.ink2)),
         ),
         TextButton(
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('覆盖并恢复', style: TextStyle(color: C.over)),
+          child: Text('覆盖并恢复', style: TextStyle(color: C.over)),
         ),
       ],
     ),
@@ -76,7 +76,7 @@ Future<bool> runRestoreFlow(
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('恢复完成', style: T.section),
+        title: Text('恢复完成', style: T.section),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,17 +87,17 @@ Future<bool> runRestoreFlow(
               style: T.body,
             ),
             const SizedBox(height: S.md),
-            const Text('覆盖前的数据已存到：', style: T.caption),
+            Text('覆盖前的数据已存到：', style: T.caption),
             const SizedBox(height: S.xs),
             Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
             const SizedBox(height: S.sm),
-            const Text('如果这次恢复的结果不对，去「我的 → 数据安全」用这份快照再导回来。', style: T.caption),
+            Text('如果这次恢复的结果不对，去「我的 → 数据安全」用这份快照再导回来。', style: T.caption),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('知道了', style: TextStyle(color: C.ink)),
+            child: Text('知道了', style: TextStyle(color: C.ink)),
           ),
         ],
       ),

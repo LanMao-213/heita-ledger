@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ledger/design/palette.dart';
+import 'package:ledger/design/theme_ctrl.dart';
 import 'package:ledger/design/tokens.dart';
 
 /// 色板护栏：以后谁调色，只要破坏可读性或层级，这里立刻红。
@@ -9,6 +11,11 @@ import 'package:ledger/design/tokens.dart';
 /// 为什么单独一个文件：`theme_palette_test.dart` 钉的是「值本身」（防止色差漂移），
 /// 这里钉的是「值之间的关系」（防止调色时只顾好看、把可读性调没了）。
 /// 前者只要换色板就会整组报废，后者是可以长期留着的规矩。
+///
+/// ⚠️ 这套断言写的是**亮色板**的方向（卡比底亮、键帽比卡沉、文字越次要越浅）。
+/// 2026-10-24 起默认主题是深色的黑塔·永夜，深浅两族的面关系相反，
+/// 所以这里在 setUp 里显式切回冷灰 —— 深色那一侧的方向由
+/// `theme_palette_test.dart` 里「面与面之间分得开」那组按 `dark` 分支断言。
 ///
 /// 亮度公式与 WCAG 2.1 一致：sRGB 通道先线性化，再按 0.2126/0.7152/0.0722 加权。
 double _relativeLuminance(Color c) {
@@ -33,6 +40,10 @@ double _contrast(Color a, Color b) {
 }
 
 void main() {
+  // 见文件头：这一组断言只对亮色板成立，所以先把主题钉回冷灰。
+  // 每个测试文件是独立 isolate，改这个单例不会影响别的文件。
+  setUpAll(() => ThemeCtrl.i.loadSilently(HeitaThemeId.cold));
+
   group('层级约束：面必须按「卡浮起来、槽沉下去」排', () {
     test('bg2 比 cardBg 深，且比 bg 深（数字键帽必须沉下去）', () {
       final bg2 = _relativeLuminance(C.bg2);

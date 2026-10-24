@@ -151,6 +151,8 @@ const Map<String, String> kChromeIcons = {
   'search': r'<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
   'filter': r'<path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/>',
   'grip': r'<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
+  // 调色盘（主题选择）。圆点用极小半径 + 圆头描边画出来就是实心点
+  'palette': r'<path d="M12 3.2c-4.86 0-8.8 3.94-8.8 8.8S7.14 20.8 12 20.8c.83 0 1.5-.67 1.5-1.5 0-.39-.17-.75-.4-1.02-.26-.26-.4-.59-.4-1.01 0-.84.67-1.5 1.5-1.5h1.8c2.75 0 5-2.25 5-5 0-4.86-3.94-8.77-8.8-8.77z"/><circle cx="8.3" cy="9.8" r=".8"/><circle cx="11.8" cy="7.4" r=".8"/><circle cx="7.4" cy="13.9" r=".8"/><circle cx="17.2" cy="10.2" r=".8"/>',
   'trash': r'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
 };
 
@@ -270,13 +272,16 @@ class BrandMark extends StatelessWidget {
   const BrandMark({
     super.key,
     required this.height,
-    this.fg = C.ink,
-    this.flameColor = C.over,
-  });
+    // 默认色改成「运行时取」：C.ink / C.over 现在是 getter，不能当 const 默认值。
+    // 调用点不传时走 build 里的回落值，效果与原来的默认完全一致。
+    Color? fg,
+    Color? flameColor,
+  })  : fgOverride = fg,
+        flameOverride = flameColor;
 
   final double height;
-  final Color fg;
-  final Color flameColor;
+  final Color? fgOverride;
+  final Color? flameOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -285,7 +290,10 @@ class BrandMark extends StatelessWidget {
       width: height * w / h,
       height: height,
       child: CustomPaint(
-        painter: _BrandMarkPainter(fg: fg, flameColor: flameColor),
+        painter: _BrandMarkPainter(
+          fg: fgOverride ?? C.ink,
+          flameColor: flameOverride ?? C.over,
+        ),
       ),
     );
   }

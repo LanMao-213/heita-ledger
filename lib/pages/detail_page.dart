@@ -245,7 +245,7 @@ class _TopBar extends StatelessWidget {
             ? GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _pickLedger(context),
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.only(left: S.sm),
                   child: LineIcon('chevron_down', size: 18, color: C.ink3),
                 ),
@@ -266,7 +266,7 @@ class _TopBar extends StatelessWidget {
             ),
             IconButton(
               onPressed: () => _search(context),
-              icon: const LineIcon(
+              icon: LineIcon(
                 'search',
                 semanticLabel: '搜索',
                 size: 20,
@@ -305,7 +305,7 @@ class _TopBar extends StatelessWidget {
                 icon: l.icon,
                 title: l.name,
                 trailing: l.id == s.ledgerId
-                    ? const LineIcon('check', size: 20, color: C.ink)
+                    ? LineIcon('check', size: 20, color: C.ink)
                     : null,
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -375,14 +375,14 @@ class _SearchDelegate extends SearchDelegate<String> {
     if (query.isNotEmpty)
       IconButton(
         onPressed: () => query = '',
-        icon: const LineIcon('close', size: 22, color: C.ink2, semanticLabel: '关闭'),
+        icon: LineIcon('close', size: 22, color: C.ink2, semanticLabel: '关闭'),
       ),
   ];
 
   @override
   Widget? buildLeading(BuildContext context) => IconButton(
     onPressed: () => close(context, ''),
-    icon: const LineIcon('arrow_left', size: 22, color: C.ink, semanticLabel: '返回'),
+    icon: LineIcon('arrow_left', size: 22, color: C.ink, semanticLabel: '返回'),
   );
 
   @override
@@ -393,12 +393,12 @@ class _SearchDelegate extends SearchDelegate<String> {
 
   @override
   ThemeData appBarTheme(BuildContext context) => Theme.of(context).copyWith(
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: C.bg,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
     ),
-    inputDecorationTheme: const InputDecorationTheme(
+    inputDecorationTheme: InputDecorationTheme(
       border: InputBorder.none,
       hintStyle: TextStyle(color: C.ink3),
     ),
@@ -446,7 +446,7 @@ class _MoreHint extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 2),
-              const LineIcon('chevron_right', size: 18, color: C.ink2),
+              LineIcon('chevron_right', size: 18, color: C.ink2),
             ],
           ),
         ),

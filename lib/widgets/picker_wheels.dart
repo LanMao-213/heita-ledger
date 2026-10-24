@@ -133,7 +133,7 @@ class _CatWheelSheetState extends State<_CatWheelSheet> {
                     itemExtent: 52,
                     onSelectedItemChanged: _onCatChanged,
                     selectionOverlay:
-                        const CupertinoPickerDefaultSelectionOverlay(
+                        CupertinoPickerDefaultSelectionOverlay(
                           background: C.inkWash,
                         ),
                     children: [
@@ -162,7 +162,7 @@ class _CatWheelSheetState extends State<_CatWheelSheet> {
                     onSelectedItemChanged: (i) =>
                         setState(() => _subIndex = i),
                     selectionOverlay:
-                        const CupertinoPickerDefaultSelectionOverlay(
+                        CupertinoPickerDefaultSelectionOverlay(
                           background: C.inkWash,
                         ),
                     children: [

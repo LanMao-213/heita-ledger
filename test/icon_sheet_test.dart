@@ -46,7 +46,7 @@ Widget _subCell(SeedSub s) => SizedBox(
       const SizedBox(height: 5),
       Text(
         s.name,
-        style: const TextStyle(fontSize: 11, color: C.ink2),
+        style: TextStyle(fontSize: 11, color: C.ink2),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -65,7 +65,7 @@ Widget _catBlock(SeedCat c) => Padding(
           const SizedBox(width: 8),
           Text(
             c.name,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
               color: C.ink,
@@ -74,7 +74,7 @@ Widget _catBlock(SeedCat c) => Padding(
           const SizedBox(width: 6),
           Text(
             '${c.subs.length}',
-            style: const TextStyle(fontSize: 11, color: C.ink3),
+            style: TextStyle(fontSize: 11, color: C.ink3),
           ),
         ],
       ),
@@ -105,7 +105,7 @@ void main() {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     '支出 · 9 类 / 48 子分类',
                     style: TextStyle(
                       fontSize: 13,
@@ -116,7 +116,7 @@ void main() {
                   const SizedBox(height: 10),
                   for (final c in kExpenseSeed) _catBlock(c),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     '收入 · 6 类 / 23 子分类',
                     style: TextStyle(
                       fontSize: 13,

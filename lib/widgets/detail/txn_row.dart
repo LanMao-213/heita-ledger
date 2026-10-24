@@ -140,7 +140,7 @@ class TxnRow extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除这笔记录？', style: T.section),
+        title: Text('删除这笔记录？', style: T.section),
         // 与列表同一口径：标题是分类名，备注只作补充。
         // 旧版拿备注当标题，出现的是「删除这笔记录？午饭」，看不出删的是哪一类。
         content: Text(
@@ -152,11 +152,11 @@ class TxnRow extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消', style: TextStyle(color: C.ink2)),
+            child: Text('取消', style: TextStyle(color: C.ink2)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除', style: TextStyle(color: C.over)),
+            child: Text('删除', style: TextStyle(color: C.over)),
           ),
         ],
       ),

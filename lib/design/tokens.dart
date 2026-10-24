@@ -1,7 +1,29 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-/// 设计 token —— 单套「纸墨」色板，1.5.0 起按「柔和版」重做过一轮。
+import 'theme_ctrl.dart';
+
+/// 设计 token —— 颜色全部是**运行时 getter**，读的是 [ThemeCtrl] 里的当前色板。
+///
+/// ## 为什么不再是 `static const`（2026-10-24）
+///
+/// 之前这里是单套「纸墨/冷灰」色板，25 个颜色全是 `static const`。想在 App 内
+/// 让用户自己换皮肤（而不是出 N 个包），颜色就必须是运行时可读的值。
+/// 代价是全仓库 446 处 `const TextStyle/BoxDecoration` 里的 `C.xxx` 全部要拆
+/// `const`（由 `lab/deconst.py` 机械拆完并逐轮 `dart analyze` 验证）。
+///
+/// 拆的收益是「一套代码、六套皮肤、用户自己选」；代价可以忽略 —— `const`
+/// 只是编译期常量优化，对一个 4 页的记账 App 没有可测量的收益。
+///
+/// ⚠️ 因为不再是常量，**换肤后必须让整棵树重建**才会重新求值。
+/// `app.dart` 给主子树挂了 `ValueKey(ThemeCtrl.i.id)` 做这件事，
+/// 详见 [ThemeCtrl] 的文档。
+///
+/// ## 色板在哪
+///
+/// 六套色板的定义在 `design/palette.dart`（[Palette] / `kPalettes` / [kDefaultTheme]）。
+/// 新增颜色先加进 [Palette]（六套都要给，少一个就是运行时空色），
+/// 再在这里补一个 getter —— **不要**在这里写死 `Color(0xFF...)` 字面量。
 ///
 /// ## 这一轮改了什么，为什么
 ///
@@ -21,117 +43,112 @@ import 'package:flutter/material.dart';
 ///   （[Shape.squircle]，iOS 的超椭圆，比圆弧软）；
 /// - 新增 [M] 动效令牌，把 0ms 硬切换成 120–420ms 的分档过渡。
 ///
-/// ## 层级（改色时别破）
-/// - 面：`cardBg` 白 > `bg` 纸白 > `bg3` > `heroBg` 压下去 > `bg2` 键帽
-/// - 文字：`ink` (>15:1) > `ink2` (>6.5:1) > `ink3` (>5:1) > `ink4`（不承担可读性）
-/// - 这四条由 `test/design/tokens_contrast_test.dart` 守着，改坏就红。
-///
-/// ## 为什么仍然全部是 `static const`
-/// 全仓库 446 处 `C.xxx` 都写在 `const TextStyle(...)` / `const BoxDecoration(...)`
-/// 里。颜色一旦变成运行时 getter，这些 const 构造全部要拆掉，几百处机械改动、
-/// 漏一个就编译不过；而单套色板本来就没有运行时可变的必要。新增颜色照旧先进这里，
-/// 不要写死 `Color(0xFF...)` 字面量。
+/// ## 层级（改色时别破）—— 深浅两族的**方向相反**
+/// - 亮色板：`cardBg` > `bg` > `bg3` > `heroBg` > `bg2`（压下去 = 更暗）
+/// - 深色板：`bg2` > `cardBg` > `bg` > `heroBg`（卡片比底亮，概览卡比底更暗）
+/// - 文字：`ink` (>7:1) > `ink2` (>4.5:1) > `ink3` (>4.5:1) > `ink4`（不承担可读性）
+/// - 这四条由 `test/theme_palette_test.dart` **遍历全部六套**守着，改坏就红。
 abstract final class C {
   /// 主文字 / 强调（对 [bg] 15.5:1）
   ///
   /// 「纸墨」的墨：不是纯黑，压一点暖调（`#14161A`），纯黑压在纸白上会发冷。
-  static const ink = Color(0xFF14161A);
+  static Color get ink => ThemeCtrl.i.palette.ink;
 
   /// 次要文字（对 [bg] 6.6:1）
-  static const ink2 = Color(0xFF5C626B);
+  static Color get ink2 => ThemeCtrl.i.palette.ink2;
 
   /// 辅助文字（对 [bg] 5.1:1）
   ///
   /// 12px 的 `caption` 在用这个色，必须过 AA（4.5:1）。旧色板这里是 `#9AA0A8`，
   /// 白底上只有 2.6:1 —— 那是既有缺陷，这一轮一并修掉。
-  static const ink3 = Color(0xFF656A75);
+  static Color get ink3 => ThemeCtrl.i.palette.ink3;
 
   /// 占位 / 弱分割：不承担可读性，只要求比 [bg2] 深一点看得出来
-  static const ink4 = Color(0xFFBFC4CC);
+  static Color get ink4 => ThemeCtrl.i.palette.ink4;
 
   /// 轮盘类选择器的选中行遮罩（墨 6%）
-  static const inkWash = Color(0x0F14161A);
+  static Color get inkWash => ThemeCtrl.i.palette.inkWash;
 
   /// 页面底 = 冷浅灰
   ///
   /// 与 [cardBg]（纯白）拉开约 1.13:1 —— 层级靠**明度差**，不靠投影。
   /// 这是 iOS grouped 的做法：底色比卡暗一档，卡自然成立，不需要浮起来。
-  static const bg = Color(0xFFF3F4F7);
+  static Color get bg => ThemeCtrl.i.palette.bg;
 
   /// **卡内的次级面**：输入底、未选中的胶囊、数字键帽、小图标底。
   ///
   /// 两条约束同时成立才行：
   /// ① 比 [cardBg] 深 —— 卡面是纯白，同色的话「未选中」这一档会整片消失；
   /// ② 比 [bg] 深 —— 键帽必须比抽屉的面沉下去，反过来会像键浮在面上。
-  static const bg2 = Color(0xFFE8EAF0);
+  static Color get bg2 => ThemeCtrl.i.palette.bg2;
 
   /// 更弱的面：比 [bg] 深一点点，比 [bg2] 浅
-  static const bg3 = Color(0xFFF6F7FA);
+  static Color get bg3 => ThemeCtrl.i.palette.bg3;
 
   /// 1px 描边（对 [cardBg] 1.30:1）
   ///
   /// ⚠️ 边界靠「底色差 + 1px 描边」，**不再用投影**。
   /// 上一版把描边几乎全去掉、用柔和投影分界；这一版反过来 —— 投影去掉，
   /// 卡面靠底色差立起来，必要时用这 1px 收边。
-  static const line = Color(0xFFE2E5EA);
+  static Color get line => ThemeCtrl.i.palette.line;
 
   /// 稍强的分隔
-  static const line2 = Color(0xFFCFD4DB);
+  static Color get line2 => ThemeCtrl.i.palette.line2;
 
   /// 超支警示（对 [bg] 5.5:1）
   ///
   /// 唯一保留色相的位置：超支必须一眼能认出来，用墨色分级做不到这件事。
   /// 压到接近砖红，仍然落在暖色系里，不会把纸墨调子打断。
-  static const over = Color(0xFFB0302A);
+  static Color get over => ThemeCtrl.i.palette.over;
 
   /// 超支警示 · 压在深色块上时用（深底上 [over] 会糊）
-  static const overD = Color(0xFFC0625A);
+  static Color get overD => ThemeCtrl.i.palette.overD;
 
   /// 原型里手机机身外的舞台底色，仅调试用
-  static const stage = Color(0xFFD8DBE1);
+  static Color get stage => ThemeCtrl.i.palette.stage;
 
   /// 强调色：进度条填充、光标、选中指示。
   ///
   /// 纸墨原则：不引入装饰色，强调 = 主文字色。要「显得重要」靠层级和留白，
   /// 不靠加一个颜色。
-  static const accent = Color(0xFF14161A);
+  static Color get accent => ThemeCtrl.i.palette.accent;
 
   /// 压在 [accent] 上的字色
-  static const onAccent = Color(0xFFFFFFFF);
+  static Color get onAccent => ThemeCtrl.i.palette.onAccent;
 
   /// 选中胶囊 / 标签底
-  static const accentSoft = Color(0xFFEEF0F4);
+  static Color get accentSoft => ThemeCtrl.i.palette.accentSoft;
 
   /// 「今天」那个圆点的底色：默认是主文字色（墨底白字）
-  static const todayMark = Color(0xFF14161A);
+  static Color get todayMark => ThemeCtrl.i.palette.todayMark;
 
   /// 压在 [todayMark] 上的字色
-  static const onTodayMark = Color(0xFFFFFFFF);
+  static Color get onTodayMark => ThemeCtrl.i.palette.onTodayMark;
 
   /// 选中行的整行染色
-  static const accentWash = Color(0xFFF0F2F5);
+  static Color get accentWash => ThemeCtrl.i.palette.accentWash;
 
   /// 卡片投影（墨 5%）—— 与 [E.low] 同值，留给还在用旧写法的调用点
-  static const cardShadow = Color(0x0D14161A);
+  static Color get cardShadow => ThemeCtrl.i.palette.cardShadow;
 
   /// 底部面板的拖拽柄 / 分块底 / 进度条轨道
-  static const handle = Color(0xFFE7EAF0);
+  static Color get handle => ThemeCtrl.i.palette.handle;
 
   /// 概览卡的描边：只在概览卡真的需要边界时才用
-  static const heroEdge = Color(0xFFD8DDE5);
+  static Color get heroEdge => ThemeCtrl.i.palette.heroEdge;
 
   /// **浮起来**的卡片（明细日卡、往来卡、SectionCard、抽屉、对话框）。
   ///
   /// 纯白，是整屏最亮的一块 —— 「卡比底亮」靠这一对关系（[cardBg] > [bg]），
   /// 再由 [E.low] 把边缘柔化，不靠描边。
-  static const cardBg = Color(0xFFFFFFFF);
+  static Color get cardBg => ThemeCtrl.i.palette.cardBg;
 
   /// **压下去**的概览卡。
   ///
   /// 必须比 [bg] 明显深一档（约 1.07:1），否则在浅灰底上「这块是不是卡」
   /// 会读不出来 —— 上一轮的暖米底与概览卡差 1.12:1，直接套用冷灰后
   /// 只差 1.02:1，第一版渲染出来概览卡像是不存在。
-  static const heroBg = Color(0xFFE8EBF1);
+  static Color get heroBg => ThemeCtrl.i.palette.heroBg;
 }
 
 /// 投影 —— **已全部归零**。
@@ -154,18 +171,7 @@ abstract final class E {
 /// 中性灰十档，与 [C] 同一族：第一档就是主文字色，最后一档是最浅的分隔灰。
 /// 相邻两档靠**明度**分，不靠色相 —— 饼图切片的颜色只是「区分」，不是「分类」，
 /// 用彩色会让人以为颜色本身有含义。
-const List<Color> kChart = [
-  Color(0xFF14161A),
-  Color(0xFF2E3238),
-  Color(0xFF454A52),
-  Color(0xFF5C626B),
-  Color(0xFF737A84),
-  Color(0xFF8B929C),
-  Color(0xFFA3AAB4),
-  Color(0xFFBBC2CB),
-  Color(0xFFD2D8E0),
-  Color(0xFFE8ECF2),
-];
+List<Color> get kChart => ThemeCtrl.i.palette.chart;
 
 /// 圆角。
 ///
@@ -264,7 +270,7 @@ abstract final class M {
 /// 只差 1px，一行里读不出主次，也是「糊成一片」的原因之一。
 abstract final class T {
   /// 大数字（概览页余额）
-  static const hero = TextStyle(
+  static TextStyle get hero => TextStyle(
     fontSize: 34,
     fontWeight: FontWeight.w600,
     color: C.ink,
@@ -273,7 +279,7 @@ abstract final class T {
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
-  static const title = TextStyle(
+  static TextStyle get title => TextStyle(
     fontSize: 22,
     fontWeight: FontWeight.w600,
     color: C.ink,
@@ -284,7 +290,7 @@ abstract final class T {
   /// 图表环形中心这类「卡片内次级大数字」。
   ///
   /// 22（[title]）给页面标题，20 给这一层 —— 两级都要，只差 2px 但该差。
-  static const titleSm = TextStyle(
+  static TextStyle get titleSm => TextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w600,
     color: C.ink,
@@ -292,20 +298,20 @@ abstract final class T {
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
-  static const section = TextStyle(
+  static TextStyle get section => TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w600,
     color: C.ink,
   );
 
-  static const body = TextStyle(fontSize: 15, color: C.ink, height: 1.5);
-  static const body2 = TextStyle(fontSize: 13, color: C.ink2, height: 1.45);
+  static TextStyle get body => TextStyle(fontSize: 15, color: C.ink, height: 1.5);
+  static TextStyle get body2 => TextStyle(fontSize: 13, color: C.ink2, height: 1.45);
 
   /// 12px —— 对 [C.ink3] 5.1:1，小字仍过 AA
-  static const caption = TextStyle(fontSize: 12, color: C.ink3, height: 1.35);
+  static TextStyle get caption => TextStyle(fontSize: 12, color: C.ink3, height: 1.35);
 
   /// 分组小标题 / 单位 / 角标：11px，字距放开一点更好读
-  static const overline = TextStyle(
+  static TextStyle get overline => TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w500,
     color: C.ink3,
@@ -313,14 +319,14 @@ abstract final class T {
   );
 
   /// 金额（等宽数字，避免列表里数字跳动）
-  static const amount = TextStyle(
+  static TextStyle get amount => TextStyle(
     fontSize: 17,
     fontWeight: FontWeight.w600,
     color: C.ink,
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
-  static const amountSm = TextStyle(
+  static TextStyle get amountSm => TextStyle(
     fontSize: 15,
     fontWeight: FontWeight.w600,
     color: C.ink,
@@ -332,7 +338,7 @@ abstract final class T {
   /// 原来这些位置写成 `amountSm.copyWith(fontSize: 13.5)` —— 13.5 是个
   /// 既不在字阶里、也不在金额档里的数，5 处各写一遍。补这一档，是为了
   /// 「小号金额」有名字可叫，而不是每次去改一个魔法数。
-  static const amountXs = TextStyle(
+  static TextStyle get amountXs => TextStyle(
     fontSize: 13,
     fontWeight: FontWeight.w600,
     color: C.ink,
@@ -342,37 +348,41 @@ abstract final class T {
 
 /// 全局主题。
 ///
-/// 单套色板，`ThemeData` 的 base 是 `light()`：纸墨是亮色方案（纸白底 + 墨字），
-/// 不是深色模式。Material 组件（Switch / 进度条 / 选择器）因此都按亮底取前景色，
-/// 不会出现「暗底配暗字」那类问题。
+/// `ThemeData` 的 base 由当前色板的 `dark` 决定：深色板走 `dark()`、
+/// 亮色板走 `light()` —— Material 组件（Switch / 进度条 / 选择器）据此取
+/// 前景色，不会出现「暗底配暗字」那类问题。
+///
+/// 色值全部从 [ThemeCtrl.i.palette] 取，换肤后由 `app.dart` 重建整棵子树
+/// 重新调用这里。
 ThemeData buildAppTheme() {
-  final base = ThemeData.light(useMaterial3: true);
+  final p = ThemeCtrl.i.palette;
+  final base = p.dark ? ThemeData.dark(useMaterial3: true) : ThemeData.light(useMaterial3: true);
 
   return base.copyWith(
-    scaffoldBackgroundColor: C.bg,
+    scaffoldBackgroundColor: p.bg,
     colorScheme: base.colorScheme.copyWith(
-      primary: C.ink,
-      onPrimary: C.bg,
-      surface: C.bg,
-      onSurface: C.ink,
-      error: C.over,
+      primary: p.ink,
+      onPrimary: p.bg,
+      surface: p.bg,
+      onSurface: p.ink,
+      error: p.over,
     ),
-    dividerColor: C.line,
+    dividerColor: p.line,
     // 分隔线压到最细：新界面靠面分界，线只做「切断」不做「装饰」
-    dividerTheme: const DividerThemeData(
-      color: C.line,
+    dividerTheme: DividerThemeData(
+      color: p.line,
       thickness: 1,
       space: 1,
     ),
     splashFactory: InkSparkle.splashFactory,
-    textTheme: base.textTheme.apply(bodyColor: C.ink, displayColor: C.ink),
+    textTheme: base.textTheme.apply(bodyColor: p.ink, displayColor: p.ink),
     appBarTheme: AppBarTheme(
-      backgroundColor: C.bg,
+      backgroundColor: p.bg,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 1,
       centerTitle: false,
-      foregroundColor: C.ink,
+      foregroundColor: p.ink,
       // 从主题自带的 titleLarge 派生，而不是直接用 T.title：
       // T.title 没有 fontFamily，AppBar 会把它当整段样式覆盖掉，
       // 结果标题脱离主题字体族（测试环境里中文会掉成方块）。
@@ -380,12 +390,12 @@ ThemeData buildAppTheme() {
         fontSize: 22,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.2,
-        color: C.ink,
+        color: p.ink,
       ),
     ),
     // 卡片统一走「白面 + 柔投影 + 连续圆角」，不再靠描边分界
     cardTheme: CardThemeData(
-      color: C.cardBg,
+      color: p.cardBg,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: Shape.squircle(R.card),
@@ -394,21 +404,21 @@ ThemeData buildAppTheme() {
     // 抽屉/对话框的面用卡面：页面底是纸白，抽屉再铺纸白就成了整片同色，
     // 卡面是纯白，压下去才看得出这是一层浮起来的面。
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: C.cardBg,
+      backgroundColor: p.cardBg,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: Shape.top(R.sheet),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: C.cardBg,
+      backgroundColor: p.cardBg,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: Shape.squircle(R.lg),
     ),
     // 去掉 Material 3 默认的彩色涟漪，保持纸墨的观感
-    textSelectionTheme: const TextSelectionThemeData(
-      cursorColor: C.accent,
-      selectionHandleColor: C.accent,
+    textSelectionTheme: TextSelectionThemeData(
+      cursorColor: p.accent,
+      selectionHandleColor: p.accent,
     ),
     // 页面转场换成 iOS 的右进右出：安卓默认的上下淡入在这个界面里
     // 显得「换页」，右推 + 边缘跟手返回才有连续感。

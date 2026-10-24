@@ -24,7 +24,7 @@ class CategoryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (cats.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: S.xl),
         child: Text('还没有分类，请先到「我的 → 分类管理」添加', style: T.caption),
       );

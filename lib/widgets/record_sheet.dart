@@ -362,7 +362,7 @@ class _RecordSheetState extends State<RecordSheet> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('存为模板', style: T.section),
+        title: Text('存为模板', style: T.section),
         content: SizedBox(
           width: 320,
           child: TextField(
@@ -379,11 +379,11 @@ class _RecordSheetState extends State<RecordSheet> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消', style: TextStyle(color: C.ink2)),
+            child: Text('取消', style: TextStyle(color: C.ink2)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('保存', style: TextStyle(color: C.ink)),
+            child: Text('保存', style: TextStyle(color: C.ink)),
           ),
         ],
       ),
@@ -587,7 +587,7 @@ class _RecordSheetState extends State<RecordSheet> {
                 title: a.name,
                 subtitle: Fmt.yuan(a.balanceCents),
                 trailing: a.id == _accountId
-                    ? const LineIcon('check', size: 20, color: C.ink)
+                    ? LineIcon('check', size: 20, color: C.ink)
                     : null,
                 onTap: () {
                   Navigator.pop(ctx);
@@ -664,11 +664,11 @@ class _RecordSheetState extends State<RecordSheet> {
                   ? TextButton(
                       // 取消：弹出 null，调用方按「没保存」处理
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('取消', style: TextStyle(color: C.ink2)),
+                      child: Text('取消', style: TextStyle(color: C.ink2)),
                     )
                   : TextButton(
                       onPressed: _saveAsTemplate,
-                      child: const Text(
+                      child: Text(
                         '存为模板',
                         style: T.body2,
                       ),
@@ -1402,7 +1402,7 @@ class _CategoryNoteRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                const LineIcon(
+                LineIcon(
                   'chevron_right',
                   size: 20,
                   color: C.ink3,
@@ -1672,7 +1672,7 @@ class _LiftRow extends StatelessWidget {
               child: Container(
                 width: 20,
                 height: 20,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: C.cardBg,
                   shape: BoxShape.circle,
                 ),

@@ -34,7 +34,7 @@ class _CatsPageState extends State<CatsPage> {
         title: const Text('分类管理'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
+          icon: LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: AnimatedBuilder(
@@ -101,7 +101,7 @@ class _CatsPageState extends State<CatsPage> {
                                 ),
                                 trailing: IconButton(
                                   onPressed: () => _menu(context, c),
-                                  icon: const LineIcon(
+                                  icon: LineIcon(
                                     'more', semanticLabel: '更多',
                                     size: 20,
                                     color: C.ink3,
@@ -130,8 +130,8 @@ class _CatsPageState extends State<CatsPage> {
         backgroundColor: C.ink,
         foregroundColor: C.bg,
         elevation: 0,
-        icon: const LineIcon('plus', size: 20, color: C.bg),
-        label: const Text('新增分类', style: T.body),
+        icon: LineIcon('plus', size: 20, color: C.bg),
+        label: Text('新增分类', style: T.body),
       ),
     );
   }
@@ -139,7 +139,7 @@ class _CatsPageState extends State<CatsPage> {
   /// 拖拽手柄。`buildDefaultDragHandles: false` 之后由它决定从哪儿开始拖。
   Widget _dragHandle(int index) => ReorderableDragStartListener(
     index: index,
-    child: const Padding(
+    child: Padding(
       padding: EdgeInsets.only(right: S.xs),
       child: LineIcon('grip', size: 20, color: C.ink3),
     ),
@@ -254,11 +254,11 @@ class _CatsPageState extends State<CatsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消', style: TextStyle(color: C.ink2)),
+            child: Text('取消', style: TextStyle(color: C.ink2)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除', style: TextStyle(color: C.over)),
+            child: Text('删除', style: TextStyle(color: C.over)),
           ),
         ],
       ),
@@ -347,11 +347,11 @@ class _CatsPageState extends State<CatsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消', style: TextStyle(color: C.ink2)),
+              child: Text('取消', style: TextStyle(color: C.ink2)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('保存', style: TextStyle(color: C.ink)),
+              child: Text('保存', style: TextStyle(color: C.ink)),
             ),
           ],
         ),
@@ -427,7 +427,7 @@ class _SubCatsPageState extends State<_SubCatsPage> {
         title: Text('${widget.parent.name} · 子分类'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
+          icon: LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: AnimatedBuilder(
@@ -466,7 +466,7 @@ class _SubCatsPageState extends State<_SubCatsPage> {
                     subtitle: c.name == widget.parent.name ? '与一级同名' : null,
                     trailing: IconButton(
                       onPressed: () => _menu(context, c),
-                      icon: const LineIcon(
+                      icon: LineIcon(
                         'more', semanticLabel: '更多',
                         size: 20,
                         color: C.ink3,
@@ -492,15 +492,15 @@ class _SubCatsPageState extends State<_SubCatsPage> {
         backgroundColor: C.ink,
         foregroundColor: C.bg,
         elevation: 0,
-        icon: const LineIcon('plus', size: 20, color: C.bg),
-        label: const Text('新增子分类', style: T.body),
+        icon: LineIcon('plus', size: 20, color: C.bg),
+        label: Text('新增子分类', style: T.body),
       ),
     );
   }
 
   Widget _dragHandle(int index) => ReorderableDragStartListener(
     index: index,
-    child: const Padding(
+    child: Padding(
       padding: EdgeInsets.only(right: S.xs),
       child: LineIcon('grip', size: 20, color: C.ink3),
     ),
@@ -560,21 +560,21 @@ class _SubCatsPageState extends State<_SubCatsPage> {
                   context: context,
                   builder: (d) => AlertDialog(
                     title: Text('删除「${c.name}」？', style: T.section),
-                    content: const Text(
+                    content: Text(
                       '这个子分类下的记录不会消失，会显示为「未分类」。',
                       style: T.body2,
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(d, false),
-                        child: const Text(
+                        child: Text(
                           '取消',
                           style: TextStyle(color: C.ink2),
                         ),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(d, true),
-                        child: const Text(
+                        child: Text(
                           '删除',
                           style: TextStyle(color: C.over),
                         ),
@@ -633,7 +633,7 @@ class _ArchivedBlock extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: S.md),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text(
+              child: Text(
                 '恢复',
                 style: T.body2,
               ),

@@ -8,10 +8,12 @@ import '../data/models.dart';
 import '../data/repo.dart';
 import '../design/hairline.dart';
 import '../design/icons.dart';
+import '../design/palette.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
 import '../widgets/restore_flow.dart';
+import '../widgets/theme_sheet.dart';
 import 'cats_page.dart';
 import 'recurring_page.dart';
 import 'safety_page.dart';
@@ -181,26 +183,47 @@ class MinePage extends StatelessWidget {
               ],
             ),
           ),
-          // 偏好：目前只有触感一项。
+          // 偏好：主题 + 触感。
           //
-          // 为什么给这个开关：震动是「我们替用户做的决定」，而它恰好有两类人
-          // 会立刻反感 —— 开会/夜里记账的人、以及手机常年静音连触感也关掉的人。
-          // 系统层面关掉当然有效，但用户不会为了一个记账 App 去翻系统设置。
-          //
-          // 没有「音量」开关：这个应用**不出声**（全仓库没有一处 SystemSound /
-          // 音频库），没有开关可加。真要做提示音属于新功能，不是开关。
+          // 主题这一行为什么存在：配色是记账 App 里少有的「纯个人口味」项 ——
+          // 有人夜里记账要深色，有人觉得深色刺眼，谁也说服不了谁。
+          // 与其挑一套当唯一答案，不如六套都给，让用户自己挑。
+          // 出厂默认黑塔·永夜（见 kDefaultTheme），老版本升上来也是它。
           const SectionTitle('偏好'),
           SectionCard(
             padding: const EdgeInsets.symmetric(vertical: S.sm),
-            child: SettingRow(
-              icon: 'pulse',
-              title: '触感反馈',
-              subtitle: s.hapticsEnabled ? '记账、删除时短震一下' : '已关闭，不做任何震动',
-              onTap: () => s.setHapticsEnabled(!s.hapticsEnabled),
-              trailing: Switch(
-                value: s.hapticsEnabled,
-                onChanged: s.setHapticsEnabled,
-              ),
+            child: Column(
+              children: [
+                SettingRow(
+                  icon: 'palette',
+                  title: '主题',
+                  subtitle: '${paletteOf(s.themeId).name} · 共 ${kPalettes.length} 套',
+                  onTap: () => _pickTheme(context),
+                ),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
+                // 为什么给这个开关：震动是「我们替用户做的决定」，而它恰好有两类人
+                // 会立刻反感 —— 开会/夜里记账的人、以及手机常年静音连触感也关掉的人。
+                // 系统层面关掉当然有效，但用户不会为了一个记账 App 去翻系统设置。
+                //
+                // 没有「音量」开关：这个应用**不出声**（全仓库没有一处 SystemSound /
+                // 音频库），没有开关可加。真要做提示音属于新功能，不是开关。
+                SettingRow(
+                  icon: 'pulse',
+                  title: '触感反馈',
+                  subtitle:
+                      s.hapticsEnabled ? '记账、删除时短震一下' : '已关闭，不做任何震动',
+                  onTap: () => s.setHapticsEnabled(!s.hapticsEnabled),
+                  trailing: Switch(
+                    value: s.hapticsEnabled,
+                    onChanged: s.setHapticsEnabled,
+                  ),
+                ),
+              ],
             ),
           ),
           // 「清空」单独拎出来：它和导出/导入不是一类操作，混在一张卡里容易误触
@@ -241,7 +264,7 @@ class MinePage extends StatelessWidget {
               ],
             ),
           ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(S.lg, S.xl, S.lg, 0),
             child: Text(
               '所有数据保存在这台设备上，应用不会发起任何网络请求。\n'
@@ -261,6 +284,19 @@ class MinePage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // ---------------------------------------------------------------- 主题
+
+  /// 选主题。选中即生效 —— `Store.setTheme` 会让 ThemeCtrl 通知整树重建。
+  ///
+  /// 这里**不能**在切换后弹 toast：换肤会重建 `_BootGate` 子树，
+  /// 这个 context 随之失效，再用它抓 Overlay 会拿到已被卸载的元素。
+  static Future<void> _pickTheme(BuildContext context) async {
+    final s = Store.i;
+    final picked = await showThemeSheet(context, current: s.themeId);
+    if (picked == null || picked == s.themeId) return;
+    await s.setTheme(picked);
   }
 
   // -------------------------------------------------------------- 账单日
@@ -346,7 +382,7 @@ class MinePage extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('导入完成', style: T.section),
+        title: Text('导入完成', style: T.section),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +400,7 @@ class MinePage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('知道了', style: TextStyle(color: C.ink)),
+            child: Text('知道了', style: TextStyle(color: C.ink)),
           ),
         ],
       ),
@@ -411,8 +447,8 @@ class MinePage extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('清空全部数据？', style: T.section),
-        content: const Text(
+        title: Text('清空全部数据？', style: T.section),
+        content: Text(
           '所有账目、账户、分类、目标都会被删除，恢复成刚装好的样子。\n\n'
           '清空前会自动存一份快照，后悔了可以从「我的 → 数据安全」里找回来。',
           style: T.body2,
@@ -420,11 +456,11 @@ class MinePage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消', style: TextStyle(color: C.ink2)),
+            child: Text('取消', style: TextStyle(color: C.ink2)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确认清空', style: TextStyle(color: C.over)),
+            child: Text('确认清空', style: TextStyle(color: C.over)),
           ),
         ],
       ),
@@ -452,18 +488,18 @@ class MinePage extends StatelessWidget {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('已清空', style: T.section),
+          title: Text('已清空', style: T.section),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('账目、账户、分类都已恢复成刚装好的样子。', style: T.body2),
+              Text('账目、账户、分类都已恢复成刚装好的样子。', style: T.body2),
               const SizedBox(height: S.md),
-              const Text('清空前的数据已存到：', style: T.caption),
+              Text('清空前的数据已存到：', style: T.caption),
               const SizedBox(height: S.xs),
               Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
               const SizedBox(height: S.sm),
-              const Text(
+              Text(
                 '要找回来的话，去「我的 → 数据安全」用这份快照恢复。',
                 style: T.caption,
               ),
@@ -472,7 +508,7 @@ class MinePage extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('知道了', style: TextStyle(color: C.ink)),
+              child: Text('知道了', style: TextStyle(color: C.ink)),
             ),
           ],
         ),
@@ -513,7 +549,7 @@ class MinePage extends StatelessWidget {
                         onTap: () => _accountMenu(context, a),
                         trailing: IconButton(
                           onPressed: () => _accountMenu(context, a),
-                          icon: const LineIcon(
+                          icon: LineIcon(
                             'more', semanticLabel: '更多',
                             size: 20,
                             color: C.ink3,
@@ -526,13 +562,13 @@ class MinePage extends StatelessWidget {
                         onPressed: () => _accountSheet(context, null),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(46),
-                          side: const BorderSide(color: C.line2),
+                          side: BorderSide(color: C.line2),
                           foregroundColor: C.ink,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(R.md),
                           ),
                         ),
-                        icon: const LineIcon('plus', size: 18, color: C.ink),
+                        icon: LineIcon('plus', size: 18, color: C.ink),
                         label: const Text('新增账户'),
                       ),
                     ),
@@ -651,11 +687,11 @@ class MinePage extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消', style: TextStyle(color: C.ink2)),
+              child: Text('取消', style: TextStyle(color: C.ink2)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('删除', style: TextStyle(color: C.over)),
+              child: Text('删除', style: TextStyle(color: C.over)),
             ),
           ],
         ),
@@ -739,7 +775,7 @@ class MinePage extends StatelessWidget {
                   value: include,
                   onChanged: (v) => setLocal(() => include = v),
                   activeThumbColor: C.ink,
-                  title: const Text('计入净资产', style: T.body2),
+                  title: Text('计入净资产', style: T.body2),
                 ),
               ],
             ),
@@ -748,11 +784,11 @@ class MinePage extends StatelessWidget {
             if (acc != null)
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('删除', style: TextStyle(color: C.over)),
+                child: Text('删除', style: TextStyle(color: C.over)),
               ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('保存', style: TextStyle(color: C.ink)),
+              child: Text('保存', style: TextStyle(color: C.ink)),
             ),
           ],
         ),
@@ -813,7 +849,7 @@ class MinePage extends StatelessWidget {
                 title: l.name,
                 subtitle: l.id == s.ledgerId ? '当前账本' : null,
                 trailing: l.id == s.ledgerId
-                    ? const LineIcon('check', size: 20, color: C.ink)
+                    ? LineIcon('check', size: 20, color: C.ink)
                     : null,
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -831,7 +867,7 @@ class MinePage extends StatelessWidget {
                   final name = await showDialog<String>(
                     context: context,
                     builder: (dctx) => AlertDialog(
-                      title: const Text('新建账本', style: T.section),
+                      title: Text('新建账本', style: T.section),
                       content: TextField(
                         controller: ctl,
                         autofocus: true,
@@ -844,14 +880,14 @@ class MinePage extends StatelessWidget {
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(dctx),
-                          child: const Text(
+                          child: Text(
                             '取消',
                             style: TextStyle(color: C.ink2),
                           ),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(dctx, ctl.text.trim()),
-                          child: const Text(
+                          child: Text(
                             '创建',
                             style: TextStyle(color: C.ink),
                           ),
@@ -869,13 +905,13 @@ class MinePage extends StatelessWidget {
                 },
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(46),
-                  side: const BorderSide(color: C.line2),
+                  side: BorderSide(color: C.line2),
                   foregroundColor: C.ink,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(R.md),
                   ),
                 ),
-                icon: const LineIcon('plus', size: 18, color: C.ink),
+                icon: LineIcon('plus', size: 18, color: C.ink),
                 label: const Text('新建账本'),
               ),
             ),
@@ -966,7 +1002,7 @@ class _CycleDaySheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: C.bg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
       ),
@@ -988,7 +1024,7 @@ class _CycleDaySheet extends StatelessWidget {
               children: [
                 Text('账单日', style: T.section),
                 const Spacer(),
-                const Text('1–31 号，短月自动取月末', style: T.caption),
+                Text('1–31 号，短月自动取月末', style: T.caption),
               ],
             ),
           ),

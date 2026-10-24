@@ -422,7 +422,7 @@ class _FilterHead extends StatelessWidget {
     final s = Store.i;
     return Row(
       children: [
-        const Text('筛选结果', style: T.section),
+        Text('筛选结果', style: T.section),
         const Spacer(),
         Flexible(
           child: Text(

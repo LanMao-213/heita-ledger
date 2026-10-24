@@ -74,15 +74,15 @@ class _TemplatesPageState extends State<TemplatesPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('删除「${t.name}」？', style: T.section),
-        content: const Text('用这个模板记过的账目会保留，只是以后不再出现在列表里。', style: T.body2),
+        content: Text('用这个模板记过的账目会保留，只是以后不再出现在列表里。', style: T.body2),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消', style: TextStyle(color: C.ink2)),
+            child: Text('取消', style: TextStyle(color: C.ink2)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除', style: TextStyle(color: C.over)),
+            child: Text('删除', style: TextStyle(color: C.over)),
           ),
         ],
       ),
@@ -111,7 +111,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
         title: const Text('记账模板'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
+          icon: LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: AnimatedBuilder(
@@ -137,7 +137,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
               // 最后一项是说明文字。放进列表里跟着滚，
               // 这样它不会像固定页脚那样被悬浮按钮盖住。
               if (i == list.length) {
-                return const Padding(
+                return Padding(
                   key: ValueKey('hint'),
                   padding: EdgeInsets.fromLTRB(S.lg, S.md, S.lg, 0),
                   child: Text(
@@ -164,8 +164,8 @@ class _TemplatesPageState extends State<TemplatesPage> {
         backgroundColor: C.ink,
         foregroundColor: C.bg,
         elevation: 0,
-        icon: const LineIcon('plus', size: 20, color: C.bg),
-        label: const Text('新增模板', style: T.body),
+        icon: LineIcon('plus', size: 20, color: C.bg),
+        label: Text('新增模板', style: T.body),
       ),
     );
   }
@@ -206,7 +206,7 @@ class _TemplateRow extends StatelessWidget {
             children: [
               ReorderableDragStartListener(
                 index: index,
-                child: const Padding(
+                child: Padding(
                   // 左右 6 是拖拽手柄图标的固定内缩，不是节奏间距，保留原值
                   padding: EdgeInsets.symmetric(horizontal: 6),
                   child: LineIcon(
@@ -250,7 +250,7 @@ class _TemplateRow extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onMore,
-                icon: const LineIcon(
+                icon: LineIcon(
                   'more', semanticLabel: '更多',
                   size: 20,
                   color: C.ink3,
@@ -402,12 +402,12 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
         title: Text(_isNew ? '新建模板' : '编辑模板'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context, false),
-          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
+          icon: LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
         actions: [
           TextButton(
             onPressed: _save,
-            child: const Text(
+            child: Text(
               '保存',
               style: T.amountSm,
             ),
@@ -488,7 +488,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
           const SectionTitle('分类'),
           const SizedBox(height: S.xs),
           if (_cats.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: S.lg),
               child: Text('还没有分类，请先到「我的 → 分类管理」添加', style: T.caption),
             )
@@ -621,7 +621,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
               ),
             ),
           ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
             child: Text(
               '填了金额 = 点模板就能一键入账；留空 = 只省掉选分类和账户的步骤。',

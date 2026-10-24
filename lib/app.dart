@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'design/icons.dart';
+import 'design/theme_ctrl.dart';
 import 'design/tokens.dart';
 import 'dev/seed.dart';
 import 'pages/home_shell.dart';
@@ -22,30 +23,43 @@ class HeitaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: kAppName,
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      locale: const Locale('zh', 'CN'),
-      supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      // App 本体是浅色界面 → 状态栏图标用深色。
-      // 启动页内部的 AnnotatedRegion 会覆盖这一层，切回浅色界面时自动失效。
-      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarIconBrightness: Brightness.dark,
-        ),
-        child: child ?? const SizedBox.shrink(),
-      ),
-      home: const _BootGate(),
+    // 换肤必须让 MaterialApp 重建：`theme: buildAppTheme()` 读的是
+    // ThemeCtrl 里的运行时色板，不重建就永远停在出厂那一套。
+    return AnimatedBuilder(
+      animation: ThemeCtrl.i,
+      builder: (context, _) {
+        final dark = ThemeCtrl.i.dark;
+        return MaterialApp(
+          title: kAppName,
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          locale: const Locale('zh', 'CN'),
+          supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          // 状态栏图标跟着主题走：深色皮肤用浅色图标，浅色皮肤用深色图标。
+          // 启动页内部的 AnnotatedRegion 会覆盖这一层 —— 那是刻意的，
+          // 启动页固定深色，不跟着皮肤变（见 _SplashScreen）。
+          builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness:
+                  dark ? Brightness.light : Brightness.dark,
+              statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+              systemNavigationBarColor: Colors.transparent,
+              systemNavigationBarIconBrightness:
+                  dark ? Brightness.light : Brightness.dark,
+            ),
+            child: child ?? const SizedBox.shrink(),
+          ),
+          // key 绑主题 id：id 一变整棵子树重建，446 处 `C.xxx` getter 才会
+          // 重新求值。ThemeCtrl 的文档里写了这个代价（丢局部状态，刻意接受）。
+          home: _BootGate(key: ValueKey(ThemeCtrl.i.id)),
+        );
+      },
     );
   }
 }
@@ -55,7 +69,7 @@ class HeitaApp extends StatelessWidget {
 /// 开屏画面就是品牌标志（用户选定的「D · 留白 88%」方案），
 /// 不放任何文字。
 class _BootGate extends StatefulWidget {
-  const _BootGate();
+  const _BootGate({super.key});
 
   @override
   State<_BootGate> createState() => _BootGateState();
@@ -94,6 +108,11 @@ class _BootGateState extends State<_BootGate> {
   }
 }
 
+/// ⚠️ 启动页**不跟主题走**：不管用户选了哪套皮肤，开屏都是这一屏深色。
+///
+/// 理由是它和 Android 原生窗口的 `launch_background.xml` 是同一张图 ——
+/// 冷启动时先出原生窗口、再接 Flutter 首帧，两边必须一模一样才不会跳。
+/// 让启动页跟着皮肤变，就要给每套皮肤出一份 drawable，收益不抵复杂度。
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
 

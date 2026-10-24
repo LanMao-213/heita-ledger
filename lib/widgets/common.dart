@@ -266,7 +266,7 @@ class CycleBar extends StatelessWidget {
             // 而不是和标签并列的另一个入口。
             if (onTapLabel != null) ...[
               const SizedBox(width: S.xs),
-              const LineIcon('calendar', size: 18, color: C.ink3),
+              LineIcon('calendar', size: 18, color: C.ink3),
             ],
           ],
         ),
@@ -394,7 +394,7 @@ class MonthBar extends StatelessWidget {
             ),
             if (onTapLabel != null) ...[
               const SizedBox(width: S.xs),
-              const LineIcon('calendar', size: 18, color: C.ink3),
+              LineIcon('calendar', size: 18, color: C.ink3),
             ],
           ],
         ),
@@ -501,7 +501,7 @@ class SettingRow extends StatelessWidget {
             if (trailing != null)
               trailing!
             else if (onTap != null && showChevron)
-              const LineIcon('chevron_right', size: 20, color: C.ink3),
+              LineIcon('chevron_right', size: 20, color: C.ink3),
           ],
         ),
       ),

@@ -54,16 +54,16 @@ class _RecurringPageState extends State<RecurringPage> {
         title: const Text('周期账单'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
+          icon: LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: C.ink))
+          ? Center(child: CircularProgressIndicator(color: C.ink))
           : ListView(
               // 底部 90 是给悬浮「新建规则」按钮让位的固定留白，不是节奏间距
               padding: const EdgeInsets.only(bottom: 90),
               children: [
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, S.md),
                   child: Text(
                     '房租、话费、订阅这类固定支出，设一次就够了。\n'
@@ -87,8 +87,8 @@ class _RecurringPageState extends State<RecurringPage> {
         backgroundColor: C.ink,
         foregroundColor: C.bg,
         elevation: 0,
-        icon: const LineIcon('plus', size: 20, color: C.bg),
-        label: const Text('新建规则', style: T.body),
+        icon: LineIcon('plus', size: 20, color: C.bg),
+        label: Text('新建规则', style: T.body),
       ),
     );
   }
@@ -214,11 +214,11 @@ class _RecurringPageState extends State<RecurringPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消', style: TextStyle(color: C.ink2)),
+                child: Text('取消', style: TextStyle(color: C.ink2)),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('保存', style: TextStyle(color: C.ink)),
+                child: Text('保存', style: TextStyle(color: C.ink)),
               ),
             ],
           );
@@ -353,16 +353,16 @@ class _RuleCard extends StatelessWidget {
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('删除这条规则？', style: T.section),
-                  content: const Text('已经补记过的账目不会受影响。', style: T.body2),
+                  title: Text('删除这条规则？', style: T.section),
+                  content: Text('已经补记过的账目不会受影响。', style: T.body2),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('取消', style: TextStyle(color: C.ink2)),
+                      child: Text('取消', style: TextStyle(color: C.ink2)),
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('删除', style: TextStyle(color: C.over)),
+                      child: Text('删除', style: TextStyle(color: C.over)),
                     ),
                   ],
                 ),
@@ -371,7 +371,7 @@ class _RuleCard extends StatelessWidget {
               await Repo.deleteRecurring(rule.id);
               await onChanged();
             },
-            icon: const LineIcon(
+            icon: LineIcon(
               'trash', semanticLabel: '删除',
               size: 19,
               color: C.ink3,

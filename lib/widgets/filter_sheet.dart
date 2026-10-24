@@ -270,7 +270,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               title: '筛选',
               action: TextButton(
                 onPressed: _reset,
-                child: const Text(
+                child: Text(
                   '重置',
                   style: T.body2,
                 ),
@@ -431,7 +431,7 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   Widget _accountBlock(Store s) {
     if (s.accounts.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(horizontal: S.lg),
         child: Text('还没有账户，请先到「我的 → 账户管理」添加', style: T.caption),
       );
@@ -461,7 +461,7 @@ class _FilterSheetState extends State<_FilterSheet> {
       child: Row(
         children: [
           Expanded(child: _amountField(_minCtrl, _minFocus, '起')),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: S.sm),
             child: Text('—', style: TextStyle(color: C.ink4)),
           ),
@@ -543,7 +543,7 @@ class _FilterSheetState extends State<_FilterSheet> {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.lg),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: C.line)),
       ),
       child: Row(

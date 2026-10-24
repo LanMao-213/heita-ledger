@@ -102,7 +102,7 @@ class _SafetyPageState extends State<SafetyPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除这份快照？', style: T.section),
+        title: Text('删除这份快照？', style: T.section),
         content: Text(
           '${info.reasonLabel} · ${info.timeLabel}\n${info.contentLabel}',
           style: T.body2,
@@ -110,11 +110,11 @@ class _SafetyPageState extends State<SafetyPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消', style: TextStyle(color: C.ink2)),
+            child: Text('取消', style: TextStyle(color: C.ink2)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除', style: TextStyle(color: C.over)),
+            child: Text('删除', style: TextStyle(color: C.over)),
           ),
         ],
       ),
@@ -172,7 +172,7 @@ class _SafetyPageState extends State<SafetyPage> {
                 ),
               if (report.hasFixable) ...[
                 const SizedBox(height: S.sm),
-                const Text(
+                Text(
                   '「重算余额」按「期初 + 流水合计」把余额改回来，'
                   '不会动期初值（你手填的那个基准）。',
                   style: T.caption,
@@ -184,12 +184,12 @@ class _SafetyPageState extends State<SafetyPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('关闭', style: TextStyle(color: C.ink2)),
+            child: Text('关闭', style: TextStyle(color: C.ink2)),
           ),
           if (report.hasFixable)
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('重算余额', style: TextStyle(color: C.ink)),
+              child: Text('重算余额', style: TextStyle(color: C.ink)),
             ),
         ],
       ),
@@ -211,12 +211,12 @@ class _SafetyPageState extends State<SafetyPage> {
         title: const Text('数据安全'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
+          icon: LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
         actions: [
           TextButton(
             onPressed: _busy ? null : _backupNow,
-            child: const Text(
+            child: Text(
               '现在备份',
               style: T.body2,
             ),
@@ -224,7 +224,7 @@ class _SafetyPageState extends State<SafetyPage> {
         ],
       ),
       body: _loading
-          ? const Center(
+          ? Center(
               child: SizedBox(
                 width: 18,
                 height: 18,
@@ -242,7 +242,7 @@ class _SafetyPageState extends State<SafetyPage> {
                     icon: 'shield',
                     title: '检查数据完整性',
                     subtitle: _checking ? '正在检查…' : '核对余额、归属期、借贷与引用',
-                    trailing: const LineIcon(
+                    trailing: LineIcon(
                       'chevron_right',
                       size: 20,
                       color: C.ink3,
@@ -258,7 +258,7 @@ class _SafetyPageState extends State<SafetyPage> {
                     children: [
                       Row(
                         children: [
-                          const LineIcon('shield', size: 20, color: C.ink2),
+                          LineIcon('shield', size: 20, color: C.ink2),
                           const SizedBox(width: S.md),
                           Text(
                             '清空、恢复之前自动留底',
@@ -267,7 +267,7 @@ class _SafetyPageState extends State<SafetyPage> {
                         ],
                       ),
                       const SizedBox(height: S.sm),
-                      const Text(
+                      Text(
                         '只保留最近 3 份、最多 7 天。快照存在应用私有目录里，'
                         '卸载应用会一起清掉 —— 要长期保存请用「我的 → 备份全部数据」'
                         '导出到手机或网盘。',
@@ -308,7 +308,7 @@ class _SafetyPageState extends State<SafetyPage> {
                     ),
                   ),
                 const SizedBox(height: S.md),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(horizontal: S.lg),
                   child: Text(
                     '恢复是覆盖式的：会先把当前数据再存一份快照，然后整库替换。'
@@ -348,7 +348,7 @@ class _SnapshotRow extends StatelessWidget {
           '${info.reasonLabel} · ${info.contentLabel} · ${info.sizeLabel}',
       onTap: canRestore ? onRestore : null,
       trailing: PopupMenuButton<String>(
-        icon: const LineIcon('more', semanticLabel: '更多', size: 20, color: C.ink3),
+        icon: LineIcon('more', semanticLabel: '更多', size: 20, color: C.ink3),
         padding: EdgeInsets.zero,
         onSelected: (v) {
           switch (v) {
@@ -364,7 +364,7 @@ class _SnapshotRow extends StatelessWidget {
           if (canRestore)
             const PopupMenuItem(value: 'restore', child: Text('用它恢复')),
           const PopupMenuItem(value: 'share', child: Text('导出这一份')),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'delete',
             child: Text('删除', style: TextStyle(color: C.over)),
           ),

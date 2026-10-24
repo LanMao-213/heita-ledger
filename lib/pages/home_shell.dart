@@ -199,7 +199,7 @@ class _TabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         // 底栏跟着卡面走：底栏用页面底就与内容糊在一起，用卡面才浮得起来
         color: C.cardBg,
         border: Border(top: BorderSide(color: C.line)),
@@ -279,10 +279,10 @@ class _TabBar extends StatelessWidget {
                     offset: const Offset(0, 6),
                   ),
                   // 3px 白色描边：让按钮从 tabbar 上「切」出来，不然只是浮着
-                  const BoxShadow(color: C.cardBg, spreadRadius: 3),
+                  BoxShadow(color: C.cardBg, spreadRadius: 3),
                 ],
               ),
-              child: const Center(
+              child: Center(
                 child: LineIcon('plus', size: 24, color: C.onAccent),
               ),
             ),

@@ -113,7 +113,7 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
         title: const Text('本期全览'),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
+          icon: LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
       ),
       body: Column(

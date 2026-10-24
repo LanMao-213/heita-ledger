@@ -252,7 +252,7 @@ class _StatsPageState extends State<StatsPage> {
             SectionTitle(s.statBasis == StatBasis.period ? '近 6 期' : '近 6 个月'),
             SectionCard(
               child: s.statTrend.isEmpty
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 90,
                       child: Center(child: Text('还没有历史数据', style: T.caption)),
                     )
@@ -548,7 +548,7 @@ class _AccountsCard extends StatelessWidget {
           ),
           for (final a in s.accounts)
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: C.line)),
               ),
               padding: const EdgeInsets.symmetric(

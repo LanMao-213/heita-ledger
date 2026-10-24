@@ -29,9 +29,9 @@ class DebtsPage extends StatelessWidget {
         // 和分类管理/模板页同一个返回箭头，不加这个系统会给一个平台默认的
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
-          icon: const LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
+          icon: LineIcon('arrow_left', semanticLabel: '返回', size: 22, color: C.ink),
         ),
-        title: const Text('往来', style: T.section),
+        title: Text('往来', style: T.section),
         centerTitle: false,
       ),
       body: AnimatedBuilder(
@@ -497,7 +497,7 @@ Future<void> showDebtDetail(BuildContext context, Debt debt) {
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: C.ink2,
-                      side: const BorderSide(color: C.line2),
+                      side: BorderSide(color: C.line2),
                       minimumSize: const Size(0, 44),
                     ),
                     onPressed: () async {
@@ -564,11 +564,11 @@ Future<void> _confirmDeleteDebt(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('取消', style: TextStyle(color: C.ink2)),
+          child: Text('取消', style: TextStyle(color: C.ink2)),
         ),
         TextButton(
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('删除', style: TextStyle(color: C.over)),
+          child: Text('删除', style: TextStyle(color: C.over)),
         ),
       ],
     ),
@@ -740,7 +740,7 @@ class _RepaySheetState extends State<_RepaySheet> {
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: C.ink2,
-                    side: const BorderSide(color: C.line2),
+                    side: BorderSide(color: C.line2),
                     minimumSize: const Size(0, 44),
                   ),
                   onPressed: _pickDate,
@@ -752,7 +752,7 @@ class _RepaySheetState extends State<_RepaySheet> {
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: C.ink2,
-                    side: const BorderSide(color: C.line2),
+                    side: BorderSide(color: C.line2),
                     minimumSize: const Size(0, 44),
                   ),
                   onPressed: () async {

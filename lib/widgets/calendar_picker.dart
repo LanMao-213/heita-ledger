@@ -247,7 +247,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewPadding.bottom),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           // 抽屉面用「卡面」而不是「页面底」：底已经是最浅的纸白，
           // 抽屉再铺纸白就整片同色；卡面是纯白，压下去才看得出这是一层浮起来的面
           color: C.cardBg,
@@ -375,7 +375,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
                         transform: Matrix4.diagonal3Values(1.18, 1, 1),
                         child: Text(
                           m,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 216,
                             fontWeight: FontWeight.w900,
                             // 月份水印：浅底是黑 6%，暗底是骨白 8%（C.inkWash）
@@ -448,7 +448,7 @@ class _CalendarPickerState extends State<_CalendarPicker> {
                 height: _dot,
                 alignment: Alignment.center,
                 decoration: isToday
-                    ? const BoxDecoration(
+                    ? BoxDecoration(
                         color: C.todayMark,
                         shape: BoxShape.circle,
                       )

@@ -7,6 +7,8 @@ import 'data/models.dart';
 import 'data/repo.dart';
 import 'data/ui_flags.dart';
 import 'design/haptics.dart';
+import 'design/palette.dart';
+import 'design/theme_ctrl.dart';
 
 /// 统计页的归集口径。
 ///
@@ -35,6 +37,25 @@ class Store extends ChangeNotifier {
     Haptics.enabled = on;
     notifyListeners();
     await Repo.setSetting(_kHaptics, on ? '1' : '0');
+  }
+
+  /// 当前主题（我的 → 偏好 → 主题）。
+  ///
+  /// 真正的执行点是 `ThemeCtrl`（设计层读的是它），这里同样是「界面读的副本 +
+  /// 落库」。出厂默认 [kDefaultTheme]（黑塔·永夜），老库没有这个键就用它。
+  HeitaThemeId themeId = kDefaultTheme;
+
+  static const _kTheme = 'ui.theme';
+
+  /// 换肤：先让 ThemeCtrl 通知整树重建，再落库。
+  ///
+  /// 顺序不能反 —— `apply()` 会触发 `app.dart` 的 AnimatedBuilder，
+  /// 此时 [themeId] 必须是新值，否则「我的」页那一行会先跳回旧值再跳回来。
+  Future<void> setTheme(HeitaThemeId id) async {
+    themeId = id;
+    ThemeCtrl.i.apply(id);
+    notifyListeners();
+    await Repo.setSetting(_kTheme, id.name);
   }
 
   /// 底部导航当前页：0 明细 / 1 图表 / 2 计划 / 3 我的。
@@ -317,6 +338,10 @@ class Store extends ChangeNotifier {
     // 触感开关：只有存过 '0' 才算关。老库没有这个键 → 保持默认开
     hapticsEnabled = (await Repo.getSetting(_kHaptics)) != '0';
     Haptics.enabled = hapticsEnabled;
+    // 主题：读不到（老库）或读到无效值都回落到出厂默认。
+    // loadSilently 不发通知 —— 此刻界面还没起来，首帧本来就会按它渲染。
+    themeId = themeIdFromString(await Repo.getSetting(_kTheme));
+    ThemeCtrl.i.loadSilently(themeId);
     ledgerId = await Repo.currentLedgerId();
     cycleStartDay = await Repo.cycleStartDay();
     resetCycleToToday();

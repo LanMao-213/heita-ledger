@@ -88,12 +88,12 @@ class _DebtsCard extends StatelessWidget {
           onTap: openPage,
           child: Row(
             children: [
-              const LineIcon('coin', size: 18, color: C.ink2),
+              LineIcon('coin', size: 18, color: C.ink2),
               const SizedBox(width: S.sm),
               Expanded(
                 child: Text('往来：记借出/借入后，在这里看谁欠谁多少', style: T.body2),
               ),
-              const LineIcon(
+              LineIcon(
                 'chevron_right',
                 size: 20,
                 color: C.ink3,
@@ -113,7 +113,7 @@ class _DebtsCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const LineIcon('coin', size: 18, color: C.ink2),
+                LineIcon('coin', size: 18, color: C.ink2),
                 const SizedBox(width: S.sm),
                 Text('往来', style: T.section),
                 const Spacer(),
@@ -123,7 +123,7 @@ class _DebtsCard extends StatelessWidget {
                     style: T.caption.copyWith(color: C.ink2),
                   ),
                 const SizedBox(width: S.xs),
-                const LineIcon(
+                LineIcon(
                   'chevron_right',
                   size: 20,
                   color: C.ink3,
@@ -191,7 +191,7 @@ class _TotalBudgetCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const LineIcon('target', size: 18, color: C.ink2),
+              LineIcon('target', size: 18, color: C.ink2),
               const SizedBox(width: S.sm),
               Text('本期总预算', style: T.section),
               const Spacer(),
@@ -277,7 +277,7 @@ class _TotalBudgetCard extends StatelessWidget {
                   Text.rich(
                     TextSpan(
                       children: [
-                        const TextSpan(text: '每天可花 ', style: T.caption),
+                        TextSpan(text: '每天可花 ', style: T.caption),
                         TextSpan(
                           text: Fmt.money(pacing.canSpendPerDayCents),
                           style: T.amountSm,
@@ -389,8 +389,8 @@ class _CategoryBudgets extends StatelessWidget {
               padding: const EdgeInsets.only(left: S.sm, top: S.xs),
               child: TextButton.icon(
                 onPressed: () => _addCategoryBudget(context),
-                icon: const LineIcon('plus', size: 16, color: C.ink2),
-                label: const Text(
+                icon: LineIcon('plus', size: 16, color: C.ink2),
+                label: Text(
                   '为分类设置额度',
                   style: T.body2,
                 ),
@@ -595,14 +595,14 @@ class _Goals extends StatelessWidget {
             onPressed: () => _edit(context, null),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
-              side: const BorderSide(color: C.line2),
+              side: BorderSide(color: C.line2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(R.md),
               ),
               foregroundColor: C.ink,
             ),
-            icon: const LineIcon('plus', size: 18, color: C.ink),
-            label: const Text('新建储蓄目标', style: T.body),
+            icon: LineIcon('plus', size: 18, color: C.ink),
+            label: Text('新建储蓄目标', style: T.body),
           ),
         ),
       ],
@@ -678,11 +678,11 @@ class _Goals extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消', style: TextStyle(color: C.ink2)),
+              child: Text('取消', style: TextStyle(color: C.ink2)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('保存', style: TextStyle(color: C.ink)),
+              child: Text('保存', style: TextStyle(color: C.ink)),
             ),
           ],
         ),
@@ -791,7 +791,7 @@ class _GoalCard extends StatelessWidget {
                     minimumSize: const Size(0, 30),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text(
+                  child: Text(
                     '存一笔',
                     style: T.body2,
                   ),
@@ -901,11 +901,11 @@ Future<int?> _askAmount(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('取消', style: TextStyle(color: C.ink2)),
+          child: Text('取消', style: TextStyle(color: C.ink2)),
         ),
         TextButton(
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('确定', style: TextStyle(color: C.ink)),
+          child: Text('确定', style: TextStyle(color: C.ink)),
         ),
       ],
     ),
