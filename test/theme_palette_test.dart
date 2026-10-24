@@ -57,6 +57,27 @@ void main() {
           expect(_contrast(p.accent, p.cardBg), greaterThanOrEqualTo(3), reason: p.name);
         });
 
+        test('ink4 够得着图形下限 3:1，但仍明显淡于 ink3', () {
+          // ink4 看着是「最弱的一档墨」，其实它承担图形岗位：图表里的收入柱、
+          // 安全页的进度圈、日历的非本月日期。图形对象的门槛是 3:1，
+          // 不是「比底深一点就行」—— 1.4.21 之前四套亮色板只有 1.47～2.37，
+          // 柱子淡到几乎看不见。
+          //
+          // 按「会画到的所有面」取最严的那个：卡面与页面底都要过。
+          // 深色板这两面都比卡亮，取 min 一样成立。
+          for (final face in [p.cardBg, p.bg]) {
+            expect(_contrast(p.ink4, face), greaterThanOrEqualTo(3.0),
+                reason: '${p.name} ink4 对面 #${face.toARGB32().toRadixString(16)} '
+                    '只有 ${_contrast(p.ink4, face).toStringAsFixed(3)}，图形要 3:1');
+          }
+          // 「弱化」这个语义不能因为提对比度就丢掉：ink3 至少要比它深 1.4 倍
+          expect(
+            _contrast(p.ink3, p.cardBg) / _contrast(p.ink4, p.cardBg),
+            greaterThanOrEqualTo(1.4),
+            reason: '${p.name} ink4 提太深了，和 ink3 分不出层级',
+          );
+        });
+
         test('压在强调色 / 今日圆点上的字看得清', () {
           // 「今天」那个圆点里是日期数字（文字），下限 4.5 不是 3。
           expect(_contrast(p.onAccent, p.accent), greaterThanOrEqualTo(4.5), reason: p.name);
@@ -127,7 +148,9 @@ void main() {
       expect(C.ink, const Color(0xFF14161A));
       expect(C.ink2, const Color(0xFF5C626B));
       expect(C.ink3, const Color(0xFF656A75));
-      expect(C.ink4, const Color(0xFFBFC4CC));
+      // 原 #BFC4CC 对卡面只有 1.75:1，够不到图形下限 3:1（柱子/进度圈在用）。
+      // 1.4.21 降明度到 #838C9C，色相（217° 蓝灰）不动。
+      expect(C.ink4, const Color(0xFF838C9C));
       expect(C.inkWash, const Color(0x0F14161A));
       expect(C.bg, const Color(0xFFF3F4F7));
       expect(C.bg2, const Color(0xFFE8EAF0));

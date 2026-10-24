@@ -46,7 +46,7 @@ import 'theme_ctrl.dart';
 /// ## 层级（改色时别破）—— 深浅两族的**方向相反**
 /// - 亮色板：`cardBg` > `bg` > `bg3` > `heroBg` > `bg2`（压下去 = 更暗）
 /// - 深色板：`bg2` > `cardBg` > `bg` > `heroBg`（卡片比底亮，概览卡比底更暗）
-/// - 文字：`ink` (>7:1) > `ink2` (>4.5:1) > `ink3` (>4.5:1) > `ink4`（不承担可读性）
+/// - 文字：`ink` (>7:1) > `ink2` (>4.5:1) > `ink3` (>4.5:1) > `ink4`（≥3:1，图形 AA）
 /// - 这四条由 `test/theme_palette_test.dart` **遍历全部六套**守着，改坏就红。
 abstract final class C {
   /// 主文字 / 强调（对 [bg] 15.5:1）
@@ -63,7 +63,14 @@ abstract final class C {
   /// 白底上只有 2.6:1 —— 那是既有缺陷，这一轮一并修掉。
   static Color get ink3 => ThemeCtrl.i.palette.ink3;
 
-  /// 占位 / 弱分割：不承担可读性，只要求比 [bg2] 深一点看得出来
+  /// 最弱的一档墨：占位符「—」、弱分割「·」、非本月日期、图表的配角柱
+  ///
+  /// ⚠️ 别被「最弱」骗了：它同时承担**图形**岗位 —— 图表里的收入柱、安全页
+  /// 的进度圈都用它。图形对象的门槛是 3:1（WCAG 1.4.11），不是「看得出就行」。
+  /// 1.4.21 之前四套亮色板只有 1.47～2.37，柱子淡到几乎看不见；现已全部压到
+  /// 对卡面 / 页面底都 ≥3.05（色相不动，只降明度）。文字岗位顺带可读性更好了。
+  ///
+  /// 仍然要明显淡于 [ink3]（层差 ≥1.5 倍对比度），「弱化」这个语义不能丢。
   static Color get ink4 => ThemeCtrl.i.palette.ink4;
 
   /// 轮盘类选择器的选中行遮罩（墨 6%）
@@ -467,6 +474,70 @@ ThemeData buildAppTheme() {
         if (states.contains(WidgetState.selected)) return Colors.transparent;
         return p.line2;
       }),
+    ),
+    // 日期选择器 / 日期范围选择器。全 App 有 5 处调用（记一笔、周期账单、
+    // 债务还款日、筛选卡自定义时间段），都没传任何颜色参数 —— 不在这里给
+    // 就整个吃 M3 默认：对话框面是 surfaceContainerHigh，顶部那块日期大字
+    // 区是 primary 的淡色调（亮色板下就是淡紫 #EADDFF 一族），选中的日子
+    // 是实心紫圆。也就是说这是**唯一一处会露出一整片紫的地方**。
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: p.cardBg,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: Shape.squircle(R.lg),
+      headerBackgroundColor: p.heroBg,
+      headerForegroundColor: p.ink,
+      weekdayStyle: T.caption.copyWith(color: p.ink3),
+      dayStyle: T.body2.copyWith(color: p.ink),
+      dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) return p.ink4;
+        if (states.contains(WidgetState.selected)) return p.onAccent;
+        return p.ink;
+      }),
+      dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return p.accent;
+        return Colors.transparent;
+      }),
+      dayOverlayColor: WidgetStateProperty.all(p.inkWash),
+      // 「今天」不填色，只描边 —— 否则它和「选中」两个圆点会打架
+      todayBackgroundColor: WidgetStateProperty.all(Colors.transparent),
+      todayForegroundColor: WidgetStateProperty.all(p.accent),
+      todayBorder: BorderSide(color: p.accent, width: 1.2),
+      yearStyle: T.body2.copyWith(color: p.ink),
+      yearForegroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return p.onAccent;
+        return p.ink;
+      }),
+      yearBackgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return p.accent;
+        return Colors.transparent;
+      }),
+      yearOverlayColor: WidgetStateProperty.all(p.inkWash),
+      rangePickerBackgroundColor: p.cardBg,
+      rangePickerHeaderBackgroundColor: p.heroBg,
+      rangePickerHeaderForegroundColor: p.ink,
+      rangePickerHeaderHeadlineStyle: T.titleSm.copyWith(color: p.ink),
+      rangePickerHeaderHelpStyle: T.caption.copyWith(color: p.ink3),
+      rangeSelectionBackgroundColor: p.accentSoft,
+      rangeSelectionOverlayColor: WidgetStateProperty.all(p.inkWash),
+      dividerColor: p.line,
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: p.bg2,
+        hintStyle: T.body2.copyWith(color: p.ink3),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(R.sm),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(R.sm),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(R.sm),
+          borderSide: BorderSide(color: p.accent, width: 1.5),
+        ),
+      ),
     ),
     // 提示条。代码里 `showToast` 已经显式给了墨底纸字，这里兜住的是将来
     // 直接用 `ScaffoldMessenger.showSnackBar` 的地方 —— 不兜的话会拿到

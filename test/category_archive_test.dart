@@ -183,6 +183,12 @@ void main() {
     final s = Store.i;
     final target = s.expenseCats.first;
 
+    // 数 Store 的通知次数 —— 用它判断「afterCategoryChange 的三步都跑完了」。
+    var storeFired = 0;
+    void onFire() => storeFired++;
+    s.addListener(onFire);
+    addTearDown(() => s.removeListener(onFire));
+
     await tester.pumpWidget(const MaterialApp(home: CatsPage()));
     await tester.pump();
 
@@ -209,8 +215,33 @@ void main() {
     //   ② 于是测试结束后那条查询撞上已关闭的库，抛 `database_closed`，
     //      框架按失败计（表现为「偶发 flaky」，全量跑时约一半概率红）。
     // 改用仓库统一的 settleWrites：真实时间与 pump 交替，让整条链走完再断言。
-    await settleWrites(tester);
-    await tester.pump();
+    // 等两件事同时成立，才算这条链真的走完：
+    //
+    // ① `已停用 1 个` 从界面上消失 —— 这是功能对不对；
+    // ② Store 又发了 3 次通知 —— 这是链走没走完。
+    //
+    // 只等 ① 会漏：`afterCategoryChange` 是
+    // `_loadCategories()` → `loadCycle()` → `loadStats()` 三步串起来的，
+    // 而列表在**第一步**之后就 notifyListeners 了，此时 ① 已成立、
+    // `loadStats` 里的三次真实查询还在跑。测试体一结束，setUp 里下一条
+    // 用例的 `Db.close()` 就把库关了，那条续体撞上 `database_closed`
+    // （框架按失败计，报 "thrown running a test (but after the test had
+    // completed)"）—— 这就是那个「约一半概率偶发红」的真因，不是运气问题。
+    //
+    // ① 先等界面正确：`已停用 1 个` 那一段消失。
+    await settleUntil(
+      tester,
+      () => find.textContaining('已停用 1 个').evaluate().isEmpty,
+    );
+    // ② 再等链尾：Store 的通知不再增加。
+    //
+    // 只做 ① 会漏：`afterCategoryChange` 是三步串起来的，界面在**第一步**
+    // 之后就更新了，`loadStats` 里那三次真实查询还在跑。测试体一结束，
+    // 下一条用例 setUp 里的 `Db.close()` 就把库关了，那条续体撞上
+    // `database_closed` —— 这就是「约一半概率偶发红」的真因（框架会把
+    // 它算在上一条用例头上，报 "thrown running a test (but after the
+    // test had completed)"）。
+    await settleQuiet(tester, () => storeFired);
     // 把 toast 的时间走完，避免结束时留着未完成的定时器
     await tester.pump(const Duration(seconds: 3));
 

@@ -172,7 +172,7 @@ const Palette _cold = Palette(
   ink: Color(0xFF14161A),
   ink2: Color(0xFF5C626B),
   ink3: Color(0xFF656A75),
-  ink4: Color(0xFFBFC4CC),
+  ink4: Color(0xFF838C9C),
   inkWash: Color(0x0F14161A),
   bg: Color(0xFFF3F4F7),
   bg2: Color(0xFFE8EAF0),
@@ -216,7 +216,7 @@ const Palette _warm = Palette(
   ink: Color(0xFF1C1A17),
   ink2: Color(0xFF5B554D),
   ink3: Color(0xFF6D655B),
-  ink4: Color(0xFFACA69E),
+  ink4: Color(0xFF91897F),
   inkWash: Color(0x0F1C1A17),
   bg: Color(0xFFF5F2EA),
   bg2: Color(0xFFE4DED0),
@@ -297,7 +297,7 @@ const Palette _zeikin = Palette(
   ink: Color(0xFF4A2C3A),
   ink2: Color(0xFF6A5060),
   ink3: Color(0xFF786070),
-  ink4: Color(0xFFC0A9B8),
+  ink4: Color(0xFFA17F96),
   inkWash: Color(0x14814864),
   // 面：天青一族，四档明度递进（底 > 概览卡 > 次级面）
   bg: Color(0xFFE9F2F5),
@@ -430,7 +430,7 @@ const Palette _holy = Palette(
   // 辅助文字。早先是 #64707D，对冷白底只有 4.26:1 —— 12px 的 caption 用这个色，
   // 差一点点没过 AA。压到 #5E6A77 后是 4.66:1。
   ink3: Color(0xFF5E6A77),
-  ink4: Color(0xFFAEB7C2),
+  ink4: Color(0xFF78879A),
   inkWash: Color(0x0F171B21),
   bg: Color(0xFFE9ECF0),
   bg2: Color(0xFFDDE2E9),

@@ -440,7 +440,10 @@ class _MonthlyTrend extends StatelessWidget {
           children: [
             _legend('支出', C.ink),
             const SizedBox(width: S.lg),
-            _legend('收入', C.ink3),
+            // ⚠️ 必须用 C.ink4 —— 柱子在下面画的就是这个色。图例是用户
+            // 「按色找柱」的唯一依据，图例色块和柱子不同色，等于给了错的
+            // 索引（1.4.21 之前这里写的是 C.ink3，比柱子深一档）。
+            _legend('收入', C.ink4),
           ],
         ),
         const SizedBox(height: S.md),

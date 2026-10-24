@@ -143,6 +143,64 @@ void main() {
         );
       });
 
+      test('日期选择器的每一块面都来自色板', () {
+        // 日期选择器是全 App 唯一一处「一整片都可以是 Material 默认紫」的
+        // 地方：对话框面、顶部日期大字区、选中的日子、范围选中的底色，
+        // 四处都能露出 M3 的默认色，而它有 5 个调用点且都没传颜色参数。
+        final dp = t.datePickerTheme;
+        const sel = <WidgetState>{WidgetState.selected};
+        const non = <WidgetState>{};
+
+        // ⚠️ 不许写成 `dp.xxx ?? cs.surface`。第一版就是这么写的，结果把
+        // datePickerTheme 整段删掉这条用例**照样是绿的** —— 因为
+        // `cs.surface` 本来就是色板的色，回落过去自然通过，等于什么都没测。
+        // 「这块面没给」本身就是缺陷（没给就吃 Material 默认），要用一个
+        // 绝不属于色板的哨兵色把它暴露出来。
+        const notGiven = Color(0xFFFF00FF);
+
+        final faces = <String, Color>{
+          '对话框底': dp.backgroundColor ?? notGiven,
+          '顶部日期区底': dp.headerBackgroundColor ?? notGiven,
+          '顶部日期区字': dp.headerForegroundColor ?? notGiven,
+          '范围选择器底': dp.rangePickerBackgroundColor ?? notGiven,
+          '范围顶部底': dp.rangePickerHeaderBackgroundColor ?? notGiven,
+          '范围选中底色': dp.rangeSelectionBackgroundColor ?? notGiven,
+          '分隔线': dp.dividerColor ?? notGiven,
+          '选中日·底': dp.dayBackgroundColor?.resolve(sel) ?? notGiven,
+          '选中日·字': dp.dayForegroundColor?.resolve(sel) ?? notGiven,
+          '普通日·字': dp.dayForegroundColor?.resolve(non) ?? notGiven,
+          '今天·描边':
+              (dp.todayBorder ?? const BorderSide(color: notGiven)).color,
+          '输入边框·聚焦': (dp.inputDecorationTheme?.focusedBorder
+                      as OutlineInputBorder?)
+                  ?.borderSide
+                  .color ??
+              notGiven,
+        };
+
+        final bad = <String>[];
+        for (final e in faces.entries) {
+          if (_naturallyBlack(e.value)) continue;
+          if (e.value == notGiven) {
+            bad.add('${e.key}=没给（会吃 Material 默认色）');
+          } else if (!own.contains(hx(e.value))) {
+            bad.add('${e.key}=${hx(e.value)} 不是本套色板的颜色');
+          }
+        }
+        expect(
+          bad,
+          isEmpty,
+          reason: '${p.name} 的日期选择器有面不对：\n  ${bad.join('\n  ')}',
+        );
+
+        // 选中日必须能一眼看出来：底色与字色不能同色
+        expect(
+          hx(dp.dayBackgroundColor?.resolve(sel) ?? notGiven),
+          isNot(hx(dp.dayForegroundColor?.resolve(sel) ?? notGiven)),
+          reason: '${p.name} 选中的日子底色与字色同色，看不出哪天被选了',
+        );
+      });
+
       test('弹层/对话框的面与色板的卡面同源', () {
         expect(
           hx(t.bottomSheetTheme.backgroundColor ?? cs.surface),
