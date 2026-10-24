@@ -41,7 +41,14 @@ class ThemeCtrl extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 启动时载入（不通知：此时界面还没起来）
+  /// 载入当前皮肤，**不发通知**。
+  ///
+  /// ⚠️ 只允许在「界面还没建好」时用（比如 `main()` 里 runApp 之前）。
+  /// 曾经在 `Store.boot()` 里用它 —— 而 boot 是在 `_BootGate.initState` 跑的，
+  /// 那时 `MaterialApp` 早就建好了：结果页面（读 `C.xxx` getter）换成了
+  /// 用户选的皮肤，`ThemeData` 却永远停在出厂那套，弹层底/对话框成了
+  /// 「永夜的深紫黑底 + 泽金的深绯紫字」，深底叠深字几乎读不出来。
+  /// 现在 boot 末尾改用 [apply]（会通知），这条坑才堵住。
   void loadSilently(HeitaThemeId id) {
     _id = id;
   }

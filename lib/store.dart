@@ -327,8 +327,26 @@ class Store extends ChangeNotifier {
   int get overBudgetCents =>
       overBudget ? expenseCents - budgetAvailableCents : 0;
 
+  /// 正在进行的 boot（并发去重用，结束即清空）
+  Future<void>? _booting;
+
   /// 首屏启动：建表/开库 → 补归属期 → 补记周期账单 → 载入全部数据
-  Future<void> boot() async {
+  ///
+  /// **并发调用复用同一个 Future**（1.4.22）。原因：boot 中途要切皮肤，
+  /// 切皮肤会通知 `ThemeCtrl`，`app.dart` 里 `_BootGate` 的 key 绑着主题 id，
+  /// 一变整棵子树重建 —— 新 State 的 initState 会再调一次 `boot()`。
+  /// 重复 boot 会把补记账单再跑一遍、再全量查一遍，测试里甚至直接卡在启动页。
+  /// 所以这里做单飞去重；`ready` 之后再次调用仍然照常重跑（测试要靠这个
+  /// 换库），只挡住「同时进行中的第二次」。
+  Future<void> boot() {
+    final inflight = _booting;
+    if (inflight != null) return inflight;
+    final f = _doBoot().whenComplete(() => _booting = null);
+    _booting = f;
+    return f;
+  }
+
+  Future<void> _doBoot() async {
     await Db.open();
     // v3 → v4 升级后 `period_start` 是空的，先补齐。账单日默认 1 时回填结果
     // 等于月初，与升级前完全一致 —— 这一步不改任何查询口径。
@@ -339,9 +357,17 @@ class Store extends ChangeNotifier {
     hapticsEnabled = (await Repo.getSetting(_kHaptics)) != '0';
     Haptics.enabled = hapticsEnabled;
     // 主题：读不到（老库）或读到无效值都回落到出厂默认。
-    // loadSilently 不发通知 —— 此刻界面还没起来，首帧本来就会按它渲染。
+    //
+    // 读到就立刻切（会通知全树重建），必须在这里切而不是等 boot 结束：
+    // `MaterialApp` 早在 `_BootGate` 之前就建好了，用的还是出厂色板。不发通知
+    // 的话，页面（读 `C.xxx` getter）是用户选的皮肤，而 ThemeData（弹层底、
+    // 对话框、AppBar）永远停在出厂那套 —— 亮色皮肤点「账户管理」会看到
+    // 永夜的深紫黑底配本皮肤的深绯紫字，深底叠深字几乎读不出来。
+    //
+    // 此刻还在启动页，通知引起的整树重建看不出来（`boot()` 单飞，新 State
+    // 复用同一个 Future，不会再跑一遍补记与查询）。
     themeId = themeIdFromString(await Repo.getSetting(_kTheme));
-    ThemeCtrl.i.loadSilently(themeId);
+    ThemeCtrl.i.apply(themeId);
     ledgerId = await Repo.currentLedgerId();
     cycleStartDay = await Repo.cycleStartDay();
     resetCycleToToday();
