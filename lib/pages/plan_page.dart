@@ -576,6 +576,13 @@ class _Goals extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Store.i;
     return Column(
+      // ⚠️ 必须 stretch。这一组夹在 ListView 里，却被 Column 包了一层 ——
+      // Column 默认 crossAxisAlignment.center，子项拿到的是**松**宽度约束，
+      // 空态卡就会缩到「最宽那行字」的宽度（360dp 屏上实测 228dp，应有 328dp），
+      // 和上面几张满宽卡差了整整 100dp，肉眼就是「下面这张卡窄一截」。stretch
+      // 把紧约束还回去，卡片左右边距才和别的卡一致。
+      // （分类预算那张卡没这个问题，因为它是直接挂在 ListView 下的。）
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (s.goals.isEmpty)
           const SectionCard(
