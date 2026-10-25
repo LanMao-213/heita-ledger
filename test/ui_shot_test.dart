@@ -23,6 +23,7 @@ import 'package:ledger/design/tokens.dart';
 import 'package:ledger/pages/safety_page.dart';
 import 'package:ledger/store.dart';
 import 'package:ledger/widgets/pickers.dart';
+import 'package:ledger/widgets/detail/txn_row.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -134,6 +135,35 @@ void main() {
     // ---- 明细页 ----
     await _shot(tester, 'build/visual/shot_1_detail.png');
     expect(tester.takeException(), isNull, reason: '明细页有布局溢出');
+
+    // ---- 明细页 · 多选态 ----
+    // 多选是这一版新增的交互，没有截图等于没验证：勾选圈的尺寸、操作条的
+    // 高度、顶栏「取消 / 已选 N 条 / 全选」挤不挤，只能靠看图确认。
+    // 截完必须**退出多选**，否则后面 20 多张都会带着勾选圈跑。
+    await tester.tap(find.byTooltip('多选'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    await tester.tap(find.byType(TxnRow).at(0));
+    await tester.pumpAndSettle(const Duration(milliseconds: 200));
+    await tester.tap(find.byType(TxnRow).at(1));
+    await tester.pumpAndSettle(const Duration(milliseconds: 200));
+    await _shot(tester, 'build/visual/shot_1b_select.png');
+    expect(tester.takeException(), isNull, reason: '多选态有布局溢出');
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+
+    // ---- 长按菜单 ----
+    // 这次给长按加了「多选」入口。三条断言钉住一件事：
+    // **多选是加进来的，不是把删除顶掉的** —— 删除一旦从长按消失，
+    // 单条删除在界面上就只剩「进多选 → 勾一条 → 删」这一条三步路。
+    await tester.longPress(find.byType(TxnRow).first);
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    expect(find.text('编辑这笔'), findsOneWidget, reason: '长按菜单丢了「编辑」');
+    expect(find.text('多选'), findsOneWidget, reason: '长按菜单丢了「多选」入口');
+    expect(find.text('删除这笔'), findsOneWidget, reason: '长按菜单丢了「删除」');
+    await _shot(tester, 'build/visual/shot_1c_longpress.png');
+    expect(tester.takeException(), isNull, reason: '长按菜单有布局溢出');
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
 
     // ---- 日历卡片（上下滚动，没有左右翻月）----
     await tester.tap(

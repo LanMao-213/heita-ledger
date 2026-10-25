@@ -580,6 +580,14 @@ class Repo {
 
   static Future<void> deleteTxn(Txn t) => WriteGateway.run(_DeleteTxn(t));
 
+  /// 批量删除，返回实际删除条数。
+  ///
+  /// 不循环调 [deleteTxn]：那样每条开一次事务、每次都要 `afterTxnChange`，
+  /// 删几十条会卡住界面；更要紧的是中途失败会留下「删了一半」——
+  /// 用户看到「已删除 20 笔」，其实只有 8 笔没了。
+  static Future<int> batchDeleteTxns(List<Txn> items) =>
+      WriteGateway.run(_DeleteTxns(items));
+
   /// 账户余额随交易增减。
   /// [reverse] 为 true 时反向回滚（改单/删单前先回滚旧值）。
   ///
@@ -1727,6 +1735,37 @@ class _DeleteTxn extends Command<void> {
 
   @override
   Future<void> verify(Verifier v) => _verifyTxnBalance(v, t);
+}
+
+/// 批量删除。一个事务里逐条回滚余额再删行。
+///
+/// 顺序不能反：先 `_applyBalanceDelta(reverse)` 再 `delete`，与 [_DeleteTxn]
+/// 完全一致 —— 余额回滚是按这条流水算的，删完行就没得算了。
+class _DeleteTxns extends Command<int> {
+  _DeleteTxns(this.items);
+
+  final List<Txn> items;
+
+  @override
+  Future<int> apply(WriteScope w) async {
+    for (final t in items) {
+      await Repo._applyBalanceDelta(w, t, reverse: true);
+      await w.delete('txn', where: 'id = ?', whereArgs: [t.id]);
+    }
+    return items.length;
+  }
+
+  @override
+  Future<void> verify(Verifier v) async {
+    // 同一账户被删多笔时只校验一次：`checkBalance` 是整账户重算，
+    // 重复调用不会出错，但会白跑
+    final seen = <int>{};
+    for (final t in items) {
+      for (final id in [t.accountId, t.toAccountId]) {
+        if (id != null && seen.add(id)) await v.checkBalance(id);
+      }
+    }
+  }
 }
 
 class _CreateDebt extends Command<int> {

@@ -14,6 +14,7 @@ import '../widgets/detail/summary_card.dart';
 import '../widgets/detail/txn_row.dart';
 import '../widgets/filter_sheet.dart';
 import '../widgets/menu.dart';
+import '../widgets/picker_wheels.dart';
 import 'period_all_page.dart';
 
 /// 明细页（首页）：按周期看每一笔。
@@ -40,6 +41,149 @@ class _DetailPageState extends State<DetailPage>
     value: 1,
     duration: M.base,
   );
+
+  // ------------------------------------------------------------------ 多选
+
+  /// 是否处于多选模式。
+  ///
+  /// 两个入口：顶栏的「选择」按钮，以及长按某行后的「多选」菜单项。
+  /// 后者会顺手把这行选中 —— 长按的目的通常就是「我要动这一笔」。
+  bool _selecting = false;
+
+  /// 已选中的交易 id。
+  ///
+  /// 存 id 而不是 [Txn]：翻期、改分类之后 Txn 对象会重建，
+  /// 存对象会出现「勾着的行和实际数据对不上」。
+  final Set<int> _selected = <int>{};
+
+  /// 可被选中的行（当前可见的）。全选与计数都基于它。
+  List<Txn> get _selectable => Store.i.visibleTxns;
+
+  bool get _allSelected =>
+      _selectable.isNotEmpty && _selected.length >= _selectable.length;
+
+  void _startSelecting([int? firstId]) {
+    Haptics.tap();
+    setState(() {
+      _selecting = true;
+      _selected.clear();
+      if (firstId != null) _selected.add(firstId);
+    });
+  }
+
+  void _exitSelecting() {
+    if (!_selecting) return;
+    setState(() {
+      _selecting = false;
+      _selected.clear();
+    });
+  }
+
+  void _toggle(int id) {
+    Haptics.tap();
+    setState(() {
+      if (!_selected.remove(id)) _selected.add(id);
+    });
+  }
+
+  /// 全选 / 全不选。
+  ///
+  /// 「全选」选的是**当前可见**的行（可能已被筛选过），不是整个账本 ——
+  /// 用户看不到的东西不该被悄悄选中。
+  void _toggleAll() {
+    final visible = _selectable;
+    Haptics.tap();
+    setState(() {
+      if (_allSelected) {
+        _selected.clear();
+      } else {
+        _selected
+          ..clear()
+          ..addAll(visible.map((t) => t.id));
+      }
+    });
+  }
+
+  /// 选中的 Txn 对象（按当前可见顺序）
+  List<Txn> get _selectedTxns =>
+      _selectable.where((t) => _selected.contains(t.id)).toList();
+
+  Future<void> _batchCategory() async {
+    final picked = _selectedTxns;
+    if (picked.isEmpty) return;
+    final s = Store.i;
+
+    // 一个 category_id 不可能既是支出又是收入分类（分类表里 type 是固定值）。
+    // 混合选中时强行归到某一侧，会把另一侧的记录挂到语义相反的分类下，
+    // 之后预算和图表都会算歪 —— 所以先挡住，让用户分开操作。
+    final types = picked.map((t) => t.type).toSet();
+    if (types.length > 1) {
+      await showAppNotice(
+        context,
+        title: '选中的类型不一致',
+        message: '支出、收入、转账要分开归类。\n'
+            '请先只选同一类型的记录，再改分类。',
+      );
+      return;
+    }
+    final type = picked.first.type;
+    if (type == TxnType.transfer) {
+      await showAppNotice(
+        context,
+        title: '转账没有分类',
+        message: '转账记录不参与分类与预算，所以不能批量改分类。\n'
+            '如需修改，请在明细里点开那一笔改。',
+      );
+      return;
+    }
+
+    final cats = type.isIncome ? s.incomeCats : s.expenseCats;
+    final pick = await showCategoryWheel(
+      context,
+      cats: cats,
+      childrenOf: s.childrenOf,
+    );
+    if (pick == null || !mounted) return;
+
+    final ids = picked.map((t) => t.id).toList();
+    final n = await Repo.batchSetCategory(
+      ledgerId: s.ledgerId,
+      txnIds: ids,
+      categoryId: pick.txnCategoryId,
+    );
+    await s.afterTxnChange();
+    if (!mounted) return;
+    Haptics.tap();
+    _exitSelecting();
+    showToast(context, '已把 $n 笔改为「${s.categoryOf(pick.txnCategoryId)?.name ?? '未分类'}」');
+  }
+
+  Future<void> _batchDelete() async {
+    final picked = _selectedTxns;
+    if (picked.isEmpty) return;
+    final total = picked.fold<int>(
+      0,
+      (a, t) => a + t.signedCents.abs(),
+    );
+    final ok = await showAppConfirm(
+      context,
+      title: '删除这 ${picked.length} 笔？',
+      // 说清两件事：删多少、余额会退回去。删完余额不动才是怪事
+      message: '合计 ${Fmt.money(total)}。\n'
+          '删除后这些钱会退回各自账户的余额，不能撤销。',
+      confirmLabel: '删除 ${picked.length} 笔',
+      danger: true,
+    );
+    if (!ok || !mounted) return;
+
+    final s = Store.i;
+    final n = await Repo.batchDeleteTxns(picked);
+    await s.afterTxnChange();
+    if (!mounted) return;
+    Haptics.warn();
+    _exitSelecting();
+    showToast(context, '已删除 $n 笔');
+  }
 
   @override
   void dispose() {
@@ -90,7 +234,17 @@ class _DetailPageState extends State<DetailPage>
 
         return Column(
           children: [
-            const _TopBar(),
+            if (_selecting)
+              _SelectBar(
+                count: _selected.length,
+                allSelected: _allSelected,
+                onExit: _exitSelecting,
+                onToggleAll: _toggleAll,
+                onCategory: _batchCategory,
+                onDelete: _batchDelete,
+              )
+            else
+              _TopBar(onStartSelect: _startSelecting),
             // 顶部那排「全部/支出/收入/转账」在 1.4.5 移除了，两个原因：
             // 1) 它走的是 `searchTxns`（跨全部历史），而紧跟其下的概览卡是「本期」——
             //    两个数字上下并排却不同口径，用户只会觉得对不上；
@@ -223,7 +377,14 @@ class _DetailPageState extends State<DetailPage>
                 color: C.line,
                 indent: 56,
               ),
-            TxnRow(txn: items[i]),
+            TxnRow(
+              txn: items[i],
+              selecting: _selecting,
+              selected: _selected.contains(items[i].id),
+              onToggle: () => _toggle(items[i].id),
+              // 长按进多选，并把这行顺手选中：长按的意图通常是「我要动这一笔」
+              onEnterSelection: () => _startSelecting(items[i].id),
+            ),
           ],
         ],
       ),
@@ -232,7 +393,10 @@ class _DetailPageState extends State<DetailPage>
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar();
+  const _TopBar({required this.onStartSelect});
+
+  /// 进入多选。顶栏按钮和长按菜单都走这一个入口，行为一致。
+  final VoidCallback onStartSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -270,6 +434,18 @@ class _TopBar extends StatelessWidget {
               icon: LineIcon(
                 'search',
                 semanticLabel: '搜索',
+                size: 20,
+                color: C.ink2,
+              ),
+              splashRadius: 20,
+            ),
+            IconButton(
+              // 放在最右：它是最「重」的一个动作，进来就离开当前浏览状态
+              onPressed: onStartSelect,
+              tooltip: '多选',
+              icon: LineIcon(
+                'check',
+                semanticLabel: '多选',
                 size: 20,
                 color: C.ink2,
               ),
@@ -352,6 +528,134 @@ class _TopBar extends StatelessWidget {
                     itemBuilder: (c, i) => TxnRow(txn: hits[i], showDate: true),
                   ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 多选态的顶栏 + 操作条。
+///
+/// 做成上下一条，而不是「顶栏换掉、操作放在屏幕底部」：底部会被「记一笔」
+/// 的 FAB 压住，而且手指刚在顶部点完全选，接下来要去屏幕另一头按删除 ——
+/// 动线是折的。放一起，选中与操作在同一个视线区域内。
+class _SelectBar extends StatelessWidget {
+  const _SelectBar({
+    required this.count,
+    required this.allSelected,
+    required this.onExit,
+    required this.onToggleAll,
+    required this.onCategory,
+    required this.onDelete,
+  });
+
+  final int count;
+  final bool allSelected;
+  final VoidCallback onExit;
+  final VoidCallback onToggleAll;
+  final VoidCallback onCategory;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = count > 0;
+    return Column(
+      children: [
+        PageHeader(
+          // 一条都没选时说「选择记录」，不说「已选 0 条」——后者像个错误提示
+          title: enabled ? '已选 $count 条' : '选择记录',
+          leading: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onExit,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: S.sm,
+                horizontal: S.xs,
+              ),
+              child: Text('取消', style: T.body2.copyWith(color: C.ink2)),
+            ),
+          ),
+          actions: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggleAll,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: S.lg,
+                vertical: S.sm,
+              ),
+              child: Text(
+                allSelected ? '全不选' : '全选',
+                style: T.body2.copyWith(color: C.ink),
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(S.lg, 0, S.lg, S.sm),
+          child: Row(
+            children: [
+              Expanded(
+                child: _BatchButton(
+                  icon: 'tag',
+                  label: '改分类',
+                  enabled: enabled,
+                  onTap: onCategory,
+                ),
+              ),
+              const SizedBox(width: S.sm),
+              Expanded(
+                child: _BatchButton(
+                  icon: 'trash',
+                  label: '删除',
+                  enabled: enabled,
+                  danger: true,
+                  onTap: onDelete,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 批量操作按钮。禁用态用最浅的文字色，但**仍然占位** ——
+/// 一进来按钮就消失，用户不知道这里本来有东西。
+class _BatchButton extends StatelessWidget {
+  const _BatchButton({
+    required this.icon,
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  final String icon;
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = !enabled ? C.ink3 : (danger ? C.over : C.ink);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: enabled ? onTap : null,
+      child: Container(
+        height: 40,
+        decoration: BoxDecoration(
+          color: C.bg2,
+          borderRadius: BorderRadius.circular(R.sm),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            LineIcon(icon, size: 16, color: fg),
+            const SizedBox(width: 6),
+            Text(label, style: T.body2.copyWith(color: fg)),
+          ],
         ),
       ),
     );

@@ -11,12 +11,38 @@ import '../common.dart';
 import '../menu.dart';
 import '../record_sheet.dart';
 
-/// 单条交易。点按进入编辑，长按删除。
+/// 单条交易。点按进入编辑，长按弹操作菜单。
+///
+/// 多选模式（[selecting]）下点按改为**切换选中**，并且**不响应长按** ——
+/// 勾选时手指按住久一点就跳出菜单，是最容易误触的一种设计。
 class TxnRow extends StatelessWidget {
-  const TxnRow({super.key, required this.txn, this.showDate = false});
+  const TxnRow({
+    super.key,
+    required this.txn,
+    this.showDate = false,
+    this.selecting = false,
+    this.selected = false,
+    this.onToggle,
+    this.onEnterSelection,
+  });
 
   final Txn txn;
   final bool showDate;
+
+  /// 多选模式：点按 = 切换选中，不再进编辑
+  final bool selecting;
+
+  /// 当前是否被选中（只在 [selecting] 为 true 时有意义）
+  final bool selected;
+
+  /// 多选模式下的点按回调
+  final VoidCallback? onToggle;
+
+  /// 长按菜单里的「多选」入口。
+  ///
+  /// 为 null 时退回旧的「长按直接删」—— 别处复用这个组件时不必都接多选。
+  /// **长按不是被多选顶掉的**：菜单里「删除」还在，只是多了一条路。
+  final VoidCallback? onEnterSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -52,17 +78,29 @@ class TxnRow extends StatelessWidget {
       child: InkWell(
         // 借贷流水不能当普通支出编辑：改金额会和债务记录对不上。
         // 点它直接看往来详情，记还款也在那一页。
-        onTap: debt != null
-            ? () => showDebtDetail(context, debt)
-            : () => showRecordSheet(context, editing: txn),
-        onLongPress: () => _confirmDelete(context),
-        child: Padding(
+        onTap: selecting
+            ? onToggle
+            : (debt != null
+                  ? () => showDebtDetail(context, debt)
+                  : () => showRecordSheet(context, editing: txn)),
+        onLongPress: selecting ? null : () => _longPressMenu(context),
+        child: AnimatedContainer(
+          duration: M.base,
+          // 选中态加一层淡底。**主信号是左侧的勾选圈**，底色只是辅助 ——
+          // 深色主题下 bg2 与 cardBg 的差异很小，指望底色扛区分度会失手。
+          color: selected ? C.bg2 : Colors.transparent,
+          child: Padding(
           // 左右 S.lg(16)：与日卡里其他元素（日期头、合计行）的右缘同一条线。
           // 纵向 11 是行内固定留白（配 36 的图标底 → 行高 58），属于组件内部
           // 尺寸，不参与页面节奏，不要收进 S 令牌
           padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 11),
           child: Row(
             children: [
+              // 勾选圈只占多选态：平时不占位，行宽与原来一像素不差
+              if (selecting) ...[
+                _SelectMark(selected: selected),
+                const SizedBox(width: S.sm),
+              ],
               Container(
                 width: 36,
                 height: 36,
@@ -133,8 +171,57 @@ class TxnRow extends StatelessWidget {
             ],
           ),
         ),
+        ),
       ),
     );
+  }
+
+  /// 长按菜单：编辑 / 多选 / 删除。
+  ///
+  /// 为什么是菜单而不是「长按直接进多选」：长按删除是这个 App 用了很久的
+  /// 路径，而 `deleteTxn` 的 UI 入口**只有这一处**（编辑页没有删除按钮）。
+  /// 长按直接改成多选，等于把「删一笔」从两步变成三步。
+  /// 菜单把多选**加**进来，两件事都保住。
+  Future<void> _longPressMenu(BuildContext context) async {
+    // 没接多选的调用方：保持原来的「长按直接删」，不必都升级
+    if (onEnterSelection == null) {
+      await _confirmDelete(context);
+      return;
+    }
+    Haptics.tap();
+    final act = await showMenuSheet<String>(
+      context: context,
+      // 标题用「分类 · 金额」：与列表同一口径，一眼知道长按的是哪一笔
+      title: Store.i.categoryOf(txn.categoryId)?.name ?? '未分类',
+      subtitle: Fmt.money(txn.signedCents, sign: true),
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(icon: 'pen', title: '编辑这笔', result: 'edit'),
+            MenuAction(
+              icon: 'check',
+              title: '多选',
+              subtitle: '批量改分类、批量删除',
+              result: 'select',
+            ),
+            MenuAction(
+              icon: 'trash',
+              title: '删除这笔',
+              danger: true,
+              result: 'delete',
+            ),
+          ],
+        ),
+      ],
+    );
+    if (act == null || !context.mounted) return;
+    if (act == 'edit') {
+      await showRecordSheet(context, editing: txn);
+    } else if (act == 'select') {
+      onEnterSelection!();
+    } else if (act == 'delete') {
+      await _confirmDelete(context);
+    }
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
@@ -178,6 +265,33 @@ class _AutoTag extends StatelessWidget {
         '周期',
         style: T.overline.copyWith(height: 1.35),
       ),
+    );
+  }
+}
+
+/// 多选态的勾选圈。
+///
+/// 用空心圆 → 实心带勾，而不是复选框方块：这个 App 里没有一块直角方块，
+/// 圆形与卡片圆角、头像底同族，不会突然冒出一套「系统控件」的观感。
+class _SelectMark extends StatelessWidget {
+  const _SelectMark({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: M.base,
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? C.ink : Colors.transparent,
+        border: Border.all(color: selected ? C.ink : C.ink3, width: 1.5),
+      ),
+      child: selected
+          ? Center(child: LineIcon('check', size: 12, color: C.bg))
+          : null,
     );
   }
 }

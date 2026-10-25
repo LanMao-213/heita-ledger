@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/data/db.dart';
+import 'package:ledger/data/integrity.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
 import 'package:ledger/store.dart';
@@ -123,6 +124,91 @@ void main() {
       );
       final dumped = await Repo.txnForExport(ledgerId: s.ledgerId);
       expect(dumped.every((t) => t.categoryId == null), isTrue);
+    });
+  });
+
+  group('批量删除', () {
+    test('三条一起删：记录清空，余额退回到记账前', () async {
+      await Store.i.boot();
+      final opening = (await Repo.listAccounts()).first.balanceCents;
+
+      await seedThree(); // 1000 + 2000 + 3000 = 6000 支出
+      final spent = (await Repo.listAccounts()).first.balanceCents;
+      expect(spent, opening - 6000, reason: '先确认记账本身是对的');
+
+      final items = await Repo.txnForExport(ledgerId: Store.i.ledgerId);
+      expect(items.length, 3);
+
+      final n = await Repo.batchDeleteTxns(items);
+      expect(n, 3);
+
+      expect(
+        (await Repo.listAccounts()).first.balanceCents,
+        opening,
+        reason: '删完必须精确回到记账前的余额 —— 少退或多退都是漂移',
+      );
+      expect(await Repo.txnForExport(ledgerId: Store.i.ledgerId), isEmpty);
+    });
+
+    test('空列表返回 0，不开事务也不报错', () async {
+      await Store.i.boot();
+      expect(await Repo.batchDeleteTxns(const []), 0);
+    });
+
+    test('收入与支出混着删，各自按方向退回', () async {
+      await Store.i.boot();
+      final s = Store.i;
+      final acc = (await Repo.listAccounts()).first;
+      final opening = acc.balanceCents;
+
+      await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: s.ledgerId,
+          type: TxnType.expense,
+          amountCents: 5000,
+          date: '2026-09-01',
+          accountId: acc.id,
+        ),
+      );
+      await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: s.ledgerId,
+          type: TxnType.income,
+          amountCents: 8000,
+          date: '2026-09-02',
+          accountId: acc.id,
+        ),
+      );
+      expect(
+        (await Repo.listAccounts()).first.balanceCents,
+        opening - 5000 + 8000,
+      );
+
+      final items = await Repo.txnForExport(ledgerId: s.ledgerId);
+      await Repo.batchDeleteTxns(items);
+
+      expect(
+        (await Repo.listAccounts()).first.balanceCents,
+        opening,
+        reason: '支出退回是加、收入退回是减，方向搞反会差出两倍金额',
+      );
+    });
+
+    test('批量删除后体检不报余额漂移', () async {
+      await Store.i.boot();
+      await seedThree();
+      final items = await Repo.txnForExport(ledgerId: Store.i.ledgerId);
+      await Repo.batchDeleteTxns(items);
+
+      // WriteGateway 自己会校验一次，这里再跑一遍体检：两条独立的检查
+      // 都过了，才说明「删完之后账面和流水仍然自洽」
+      final report = await Integrity.check();
+      final drift = report.issues.where(
+        (i) => i.kind == IntegrityKind.balanceDrift,
+      );
+      expect(drift, isEmpty, reason: '批量删除不该留下只能靠体检发现的漂移');
     });
   });
 
