@@ -105,7 +105,11 @@ class _ImportBillPageState extends State<ImportBillPage> {
       });
     } on BillParseException catch (e) {
       if (mounted) {
-        await showAppNotice(context, title: '打不开这个文件', message: e.message);
+        await showAppNotice(
+          context,
+          title: _errorTitle(e.error),
+          message: e.message,
+        );
       }
     } catch (e) {
       if (mounted) showToast(context, '读取失败：$e');
@@ -231,6 +235,27 @@ class _ImportBillPageState extends State<ImportBillPage> {
     }
   }
 
+  /// 弹窗标题按原因分类。
+  ///
+  /// 标题先说「是什么问题」，正文再说「怎么解决」—— 用户扫一眼标题
+  /// 就知道该不该继续读下去。
+  static String _errorTitle(BillParseError e) {
+    switch (e) {
+      case BillParseError.notCsv:
+        return '这不是 CSV 文件';
+      case BillParseError.encodingGbk:
+        return '编码不对（GBK）';
+      case BillParseError.encodingUtf16:
+        return '编码不对（UTF-16）';
+      case BillParseError.encoding:
+        return '编码不对';
+      case BillParseError.header:
+        return '认不出这份账单';
+      case BillParseError.empty:
+        return '没有可导入的记录';
+    }
+  }
+
   String _noteFor(BillRow r) {
     final parts = <String>[
       if (r.counterparty.isNotEmpty) r.counterparty,
@@ -283,6 +308,13 @@ class _ImportBillPageState extends State<ImportBillPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('${p.source.label} · $_fileName', style: T.section),
+          const SizedBox(height: S.xs),
+          // 编码与表头行号常驻显示：对用户是「文件被认出来了」，
+          // 不是黑箱；对真机验证是数据来源（到底多少份账单是 GBK）。
+          Text(
+            '检测到 ${p.encoding.label}  ·  表头在第 ${p.headerLine} 行',
+            style: T.caption.copyWith(color: C.ink3),
+          ),
           const SizedBox(height: S.xs),
           Text(
             '可导入 ${p.importable.length} 条  ·  支出 ${Fmt.money(p.expenseTotalCents)}'

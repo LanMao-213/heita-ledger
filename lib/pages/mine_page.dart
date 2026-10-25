@@ -166,7 +166,7 @@ class MinePage extends StatelessWidget {
                 SettingRow(
                   icon: 'download',
                   title: '从支付宝 / 微信账单导入',
-                  subtitle: 'CSV，逐行过目后再算入',
+                  subtitle: 'CSV（需 UTF-8 编码），逐行过目后再算入',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) =>

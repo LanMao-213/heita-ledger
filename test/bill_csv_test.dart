@@ -51,8 +51,8 @@ void main() {
       expect(r.importable.length, 2);
     });
 
-    test('GBK 触发 encoding 错误，而不是解出乱码', () {
-      // 「交易时间,金额」的 GBK 字节，不是合法 UTF-8
+    test('GBK 被准确识别成 encodingGbk，而不是笼统的 encoding', () {
+      // 「交易时间」的 GBK 字节，不是合法 UTF-8
       final gbk = <int>[0xBD, 0xBB, 0xD2, 0xD7, 0xCA, 0xB1, 0xBC, 0xE4];
       expect(
         () => BillCsv.parse(gbk),
@@ -60,10 +60,102 @@ void main() {
           isA<BillParseException>().having(
             (e) => e.error,
             'error',
-            BillParseError.encoding,
+            BillParseError.encodingGbk,
           ),
         ),
       );
+    });
+
+    test('GBK 的错误文案同时给出「有电脑」和「只有手机」两条路径', () {
+      final gbk = <int>[0xBD, 0xBB, 0xD2, 0xD7, 0xCA, 0xB1, 0xBC, 0xE4];
+      try {
+        BillCsv.parse(gbk);
+        fail('应该抛异常');
+      } on BillParseException catch (e) {
+        // 手机上无法转码是真实的能力边界，必须明说而不是含糊带过
+        expect(e.message, contains('有电脑'));
+        expect(e.message, contains('只有手机'));
+        expect(e.message, contains('不会影响你已经导入的记录'));
+      }
+    });
+
+    test('成功解码时带上识别出的编码', () {
+      expect(
+        BillCsv.parse(utf8.encode(_alipay)).encoding,
+        BillEncoding.utf8,
+      );
+      expect(
+        BillCsv.parse(<int>[0xEF, 0xBB, 0xBF, ...utf8.encode(_alipay)]).encoding,
+        BillEncoding.utf8Bom,
+      );
+    });
+
+    test('UTF-16LE + BOM 报 utf16Le', () {
+      final bytes = <int>[0xFF, 0xFE];
+      for (final u in _wechat.codeUnits) {
+        bytes.add(u & 0xFF);
+        bytes.add((u >> 8) & 0xFF);
+      }
+      expect(BillCsv.parse(bytes).encoding, BillEncoding.utf16Le);
+    });
+  });
+
+  group('编码诊断（嗅探）', () {
+    /// 解析失败时返回错误类型；没抛异常则判失败。
+    BillParseError errorOf(List<int> bytes) {
+      try {
+        BillCsv.parse(bytes);
+      } on BillParseException catch (e) {
+        return e.error;
+      }
+      fail('应该抛 BillParseException，但解析成功了 —— 说明硬解出了乱码');
+    }
+
+    test('xlsx（zip 包装）报 notCsv，并指出去另存为 CSV', () {
+      final xlsx = <int>[0x50, 0x4B, 0x03, 0x04, ...List.filled(100, 0x41)];
+      expect(errorOf(xlsx), BillParseError.notCsv);
+
+      try {
+        BillCsv.parse(xlsx);
+      } on BillParseException catch (e) {
+        expect(e.message, contains('Excel'));
+        expect(e.message, contains('另存为'));
+      }
+    });
+
+    test('PDF 报 notCsv', () {
+      final pdf = <int>[0x25, 0x50, 0x44, 0x46, ...List.filled(100, 0x41)];
+      expect(errorOf(pdf), BillParseError.notCsv);
+    });
+
+    test('无 BOM 的 UTF-16 报 encodingUtf16（零字节挤在单侧）', () {
+      // 整份账单转 UTF-16BE 且去掉 BOM：数字/逗号/引号这些 ASCII 的
+      // 高字节恒为 0，全挤在偶数位 —— 这就是判据，不是「零字节多不多」
+      final bytes = <int>[];
+      for (final u in _alipay.codeUnits) {
+        bytes.add((u >> 8) & 0xFF);
+        bytes.add(u & 0xFF);
+      }
+      expect(errorOf(bytes), BillParseError.encodingUtf16);
+    });
+
+    test('二进制（零字节分布不规律）报 notCsv', () {
+      // 0 均匀落在奇偶位，不像 UTF-16，也不像文本
+      final bin = <int>[
+        for (var i = 0; i < 400; i++) i % 4 == 1 || i % 4 == 2 ? 0x00 : 0xFF,
+      ];
+      expect(errorOf(bin), BillParseError.notCsv);
+    });
+
+    test('认不出具体编码时回落到 encoding，不误判成 GBK', () {
+      // 0x80 后接 0x20（< 0x40）不构成 GBK 双字节对
+      final odd = <int>[for (var i = 0; i < 200; i++) i.isEven ? 0x80 : 0x20];
+      expect(errorOf(odd), BillParseError.encoding);
+    });
+
+    test('合法 UTF-8 永远不走嗅探，不会被误判', () {
+      // 这条是安全阀：嗅探只在 utf8.decode 失败后触发
+      expect(BillCsv.parse(utf8.encode(_alipay)).encoding, BillEncoding.utf8);
     });
   });
 
