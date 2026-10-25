@@ -70,6 +70,26 @@ android {
             }
         }
     }
+
+    packaging {
+        jniLibs {
+            // 只保留 arm64-v8a。
+            //
+            // 为什么需要这条：Flutter 的插件（这里是 dartjni）自带全 ABI 的 .so，
+            // 即使 `--target-platform android-arm64` 也会被一起打进来，于是包里同时
+            // 出现 lib/armeabi-v7a/libdartjni.so —— 看起来支持 32 位，实际上
+            // libapp.so 只有 arm64。32 位设备会**装得上然后一启动就闪退**。
+            //
+            // 排除掉之后，32 位设备在安装阶段就被
+            // INSTALL_FAILED_NO_MATCHING_ABIS 拒掉，原因清楚，也不会留下一个
+            // 「装了但打不开」的坏印象。
+            //
+            // 不用 `--split-per-abi`：那个会给 versionCode 加 1000*ABI 偏移
+            // （23 变成 2023），之后正常打包的版本号反而比它小，升级直接卡死。
+            // `tools/verify_apk.py` 的版本号校验就是被这个坑触发的。
+            excludes += listOf("lib/armeabi-v7a/**", "lib/x86/**", "lib/x86_64/**")
+        }
+    }
 }
 
 kotlin {

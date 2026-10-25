@@ -144,10 +144,13 @@ def _is_mere_reference(matched: str, line: str) -> bool:
     return re.search(r'[A-Za-z0-9+/=]{16,}', tail) is None
 
 
-def scan_text(rel: str, text: str) -> list[str]:
+def scan_text(rel: str, text: str, keep: set[str] | None = None) -> list[str]:
+    """扫一段文本。`keep` 不为空时只应用其中的规则名。"""
     hits = []
     for i, line in enumerate(text.splitlines(), 1):
         for name, pat in PATTERNS:
+            if keep is not None and name not in keep:
+                continue
             m = pat.search(line)
             if not m:
                 continue
@@ -156,6 +159,22 @@ def scan_text(rel: str, text: str) -> list[str]:
             hits.append(f'  {rel}:{i}  [{name}]  {line.strip()[:140]}')
             break
     return hits
+
+
+# 交付物（apk / zip）解包后只查这几类。
+#
+# 为什么不用全套规则：apk 里躺着三方编译好的二进制与 shader。
+# 2026-10-25 实测，全套规则在这一个包上撞出 4 处假阳性 ——
+# `libflutter.so` 里 OpenSSL 的署名邮箱（`appro@openssl.org`）、
+# `ink_sparkle.frag` 里一串浮点数被当成银行卡号。这些都不是我们的数据，
+# 但它们足以让人开始忽略输出，而忽略输出就等于没有检查。
+#
+# 交付物真正该防的是两件：**本机路径被打进包里**、**凭证被带进去**。
+_ARTIFACT_KEEP = {
+    'Windows 个人路径', 'macOS/Linux 个人路径',
+    'GitHub Token', 'GitHub PAT(新版)', 'GitLab Token', 'OpenAI Key',
+    'AWS Access Key', '私钥', '密码被写成字面量', '密钥被写成字面量',
+}
 
 
 # 给 git grep 的 ERE 粗筛。必须是合法 POSIX ERE（无 lookahead、无 \d），
@@ -270,7 +289,8 @@ def _scan_extracted(root: Path) -> list[str]:
             text = f.read_text(encoding='utf-8', errors='replace')
         except OSError:
             continue
-        hits.extend(scan_text(f.relative_to(root).as_posix(), text))
+        hits.extend(scan_text(f.relative_to(root).as_posix(), text,
+                              keep=_ARTIFACT_KEEP))
     return hits
 
 

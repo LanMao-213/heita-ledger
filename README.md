@@ -82,8 +82,15 @@ flutter analyze                                                # 提交前必须
 flutter test                                                   # 全部测试
 flutter test test/ui_shot_test.dart                            # 只跑界面截图自检
 flutter build apk --release --target-platform android-arm64    # 发版:只出 arm64,约 20 MB
-flutter build apk --release --split-per-abi                    # 兼容老机型时用
 ```
+
+`--target-platform` 只管 `libapp.so`,管不住插件自带的 `.so` —— 不加约束时包里会混进
+`lib/armeabi-v7a/libdartjni.so`,32 位设备能装上但一启动就闪退。现在
+`android/app/build.gradle.kts` 的 `packaging.jniLibs.excludes` 已排除非 arm64,
+使 32 位设备在**安装阶段**就被拒(`INSTALL_FAILED_NO_MATCHING_ABIS`)。
+
+**不要用 `--split-per-abi` 发版**:它给 versionCode 加 `1000×ABI` 偏移(23 变 2023),
+之后正常打包的版本号反而更小,升级会卡死。`tools/verify_apk.py` 的版本号校验会拦住。
 
 `flutter test` 会真的把界面渲染成 PNG 到 `build/visual/`,可直接核对观感;
 布局溢出(文字撑破卡片一类)会让测试失败,比肉眼可靠。

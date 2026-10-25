@@ -40,19 +40,27 @@ EXPECT_ABI = "arm64-v8a"
 
 ok_all = True
 warnings: list[str] = []
+# 已执行的检查项数。以前汇总行硬写着「五项」，脚本加了 kAppVersion 与 ABI
+# 之后变成七项，那句文案就一直是错的。数字要自己数，不要手写。
+checks = 0
 
 
 def ok(name: str, detail: str = "") -> None:
+    global checks
+    checks += 1
     print(f"  [OK]   {name}{('  —  ' + detail) if detail else ''}")
 
 
 def fail(name: str, detail: str) -> None:
-    global ok_all
+    global ok_all, checks
     ok_all = False
+    checks += 1
     print(f"  [FAIL] {name}  —  {detail}")
 
 
 def warn(name: str, detail: str) -> None:
+    global checks
+    checks += 1
     warnings.append(name)
     print(f"  [WARN] {name}  —  {detail}")
 
@@ -296,7 +304,10 @@ def main(argv: list[str]) -> int:
 
     print()
     if ok_all:
-        print(f"五项全过{f'（{len(warnings)} 条警告）' if warnings else ''}")
+        tail = ''
+        if warnings:
+            tail = f'（{len(warnings)} 条警告：' + '、'.join(warnings) + '）'
+        print(f'{checks} 项全过{tail}')
         return 0
     print("有检查未通过 —— 这个包不要发。")
     return 1
