@@ -11,6 +11,7 @@ import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/pacing.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/data/repo_stats.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -180,7 +181,7 @@ void main() {
         amountCents: 100000,
       );
 
-      final inThisPeriod = await Repo.budgetStats(
+      final inThisPeriod = await RepoStats.budgetStats(
         ledgerId: ledgerId,
         periodStart: '2026-10-15',
         from: '2026-10-15',
@@ -192,7 +193,7 @@ void main() {
         reason: '10-10 那笔不算在 10-15 起的这一期',
       );
 
-      final inPrevPeriod = await Repo.budgetStats(
+      final inPrevPeriod = await RepoStats.budgetStats(
         ledgerId: ledgerId,
         periodStart: '2026-09-15',
         from: '2026-09-15',

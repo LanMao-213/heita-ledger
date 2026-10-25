@@ -12,6 +12,7 @@ import 'package:ledger/data/backup_service.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/data/repo_stats.dart';
 import 'package:ledger/store.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -137,7 +138,7 @@ void main() {
       return (r.first['c'] as int?) ?? 0;
     }
 
-    final totals = await Repo.monthTotals(s.ledgerId, s.month);
+    final totals = await RepoStats.monthTotals(s.ledgerId, s.month);
     final budgets = await Repo.totalBudgetCents(s.ledgerId, s.month);
     return (
       txns: totals.$3,

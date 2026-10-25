@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/data/repo_stats.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -80,7 +81,7 @@ void main() {
 
   test('月合计：支出负数进收入，收入负数进支出，转账不计', () async {
     await seed();
-    final (exp, inc, cnt) = await Repo.monthTotals(ledgerId, month);
+    final (exp, inc, cnt) = await RepoStats.monthTotals(ledgerId, month);
     // 支出 = 10000（支出正数）+ 3000（收入负数）
     expect(exp, 13000);
     // 收入 = 100000（收入正数）+ 2000（支出负数）
@@ -90,14 +91,14 @@ void main() {
 
   test('饼图分项按同口径交叉，且分项之和等于合计', () async {
     await seed();
-    final (exp, inc, _) = await Repo.monthTotals(ledgerId, month);
+    final (exp, inc, _) = await RepoStats.monthTotals(ledgerId, month);
 
-    final expStats = await Repo.categoryStats(
+    final expStats = await RepoStats.categoryStats(
       ledgerId: ledgerId,
       month: month,
       type: TxnType.expense,
     );
-    final incStats = await Repo.categoryStats(
+    final incStats = await RepoStats.categoryStats(
       ledgerId: ledgerId,
       month: month,
       type: TxnType.income,
@@ -117,7 +118,7 @@ void main() {
   test('内存侧的 sumBySide 与 SQL 同口径', () async {
     await seed();
     final txns = await Repo.listTxns(ledgerId: ledgerId, month: month);
-    final (exp, inc, _) = await Repo.monthTotals(ledgerId, month);
+    final (exp, inc, _) = await RepoStats.monthTotals(ledgerId, month);
     expect(sumBySide(txns, TxnType.expense), exp);
     expect(sumBySide(txns, TxnType.income), inc);
     expect(sumBySide(txns, TxnType.transfer), 0);
@@ -126,7 +127,7 @@ void main() {
   test('全是正数时口径与过去一致', () async {
     await add(TxnType.expense, 10000, cat: catFood);
     await add(TxnType.income, 50000, cat: catSalary);
-    final (exp, inc, _) = await Repo.monthTotals(ledgerId, month);
+    final (exp, inc, _) = await RepoStats.monthTotals(ledgerId, month);
     expect(exp, 10000);
     expect(inc, 50000);
   });

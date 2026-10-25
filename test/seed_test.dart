@@ -15,6 +15,7 @@ import 'package:ledger/data/debt_grouping.dart';
 import 'package:ledger/data/integrity.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/data/repo_stats.dart';
 import 'package:ledger/dev/seed.dart';
 import 'package:ledger/store.dart';
 import 'package:path/path.dart' as p;
@@ -84,7 +85,7 @@ void main() {
     );
 
     // 本月：收入一笔工资 15000，支出是那 14 笔之和
-    final totals = await Repo.monthTotals(ledgerId, Fmt.month(DateTime.now()));
+    final totals = await RepoStats.monthTotals(ledgerId, Fmt.month(DateTime.now()));
     expect(totals.$2, 1500000, reason: '这个月只有一笔工资');
     expect(
       totals.$1,

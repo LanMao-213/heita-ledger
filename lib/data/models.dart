@@ -121,6 +121,20 @@ abstract final class Fmt {
   static int daysInMonth(int year, int month) =>
       DateTime(year, month + 1, 0).day;
 
+  /// 某月第一天：`'2026-10'` → `'2026-10-01'`。
+  ///
+  /// 月份参数统一折成日期区间，才能吃到 `idx_txn_ledger_date` 索引；
+  /// 用 `LIKE '2026-10%'` 也行但走不了索引。所以这个换算只能有一份 ——
+  /// 明细、统计、图表三处都从这里取。
+  static String monthStart(String ym) => '$ym-01';
+
+  /// 某月最后一天：`'2026-02'` → `'2026-02-28'`。
+  static String monthEnd(String ym) {
+    final p = ym.split('-');
+    final last = daysInMonth(int.parse(p[0]), int.parse(p[1]));
+    return '$ym-${last.toString().padLeft(2, '0')}';
+  }
+
   /// 月份偏移，`shiftMonth('2026-01', -1)` → `2025-12`
   static String shiftMonth(String ym, int delta) {
     final p = ym.split('-');

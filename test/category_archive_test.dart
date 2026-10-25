@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/data/repo_stats.dart';
 import 'package:ledger/pages/cats_page.dart';
 import 'package:ledger/store.dart';
 import 'package:path/path.dart' as p;
@@ -88,7 +89,7 @@ void main() {
 
     // 统计照旧包含它 —— 停用只管「以后不再选到」，已经花掉的钱不能凭空消失，
     // 否则各分类加总会和总额对不上
-    final stats = await Repo.rangeCategoryStats(
+    final stats = await RepoStats.rangeCategoryStats(
       ledgerId: s.ledgerId,
       from: s.cycleFrom,
       to: s.cycleTo,

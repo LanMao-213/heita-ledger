@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/cycle.dart';
 import '../data/models.dart';
-import '../data/repo.dart';
+import '../data/repo_stats.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 
@@ -44,8 +44,8 @@ Future<void> showCalendarAndGo(
   bool byMonth = false,
 }) async {
   final s = Store.i;
-  final from = byMonth ? Repo.monthStart(s.month) : s.cycleFrom;
-  final to = byMonth ? Repo.monthEnd(s.month) : s.cycleTo;
+  final from = byMonth ? Fmt.monthStart(s.month) : s.cycleFrom;
+  final to = byMonth ? Fmt.monthEnd(s.month) : s.cycleTo;
   final date = await showCalendarPicker(
     context,
     from: from,
@@ -177,10 +177,10 @@ class _CalendarPickerState extends State<_CalendarPicker> {
   /// 一次把这两年多的每日支出取完：一次查询，滚动时不再发请求
   Future<void> _loadDaily() async {
     final ledgerId = Store.i.ledgerId;
-    final rows = await Repo.rangeDailyTotals(
+    final rows = await RepoStats.rangeDailyTotals(
       ledgerId,
-      Repo.monthStart(_oldestYm),
-      Repo.monthEnd(_newestYm),
+      Fmt.monthStart(_oldestYm),
+      Fmt.monthEnd(_newestYm),
       basis: DateBasis.date,
     );
     if (!mounted) return;

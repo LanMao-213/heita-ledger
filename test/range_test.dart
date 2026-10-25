@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/data/repo_stats.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -82,7 +83,7 @@ void main() {
       await add(type: TxnType.expense, date: '2026-11-15', categoryId: catFood);
       await add(type: TxnType.expense, date: '2026-12-01', categoryId: catFood);
 
-      final (exp, _, cnt) = await Repo.rangeTotals(
+      final (exp, _, cnt) = await RepoStats.rangeTotals(
         ledgerId,
         '2026-10-15',
         '2026-11-14',
@@ -98,7 +99,7 @@ void main() {
         categoryId: catSalary,
       );
 
-      final (_, incomeThis, cntThis) = await Repo.rangeTotals(
+      final (_, incomeThis, cntThis) = await RepoStats.rangeTotals(
         ledgerId,
         '2026-10-15',
         '2026-11-14',
@@ -106,7 +107,7 @@ void main() {
       expect(cntThis, 1, reason: '10-10 的工资应抬进 10-15 这一期');
       expect(incomeThis, 1000);
 
-      final (_, incomePrev, cntPrev) = await Repo.rangeTotals(
+      final (_, incomePrev, cntPrev) = await RepoStats.rangeTotals(
         ledgerId,
         '2026-09-15',
         '2026-10-14',
@@ -122,7 +123,7 @@ void main() {
         categoryId: catParttime,
       );
 
-      final (_, _, cntPrev) = await Repo.rangeTotals(
+      final (_, _, cntPrev) = await RepoStats.rangeTotals(
         ledgerId,
         '2026-09-15',
         '2026-10-14',
@@ -156,7 +157,7 @@ void main() {
         to: to,
         limit: 1000,
       );
-      final (_, _, cnt) = await Repo.rangeTotals(ledgerId, from, to);
+      final (_, _, cnt) = await RepoStats.rangeTotals(ledgerId, from, to);
 
       expect(rows.length, cnt);
       expect(rows.length, 3, reason: '10-20 支出、10-10 工资(抬期)、11-02 支出');
@@ -172,7 +173,7 @@ void main() {
       // 上一期的支出，不该出现
       await add(type: TxnType.expense, date: '2026-10-01', categoryId: catFood);
 
-      final daily = await Repo.rangeDailyTotals(
+      final daily = await RepoStats.rangeDailyTotals(
         ledgerId,
         '2026-10-15',
         '2026-11-14',
@@ -208,8 +209,8 @@ void main() {
 
       const from = '2026-10-15';
       const to = '2026-11-14';
-      final (exp, _, _) = await Repo.rangeTotals(ledgerId, from, to);
-      final stats = await Repo.rangeCategoryStats(
+      final (exp, _, _) = await RepoStats.rangeTotals(ledgerId, from, to);
+      final stats = await RepoStats.rangeCategoryStats(
         ledgerId: ledgerId,
         from: from,
         to: to,
@@ -237,8 +238,8 @@ void main() {
         categoryId: catSalary,
       );
 
-      final legacy = await Repo.monthTotals(ledgerId, '2026-10');
-      final ranged = await Repo.rangeTotals(
+      final legacy = await RepoStats.monthTotals(ledgerId, '2026-10');
+      final ranged = await RepoStats.rangeTotals(
         ledgerId,
         '2026-10-01',
         '2026-10-31',
@@ -262,8 +263,8 @@ void main() {
 
     test('dailyTotals(month) == rangeDailyTotals(月初, 月末)', () async {
       await add(type: TxnType.expense, date: '2026-10-05', categoryId: catFood);
-      final legacy = await Repo.dailyTotals(ledgerId, '2026-10');
-      final ranged = await Repo.rangeDailyTotals(
+      final legacy = await RepoStats.dailyTotals(ledgerId, '2026-10');
+      final ranged = await RepoStats.rangeDailyTotals(
         ledgerId,
         '2026-10-01',
         '2026-10-31',
@@ -277,7 +278,7 @@ void main() {
         date: '2026-10-10',
         categoryId: catSalary,
       );
-      final totals = await Repo.monthTotals(ledgerId, '2026-10');
+      final totals = await RepoStats.monthTotals(ledgerId, '2026-10');
       expect(totals.$2, 1000);
       expect(totals.$3, 1);
     });

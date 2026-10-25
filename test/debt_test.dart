@@ -14,6 +14,7 @@ import 'package:ledger/data/db.dart';
 import 'package:ledger/data/debt_grouping.dart';
 import 'package:ledger/data/models.dart';
 import 'package:ledger/data/repo.dart';
+import 'package:ledger/data/repo_stats.dart';
 import 'package:ledger/pages/debts_page.dart';
 import 'package:ledger/store.dart';
 import 'package:ledger/widgets/calc_keypad.dart';
@@ -491,18 +492,18 @@ void main() {
     await _freshDb();
     final c = await _ctx();
     final month = Fmt.month(DateTime.now());
-    final before = await Repo.monthTotals(c.ledgerId, month);
+    final before = await RepoStats.monthTotals(c.ledgerId, month);
 
     await Repo.createDebt(
       _debt(ledgerId: c.ledgerId, accountId: c.account.id),
       _principal(ledgerId: c.ledgerId, accountId: c.account.id),
     );
 
-    final after = await Repo.monthTotals(c.ledgerId, month);
+    final after = await RepoStats.monthTotals(c.ledgerId, month);
     expect(after.$1, before.$1, reason: '借出不是消费，支出合计不该变');
     expect(after.$2, before.$2, reason: '借出更不是收入');
 
-    final cats = await Repo.categoryStats(
+    final cats = await RepoStats.categoryStats(
       ledgerId: c.ledgerId,
       month: month,
       type: TxnType.expense,
@@ -518,7 +519,7 @@ void main() {
       _debt(ledgerId: c.ledgerId, accountId: c.account.id),
       _principal(ledgerId: c.ledgerId, accountId: c.account.id),
     );
-    final before = await Repo.monthTotals(c.ledgerId, month);
+    final before = await RepoStats.monthTotals(c.ledgerId, month);
     final d = (await Repo.listDebts(
       ledgerId: c.ledgerId,
     )).firstWhere((e) => e.id == debtId);
@@ -530,7 +531,7 @@ void main() {
       date: Fmt.today(),
     );
 
-    final after = await Repo.monthTotals(c.ledgerId, month);
+    final after = await RepoStats.monthTotals(c.ledgerId, month);
     expect(after.$1, before.$1);
     expect(after.$2, before.$2, reason: '收回来的钱不是这个月的收入');
   });

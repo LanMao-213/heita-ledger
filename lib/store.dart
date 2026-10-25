@@ -5,6 +5,7 @@ import 'data/db.dart';
 import 'data/cycle.dart' as cyc;
 import 'data/models.dart';
 import 'data/repo.dart';
+import 'data/repo_stats.dart';
 import 'data/ui_flags.dart';
 import 'design/haptics.dart';
 import 'design/palette.dart';
@@ -525,7 +526,7 @@ class Store extends ChangeNotifier {
           .shiftCycle(DateTime.parse(prevFrom), cycleStartDay, 1)
           .subtract(const Duration(days: 1)),
     );
-    final t = await Repo.rangeTotals(ledgerId, prevFrom, prevTo);
+    final t = await RepoStats.rangeTotals(ledgerId, prevFrom, prevTo);
     prevPeriod = (
       expense: t.$1,
       count: t.$3,
@@ -537,13 +538,13 @@ class Store extends ChangeNotifier {
 
   /// 载入当前期：明细页、计划页、预算都看这一份
   Future<void> loadCycle() async {
-    final totals = await Repo.rangeTotals(ledgerId, cycleFrom, cycleTo);
+    final totals = await RepoStats.rangeTotals(ledgerId, cycleFrom, cycleTo);
     expenseCents = totals.$1;
     incomeCents = totals.$2;
     txnCount = totals.$3;
     totalBudgetCents = await Repo.totalBudgetCents(ledgerId, cycleFrom);
     await _loadPrevPeriod();
-    budgetStats = await Repo.budgetStats(
+    budgetStats = await RepoStats.budgetStats(
       ledgerId: ledgerId,
       periodStart: cycleFrom,
       from: cycleFrom,
@@ -567,11 +568,11 @@ class Store extends ChangeNotifier {
   /// 所以切换口径不会动到明细页的数字。
   Future<void> loadStats() async {
     final byPeriod = statBasis == StatBasis.period;
-    statFrom = byPeriod ? cycleFrom : Repo.monthStart(month);
-    statTo = byPeriod ? cycleTo : Repo.monthEnd(month);
+    statFrom = byPeriod ? cycleFrom : Fmt.monthStart(month);
+    statTo = byPeriod ? cycleTo : Fmt.monthEnd(month);
     final basis = byPeriod ? DateBasis.period : DateBasis.date;
 
-    final totals = await Repo.rangeTotals(
+    final totals = await RepoStats.rangeTotals(
       ledgerId,
       statFrom,
       statTo,
@@ -579,34 +580,34 @@ class Store extends ChangeNotifier {
     );
     statExpenseCents = totals.$1;
     statIncomeCents = totals.$2;
-    statExpenseStats = await Repo.rangeCategoryStats(
+    statExpenseStats = await RepoStats.rangeCategoryStats(
       ledgerId: ledgerId,
       from: statFrom,
       to: statTo,
       type: TxnType.expense,
       basis: basis,
     );
-    statIncomeStats = await Repo.rangeCategoryStats(
+    statIncomeStats = await RepoStats.rangeCategoryStats(
       ledgerId: ledgerId,
       from: statFrom,
       to: statTo,
       type: TxnType.income,
       basis: basis,
     );
-    statDailyTotals = await Repo.rangeDailyTotals(
+    statDailyTotals = await RepoStats.rangeDailyTotals(
       ledgerId,
       statFrom,
       statTo,
       basis: basis,
     );
     statTrend = byPeriod
-        ? await Repo.recentPeriods(
+        ? await RepoStats.recentPeriods(
             ledgerId: ledgerId,
             endFrom: cycleFrom,
             startDay: cycleStartDay,
             count: 6,
           )
-        : await Repo.recentMonths(
+        : await RepoStats.recentMonths(
             ledgerId: ledgerId,
             endMonth: month,
             count: 6,
@@ -812,7 +813,7 @@ class Store extends ChangeNotifier {
     totalBudgetCents = await Repo.totalBudgetCents(ledgerId, cycleFrom);
     // 预算被删掉时这个期会切到「小总结」底栏，环比数据要跟着补上
     await _loadPrevPeriod();
-    budgetStats = await Repo.budgetStats(
+    budgetStats = await RepoStats.budgetStats(
       ledgerId: ledgerId,
       periodStart: cycleFrom,
       from: cycleFrom,
