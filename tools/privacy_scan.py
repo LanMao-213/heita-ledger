@@ -88,14 +88,19 @@ PATTERNS: list[tuple[str, re.Pattern]] = [
     ('银行卡号', re.compile(r'(?<!\d)\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}(?!\d)')),
 ]
 
-# 放行：这些文件里出现的是「教人怎么配」的说明，不是真的凭证
+# 放行名单：这些文件不当作「被检测对象」。
+#
+# `tools/privacy_scan.py` 必须在这里，原因是**规则的定义文件天然包含规则的文本**：
+# 它的规则表里写着证书页眉，注释里举了 `3.6.1.8` 当反例，自测样本里放着
+# `/Users/alice/proj` 这类假路径。扫它必然自命中，而且命中数与规则条数一起增长。
+#
+# 这不是「绕开检测」：检测器不能把自己当输入，就像编译器不编译自己的语法表。
+# 我曾试图把这条删掉、改用「页眉后必须跟 base64 密钥体」来消除自命中 ——
+# 那条规则本身是对的（已保留，见 false_positive），但它只解决私钥一类，
+# 证书页眉、SVG 坐标、自测样本照样命中。删白名单的结论是：**这条必须留**。
 SKIP_FILES = {
     'LICENSE',                  # 版权人名本来就要公开
-    # 扫自己会命中规则表和说明里的示例字面量（`-----BEGIN PRIVATE KEY-----`
-    # 这种），于是脚本永远返回 1。一个永远报红的扫描器等于不存在 ——
-    # 事实上它从 2026-10-24 建好到 2026-10-25 就一直是红的，没人发现，
-    # 因为它没接进任何自动流程。这条注释就是防止有人再把扫描器写成永远红。
-    'tools/privacy_scan.py',
+    'tools/privacy_scan.py',    # 规则定义文件，见上
 }
 
 BINARY_SUFFIX = {'.png', '.jpg', '.jpeg', '.gif', '.ico', '.bmp', '.webp',
@@ -116,11 +121,27 @@ def false_positive(name: str, matched: str, line: str) -> bool:
         # SVG 路径里的 `3.6.1.8` 这类坐标串
         if _SVG_DATA.search(line):
             return True
+    if name == '私钥' and _is_mere_reference(matched, line):
+        # 只有页眉、后面没有密钥体 —— 那是在「讲」私钥长什么样，不是贴了一把私钥。
+        # 区分依据：真实私钥的页眉后面一定跟着 base64 的密钥体（长度几十到几千）。
+        # 这条规则替代了原来「把说明文档加进 SKIP_FILES」的权宜做法：
+        # 白名单会连真泄漏一起放过，而按形态判断不会。
+        return True
     if name in ('银行卡号', '身份证号', '手机号') and _SVG_DATA.search(line):
         return True
     if name == '邮箱' and matched.startswith('git@'):
         return True          # git@github.com:owner/repo 是 SSH 远程地址
     return False
+
+
+def _is_mere_reference(matched: str, line: str) -> bool:
+    """页眉之后没有 base64 密钥体 → 只是引用格式，不是密钥material。"""
+    idx = line.find(matched)
+    if idx < 0:
+        return False
+    tail = line[idx + len(matched):]
+    # 真实密钥体：连续 16 个以上 base64 字符。`...`、`.`、反引号、空格都不算
+    return re.search(r'[A-Za-z0-9+/=]{16,}', tail) is None
 
 
 def scan_text(rel: str, text: str) -> list[str]:
@@ -307,6 +328,10 @@ def selftest() -> int:
         ('git@github.com:owner/repo', None, 'SSH 地址不是邮箱'),
         ('127.0.0.1', None, '环回地址不是敏感信息'),
         ('1' + '3800138000', '手机号', '手机号形态'),
+        # 私钥页眉：只有页眉 = 在讲格式（放行）；页眉 + base64 体 = 真密钥（命中）
+        ('-----BEGIN ' + 'PRIVATE KEY-----', None, '只有页眉，属于引用格式'),
+        ('-----BEGIN ' + 'PRIVATE KEY-----\nMIIEow' + 'IBAAKCAQEA' + 'x' * 24,
+         '私钥', '页眉后有 base64 密钥体'),
     ]
     bad = 0
     for text, expect, why in cases:
