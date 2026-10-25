@@ -536,6 +536,35 @@ class Repo {
     );
   }
 
+  /// 批量导入账单：插入流水 + 按账户反补期初，**一个事务**。
+  ///
+  /// ## 为什么补期初，而不是让余额变
+  ///
+  /// 导入的是「历史账单」——这些钱早就花出去了，用户此刻的账户余额里
+  /// 本来就包含它们。若只插流水，余额会凭空再少一次。
+  ///
+  /// 做法：流水照常写（`余额 = 期初 + 流水合计` 这条恒等式不破），
+  /// 同时把该账户的**期初**反向补齐同样的金额：
+  ///     期初 += (支出合计 − 收入合计)
+  /// 于是 `期初 + 流水` 的净变化为 0，**余额不动**。
+  ///
+  /// ★ 必须**按账户分别调**。一份账单跨 3 个账户时，按总额调会让
+  ///   A 账户凭空多钱、B 账户凭空少钱，体检立刻报漂移（`integrity.dart`）。
+  ///   这也是本方法不接收「一个总金额」的原因。
+  static Future<int> importBillRows({required List<Txn> txns}) async {
+    if (txns.isEmpty) return 0;
+    final startDay = await cycleStartDay();
+    final ledgerId = txns.first.ledgerId;
+    final liftable = await _liftableCategoryIds(await Db.open(), ledgerId);
+    final rows = [
+      for (final t in txns)
+        // 导入的记录一律不抬期：抬期是「工资」这类收入的专属规则，
+        // 账单里的收入行是不是工资，我们无从判断，宁可不动。
+        _txnRow(t, periodFor(t, startDay, liftable, liftToNext: false)),
+    ];
+    return WriteGateway.run(_ImportBills(txns, rows));
+  }
+
   static Future<void> updateTxn(Txn old, Txn now, {bool? liftToNext}) async {
     final startDay = await cycleStartDay();
     final liftable = await _liftableCategoryIds(await Db.open(), now.ledgerId);
@@ -954,6 +983,53 @@ class Repo {
       args.add(filter!.dateTo);
     }
     return (where.join(' AND '), args);
+  }
+
+  /// 批量改分类：一条 UPDATE，要么全中要么全不动。
+  ///
+  /// 为什么不逐条调 [updateTxn]：那会逐条重算归属期、逐条回滚再应用余额，
+  /// 20 条就是 20 次事务、40 次余额写。分类既不参与余额也不改日期，
+  /// 逐条走只会把风险放大 20 倍。
+  ///
+  /// 但**归属期确实可能变**：把记录改到「工资」这类抬期分类上时，它该落到
+  /// 下一期。所以改完重算一次归属期 —— 漏了这步会出现「日期对、期归错」
+  /// 的记录，而这在明细里几乎看不出来，只会在预算/汇总里悄悄错位。
+  static Future<int> batchSetCategory({
+    required int ledgerId,
+    required List<int> txnIds,
+    required int? categoryId,
+  }) async {
+    if (txnIds.isEmpty) return 0;
+    final db = await Db.open();
+    final marks = List.filled(txnIds.length, '?').join(',');
+    final n = await db.update(
+      'txn',
+      {'category_id': categoryId},
+      where: 'ledger_id = ? AND id IN ($marks)',
+      whereArgs: [ledgerId, ...txnIds],
+    );
+    if (n > 0) await rebuildPeriods(ledgerId);
+    return n;
+  }
+
+  /// 按筛选条件取**全部**记录（导出用）。
+  ///
+  /// 与明细列表共用 [_txnWhere]：导出的行数必须和用户在屏幕上看到的一致。
+  /// 条件写两遍迟早会漂（一处加了账户条件、另一处忘了），那次「导出 800 条、
+  /// 列表 137 条」的解释成本远高于复用这一个小函数。
+  static Future<List<Txn>> txnForExport({
+    required int ledgerId,
+    TxnFilter? filter,
+  }) async {
+    final (whereSql, args) = _txnWhere(ledgerId: ledgerId, filter: filter);
+    final db = await Db.open();
+    final rows = await db.query(
+      'txn',
+      where: whereSql,
+      whereArgs: args,
+      orderBy: 'date ASC, id ASC',
+    );
+    return rows.map(Txn.fromMap).toList();
   }
 
   static Future<(List<Txn>, bool)> searchTxns({
@@ -1811,6 +1887,64 @@ Future<void> _verifyTxnBalance(Verifier v, Txn t) async {
     return;
   }
   await v.checkBalance(t.accountId);
+}
+
+/// 批量导入账单。一次事务写全部流水，然后按账户反补期初。
+///
+/// 为什么不是「循环调 insertTxn」：那样每条开一次事务，中途失败会留下
+/// 半批数据 —— 用户看到「导入成功 87 条」，其实只进了一半。
+class _ImportBills extends Command<int> {
+  _ImportBills(this.txns, this.rows);
+
+  final List<Txn> txns;
+
+  /// 已算好归属期的行（`_txnRow` 的结果），与 [txns] 一一对应
+  final List<Map<String, Object?>> rows;
+
+  @override
+  Future<int> apply(WriteScope w) async {
+    // ★ 这里**故意不调 `_applyBalanceDelta`**。
+    //
+    // 那个方法是给「现在花了一笔」用的：它把流水和余额一起改。
+    // 而导入历史账单的语义是「流水要进来，余额不能动」—— 若先调它再把
+    // 余额补回去，等于一进一出写两次同一个数，中间只要有一处漏了，
+    // 就会留下只能靠体检才发现的漂移（第一版就是这么写错的，
+    // 被 WriteGateway 的自检当场抓到：账面 −3000、按流水应为 0）。
+    //
+    // 正确做法：只把期初调过来。因为 `余额 = 期初 + 流水合计`，
+    // 流水变了而余额不许变，那就只能由期初来吸收这个差额。
+    final openingFix = <int, int>{};
+
+    for (var i = 0; i < txns.length; i++) {
+      final t = txns[i];
+      await w.insert('txn', rows[i]);
+
+      final acc = t.accountId;
+      if (acc != null) {
+        // 支出让流水变负，期初就补正；收入反之。
+        final delta = t.type.isIncome ? -t.amountCents : t.amountCents;
+        openingFix[acc] = (openingFix[acc] ?? 0) + delta;
+      }
+    }
+
+    for (final e in openingFix.entries) {
+      if (e.value == 0) continue;
+      await w.rawUpdate(
+        'UPDATE account SET opening_cents = opening_cents + ? WHERE id = ?',
+        [e.value, e.key],
+      );
+    }
+
+    return txns.length;
+  }
+
+  @override
+  Future<void> verify(Verifier v) async {
+    // 导入最容易踩的就是「余额被重复扣一次」，所以每个碰到的账户都对一次账
+    for (final id in txns.map((t) => t.accountId).whereType<int>().toSet()) {
+      await v.checkBalance(id);
+    }
+  }
 }
 
 class _InsertTxn extends Command<int> {

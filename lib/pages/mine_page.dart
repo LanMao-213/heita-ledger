@@ -16,6 +16,7 @@ import '../widgets/menu.dart';
 import '../widgets/restore_flow.dart';
 import '../widgets/theme_sheet.dart';
 import 'cats_page.dart';
+import 'import_bill_page.dart';
 import 'recurring_page.dart';
 import 'safety_page.dart';
 import 'templates_page.dart';
@@ -136,10 +137,42 @@ class MinePage extends StatelessWidget {
                   indent: 52,
                 ),
                 SettingRow(
+                  icon: 'filter',
+                  title: '导出当前筛选结果',
+                  subtitle: '只导明细页正在看的那部分',
+                  onTap: () => _exportFiltered(context),
+                ),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
+                SettingRow(
                   icon: 'download',
                   title: '从 Excel 导入账单',
                   subtitle: '按导出格式即可批量导入',
                   onTap: () => _import(context),
+                ),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
+                // 支付宝 / 微信账单是**别人的格式**：只补流水、不动余额，
+                // 所以单独一个入口，不并进上面那条 Excel 导入 ——
+                // 两条的语义完全不同（一个改余额，一个不改），混在一起用户会误判。
+                SettingRow(
+                  icon: 'download',
+                  title: '从支付宝 / 微信账单导入',
+                  subtitle: 'CSV，逐行过目后再算入',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ImportBillPage(ledgerId: Store.i.ledgerId),
+                    ),
+                  ),
                 ),
                 Divider(
                   height: 1,
@@ -345,6 +378,30 @@ class MinePage extends StatelessWidget {
       );
       if (!context.mounted) return;
       await ExcelService.share(path, text: '$kAppName 账单导出');
+    } catch (e) {
+      if (context.mounted) showToast(context, '导出失败：$e');
+    }
+  }
+
+  /// 导出「当前筛选结果」。
+  ///
+  /// 和上面的整本导出是两件事：那个是备份，这个是交付（「把这个月的餐饮发我」）。
+  /// 筛选条件由明细页设置、存在 [Store.filter] 里 —— 所以这里不需要再选一次，
+  /// 但要**先确认筛选是开着的**，否则用户会以为导出了筛选结果、其实是整本。
+  static Future<void> _exportFiltered(BuildContext context) async {
+    final s = Store.i;
+    if (s.filter.isEmpty) {
+      showToast(context, '先在明细页设置筛选条件');
+      return;
+    }
+    try {
+      final path = await ExcelService.exportAll(
+        s.ledgerId,
+        ledgerName: s.currentLedger?.name,
+        filter: s.filter,
+      );
+      if (!context.mounted) return;
+      await ExcelService.share(path, text: '$kAppName 筛选结果导出');
     } catch (e) {
       if (context.mounted) showToast(context, '导出失败：$e');
     }

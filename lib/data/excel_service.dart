@@ -7,7 +7,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'category_seed.dart';
-import 'db.dart';
 import 'models.dart';
 import 'repo.dart';
 
@@ -41,8 +40,15 @@ abstract final class ExcelService {
   /// 旧版（≤ v5）导出的表头，表头认不出来时按列号兜底用
   static const _legacyHeaders = ['日期', '类型', '分类', '金额', '账户', '备注'];
 
-  /// 导出当前账本全部记录，返回生成的文件路径。
-  static Future<String> exportAll(int ledgerId, {String? ledgerName}) async {
+  /// 导出记录，返回生成的文件路径。
+  ///
+  /// [filter] 为空 = 导整本；非空 = 只导筛选结果（「导出当前筛选」用）。
+  /// 取数走 [Repo.txnForExport]，与明细列表同一份 WHERE，行数才对得上。
+  static Future<String> exportAll(
+    int ledgerId, {
+    String? ledgerName,
+    TxnFilter? filter,
+  }) async {
     final excel = Excel.createExcel();
     final sheetName = '账单';
     // 默认生成的 Sheet1 改名，多余的删掉，保证只有一个表
@@ -76,17 +82,10 @@ abstract final class ExcelService {
       debts[d.id] = '${d.direction.label} · ${d.counterparty}';
     }
 
-    final db = await Db.open();
-    final rows = await db.query(
-      'txn',
-      where: 'ledger_id = ?',
-      whereArgs: [ledgerId],
-      orderBy: 'date ASC, id ASC',
-    );
+    final rows = await Repo.txnForExport(ledgerId: ledgerId, filter: filter);
 
     var r = 1;
-    for (final row in rows) {
-      final t = Txn.fromMap(row);
+    for (final t in rows) {
       final values = exportRow(t, byId, accs, debtLabels: debts);
       for (var c = 0; c < values.length; c++) {
         final cell = sheet.cell(
