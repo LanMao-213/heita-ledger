@@ -92,6 +92,29 @@ flutter build apk --release --target-platform android-arm64    # 发版:只出 a
 **不要用 `--split-per-abi` 发版**:它给 versionCode 加 `1000×ABI` 偏移(23 变 2023),
 之后正常打包的版本号反而更小,升级会卡死。`tools/verify_apk.py` 的版本号校验会拦住。
 
+### ⚠️ 发版包要在「路径不含用户名」的目录下构建
+
+`libapp.so` 会嵌入构建期的绝对路径 —— 实测形如
+`file:///C:/Users/<用户名>/.../.dart_tool/flutter_build/dart_plugin_registrant.dart`。
+这是 Dart AOT 的行为,没有配置项能关掉。**在带用户名的目录里打出来的包,
+等于把本机路径随 APK 一起发出去**(2026-10-25 开工前所有历史 APK 都带着它)。
+
+做法是先导出到中性路径再构建:
+
+```bash
+git archive HEAD | tar -x -C /c/hb/hl          # 只导出被跟踪文件
+cp android/key.properties /c/hb/hl/android/     # 签名文件未被跟踪,要手动补
+cp android/app/release.jks /c/hb/hl/android/app/
+cd /c/hb/hl && flutter pub get
+flutter build apk --release --target-platform android-arm64
+```
+
+出包后必须验一遍,**没有这条扫描就别发**:
+
+```bash
+python tools/privacy_scan.py --artifacts <apk路径>   # 应输出「干净」
+```
+
 `flutter test` 会真的把界面渲染成 PNG 到 `build/visual/`,可直接核对观感;
 布局溢出(文字撑破卡片一类)会让测试失败,比肉眼可靠。
 
