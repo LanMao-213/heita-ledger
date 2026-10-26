@@ -49,8 +49,11 @@ jobs:
       - name: 取依赖
         run: flutter pub get
 
+      # --fatal-infos：`flutter analyze` 默认**不把 info 当失败**（退出码仍是 0），
+      # 于是「未使用的插值、多余的 import」这类提示会一路溜进 main。
+      # 本机与 CI 都固定在 3.47.7，info 集合一致，因此可以把它当硬门禁。
       - name: 静态检查
-        run: flutter analyze
+        run: flutter analyze --fatal-infos
 
       # 不加 --coverage：这个项目还没有覆盖率门槛，先让「跑没跑过」变成硬约束
       - name: 测试

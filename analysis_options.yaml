@@ -26,8 +26,10 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # 「异步丢了」这类错误不会崩、也不会报，只会让顺序错位。
+    unawaited_futures: true
+    # 打印只允许出现在 WriteGateway 的调试警告里（那里有局部 ignore）
+    avoid_print: true
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

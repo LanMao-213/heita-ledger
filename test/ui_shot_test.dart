@@ -78,17 +78,37 @@ Future<void> _loadIconFont() async {
   await loader.load();
 }
 
+/// 截图输出根目录。默认 `build/visual` —— 它在 `.gitignore` 里，
+/// 所以截图永远不会进版本库（这也是本仓库不做 `matchesGoldenFile` 的原因：
+/// 字体来自 `C:\Windows\Fonts`，CI 在 ubuntu 上没有，基线必然对不上）。
+///
+/// 它的真正用途是**改前改后对拍**：
+///
+/// ```bash
+/// flutter test test/ui_shot_test.dart --dart-define=SHOT_DIR=build/visual/base
+/// # 改代码（重构/拆 widget），不改行为
+/// flutter test test/ui_shot_test.dart --dart-define=SHOT_DIR=build/visual/after
+/// python tools/visual_diff.py build/visual/base build/visual/after
+/// ```
+///
+/// 差异为 0 才说明「只是搬了代码，界面没变」。这比提交 golden 便宜：
+/// 一次性用完就删，不用跟着 Flutter 版本升级维护基线。
+const _shotRoot = String.fromEnvironment('SHOT_DIR', defaultValue: 'build/visual');
+
 Future<void> _shot(WidgetTester tester, String path) async {
+  // 调用点统一写 `build/visual/xxx.png`；这里只换前缀，
+  // 让同一套用例能在两个目录下各出一份图。
+  final out = path.replaceFirst('build/visual', _shotRoot);
   await tester.binding.runAsync(() async {
     final boundary =
         _shotKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
     final image = await boundary.toImage(pixelRatio: 1.0);
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    final file = File(path);
+    final file = File(out);
     file.parent.createSync(recursive: true);
     file.writeAsBytesSync(data!.buffer.asUint8List());
     // ignore: avoid_print
-    print('截图 $path (${image.width}x${image.height})');
+    print('截图 $out (${image.width}x${image.height})');
   });
 }
 
@@ -495,7 +515,21 @@ void main() {
       );
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
-    await tester.pump();
+    // 原来这里只 `pump()` 一次，靠前面那个固定 300ms 赌「文件 IO 已经回来」。
+    // 改成**有界等待**加载态结束，少一个时间赌注。
+    // （不用 pumpAndSettle：加载态里是 `CircularProgressIndicator`，无限动画，
+    //   settle 会一直等到超时。）
+    //
+    // ⚠️ 注意：这张图**仍然不是完全确定的**。对拍实测差 45~90 个像素，
+    //    包围盒落在 x177..184 / y442..452 —— 一个字符宽，是页面上那行
+    //    「快照体积/时间」：测试每次都会 writeSnapshot 写一份新文件，
+    //    内容里的时间戳不同、体积就不同，那一位数字必然变。
+    //    所以 `tools/visual_diff.py` 跑这张图时要 `--exclude shot_24_safety`。
+    //    真要让它稳定，得让这个用例读固定 fixture，而不是现写一份 —— 留作后续。
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byType(CircularProgressIndicator).evaluate().isEmpty) break;
+    }
     await _shot(tester, 'build/visual/shot_24_safety.png');
     expect(tester.takeException(), isNull, reason: '数据安全页有布局溢出');
   });
