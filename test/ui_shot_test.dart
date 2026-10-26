@@ -231,6 +231,32 @@ void main() {
     await _shot(tester, 'build/visual/shot_4_mine.png');
     expect(tester.takeException(), isNull, reason: '我的页有布局溢出');
 
+    // ---- 本地存储说明（2026-10-26 新增）----
+    // 这段文案是唯一解释「数据会怎么消失」的地方，措辞改错过一次
+    // （原写「卸载即清空」，而 allowBackup 默认开着）。留一张图 + 断言，
+    // 免得下次改文案时又把"可能留副本"这层去掉。
+    await tester.dragUntilVisible(
+      find.text('本地存储'),
+      find.byType(Scrollable).first,
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('本地存储'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_4b_storage_note.png');
+    expect(tester.takeException(), isNull, reason: '本地存储说明弹窗有布局溢出');
+    expect(find.textContaining('系统备份可能给你留一份副本'), findsOneWidget);
+    await tester.tap(find.text('知道了'));
+    await tester.pumpAndSettle();
+    // 上面把它滚到了底部，这里反向滚回「账户管理」那一行 —— 后面几步要点它。
+    // 不用固定位移：页面高度会随文案改动变化，写死 800 只是碰运气。
+    await tester.dragUntilVisible(
+      find.text('账户管理'),
+      find.byType(Scrollable).first,
+      const Offset(0, 200),
+    );
+    await tester.pumpAndSettle();
+
     // ---- 账户管理（二级：列表弹层，行尾还挂一颗 ⋯）----
     // 这一层是「菜单组 + 自定义行」的混排，菜单件改版后要亲眼确认行高与
     // 分割线没错位，所以单独留一张。

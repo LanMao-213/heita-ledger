@@ -14,6 +14,7 @@ import '../store.dart';
 import '../widgets/common.dart';
 import '../widgets/menu.dart';
 import '../widgets/restore_flow.dart';
+import '../widgets/storage_note.dart';
 import '../widgets/theme_sheet.dart';
 import 'cats_page.dart';
 import 'import_bill_page.dart';
@@ -290,10 +291,18 @@ class MinePage extends StatelessWidget {
                   color: C.line,
                   indent: 52,
                 ),
-                const SettingRow(
+                SettingRow(
                   icon: 'lock',
                   title: '本地存储',
-                  subtitle: '不联网、不上传，卸载即清空',
+                  subtitle: '不联网、不上传 · 点开看数据存在哪',
+                  onTap: () => showAppDialog<void>(
+                    context: context,
+                    title: '账本存在哪',
+                    content: const StorageNote(),
+                    actions: const [
+                      DialogAction(label: '知道了', strong: true),
+                    ],
+                  ),
                 ),
               ],
             ),
