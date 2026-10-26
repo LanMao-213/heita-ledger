@@ -451,4 +451,141 @@ void main() {
       expect(rows.first.duplicateScore, 0);
     });
   });
+
+  // ------------------------------------------------------------------
+  // CSV 结构：这两条以前会**静默丢账**（不是算错，是整行消失）
+  // ------------------------------------------------------------------
+  group('CSV 结构', () {
+    const header = '交易时间,交易分类,交易对方,商品说明,收/支,金额,收/付款方式,交易状态';
+
+    test('引号内的换行属于字段，不会把一条记录劈成两条', () {
+      // 商品说明里带换行（多行备注）是真实账单里出现过的形态。
+      // 旧实现按 \n 切行 → 两条残行都解析失败 → 静默少一笔。
+      final csv = '\n$header\n'
+          '2026-09-10 08:00:00,餐饮,某某,"第一行\n第二行",支出,20.00,余额,交易成功\n'
+          '2026-09-11 09:00:00,餐饮,隔壁,豆浆,支出,5.00,余额,交易成功\n';
+      final r = BillCsv.parse(utf8.encode(csv));
+      expect(r.importable.length, 2, reason: '跨行字段不能被当成两行');
+      expect(r.importable.first.note, '第一行\n第二行');
+      expect(r.importable.first.amountCents, 2000);
+      // 行号仍是**原文行号**：跨行记录之后的行不能因为"记录数"而错位
+      expect(r.importable.first.lineNo, 3);
+      expect(r.importable.last.lineNo, 5);
+    });
+
+    test('商品说明里没加引号的逗号不会让整行被丢掉', () {
+      // 支付宝/微信不保证给字段加引号：多切出一列后，
+      // 金额列会读到「支出」，整行被当成说明行丢掉。
+      final csv = '$header\n'
+          '2026-09-13 12:00:00,餐饮,某某,套餐,加饮料,支出,25.00,余额,交易成功\n';
+      final r = BillCsv.parse(utf8.encode(csv));
+      expect(r.importable.length, 1, reason: '多切一列不能导致整行消失');
+      expect(r.importable.first.amountCents, 2500);
+      expect(r.importable.first.note, '套餐,加饮料', reason: '多出的列并回商品说明');
+      expect(r.importable.first.payMethod, '余额', reason: '后面的列不能跟着错位');
+    });
+
+    test('行尾少列时补空串，不崩也不错位', () {
+      final csv = '$header\n'
+          '2026-09-12 10:00:00,餐饮,便利店,矿泉水,支出,3.00\n';
+      final r = BillCsv.parse(utf8.encode(csv));
+      expect(r.importable.length, 1);
+      expect(r.importable.first.amountCents, 300);
+      expect(r.importable.first.payMethod, '');
+    });
+
+    test('引号包裹 + 双引号转义仍然正确', () {
+      final csv = '$header\n'
+          '2026-09-14 10:00:00,餐饮,某某,"他说""好""的",支出,9.00,余额,交易成功\n';
+      final r = BillCsv.parse(utf8.encode(csv));
+      expect(r.importable.single.note, '他说"好"的');
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // 指纹幂等：挡"同一份账单导两次"，但不误杀同额同日的第二笔真账
+  // ------------------------------------------------------------------
+  group('指纹幂等', () {
+    Txn txn({
+      required int cents,
+      required String date,
+      String note = '',
+      TxnType type = TxnType.expense,
+    }) => Txn(
+      id: 1,
+      ledgerId: 1,
+      type: type,
+      amountCents: cents,
+      date: date,
+      note: note,
+    );
+
+    BillRow row({
+      required int cents,
+      required String date,
+      required String party,
+      String note = '',
+    }) => BillRow(
+      lineNo: 2,
+      date: date,
+      time: '12:00',
+      amountCents: cents,
+      type: TxnType.expense,
+      counterparty: party,
+      note: note,
+      payMethod: '',
+      rawAmount: '${cents / 100}',
+    );
+
+    test('同一份账单导第二次：全部判为已存在，默认不勾', () {
+      final rows = [
+        row(cents: 3200, date: '2026-09-03', party: '星巴克', note: '拿铁'),
+        row(cents: 1850, date: '2026-09-05', party: '滴滴出行'),
+      ];
+      // 库里的 note 就是导入时写的 `对方 · 商品说明`
+      final existing = [
+        txn(cents: 3200, date: '2026-09-03', note: '星巴克 · 拿铁'),
+        txn(cents: 1850, date: '2026-09-05', note: '滴滴出行'),
+      ];
+      BillCsv.markDuplicates(rows, existing);
+      for (final r in rows) {
+        expect(r.certainDuplicate, isTrue);
+        expect(r.suspectedDuplicate, isTrue);
+        expect(r.duplicateScore, 80);
+        expect(r.include, isFalse, reason: '确定性重复默认不导，但用户可勾回');
+      }
+    });
+
+    test('库里 1 笔、文件 2 笔：只认领 1 笔，第 2 笔保持可导入', () {
+      // 真实场景：上午下午各喝一杯，库里只存了上午那杯。
+      // 用布尔集合会让两行都被排除 → 丢一笔真账。
+      final rows = [
+        row(cents: 3200, date: '2026-09-03', party: '星巴克'),
+        row(cents: 3200, date: '2026-09-03', party: '星巴克'),
+      ];
+      BillCsv.markDuplicates(rows, [
+        txn(cents: 3200, date: '2026-09-03', note: '星巴克'),
+      ]);
+      expect(rows.where((r) => r.certainDuplicate).length, 1);
+      expect(rows.where((r) => r.include).length, 1, reason: '第 2 笔必须仍可导入');
+    });
+
+    test('对方为空时不做指纹判定（只留模糊打分）', () {
+      final rows = [row(cents: 3200, date: '2026-09-03', party: '')];
+      BillCsv.markDuplicates(rows, [
+        txn(cents: 3200, date: '2026-09-03', note: ''),
+      ]);
+      expect(rows.single.certainDuplicate, isFalse);
+      expect(rows.single.suspectedDuplicate, isTrue, reason: '同额同日仍要提示');
+      expect(rows.single.include, isTrue, reason: '模糊档不动默认勾选');
+    });
+
+    test('金额不同、仅对方相同 → 不是确定性重复', () {
+      final rows = [row(cents: 3300, date: '2026-09-03', party: '星巴克')];
+      BillCsv.markDuplicates(rows, [
+        txn(cents: 3200, date: '2026-09-03', note: '星巴克'),
+      ]);
+      expect(rows.single.certainDuplicate, isFalse);
+    });
+  });
 }

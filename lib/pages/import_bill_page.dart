@@ -195,15 +195,18 @@ class _ImportBillPageState extends State<ImportBillPage> {
             note: _noteFor(r),
           ),
       ];
-      await Repo.importBillRows(txns: txns);
-      await Store.i.afterTxnChange();
+      await Store.i.importBillRows(txns);
       if (!mounted) return;
 
-      // 三个数字必须分开写：用户要能对上「我勾了多少、我排除了多少、
-      // 系统因为重复帮我跳了多少」。合成一句「导入 87 条」等于把账算糊了。
-      final manualExcluded = parsed.importable.length - chosen.length;
+      // 四个数字必须分开写：用户要能对上「我勾了多少、我排除了多少、
+      // 系统认定已存在多少、系统提示相似多少」。合成一句「导入 87 条」等于把账算糊了。
+      final certainExcluded = parsed.importable
+          .where((r) => r.certainDuplicate && !r.include)
+          .length;
+      final manualExcluded =
+          parsed.importable.length - chosen.length - certainExcluded;
       final dupNote = parsed.importable
-          .where((r) => r.suspectedDuplicate && !r.include)
+          .where((r) => r.suspectedDuplicate && !r.certainDuplicate && !r.include)
           .length;
 
       await showAppNotice(
@@ -216,6 +219,9 @@ class _ImportBillPageState extends State<ImportBillPage> {
             Text('算入 ${chosen.length} 条', style: T.body),
             if (manualExcluded > 0)
               Text('你没勾选 $manualExcluded 条', style: T.caption),
+            if (certainExcluded > 0)
+              Text('$certainExcluded 条与已有记录完全相同，默认没勾',
+                  style: T.caption),
             if (parsed.skippedLines > 0)
               Text('账单里另有 ${parsed.skippedLines} 行不计收支 / 已关闭，未纳入',
                   style: T.caption),
@@ -299,7 +305,11 @@ class _ImportBillPageState extends State<ImportBillPage> {
   }
 
   Widget _summary(BillParseResult p) {
-    final dup = p.importable.where((r) => r.suspectedDuplicate).length;
+    // 两档分开报：「已存在」是能确定的事，「相似」是提醒。
+    // 合成一个数字会让用户以为系统在瞎猜 —— 而这两件事的可信度差一个档。
+    final certain = p.importable.where((r) => r.certainDuplicate).length;
+    final similar =
+        p.importable.where((r) => r.suspectedDuplicate && !r.certainDuplicate).length;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(S.lg, S.md, S.lg, S.md),
@@ -321,9 +331,16 @@ class _ImportBillPageState extends State<ImportBillPage> {
             '${p.incomeTotalCents > 0 ? '  ·  收入 ${Fmt.money(p.incomeTotalCents)}' : ''}',
             style: T.caption,
           ),
-          if (dup > 0) ...[
+          if (certain > 0) ...[
             const SizedBox(height: S.xs),
-            Text('有 $dup 条与已有记录相似，已标黄 —— 要不要算入由你定', style: T.caption.copyWith(color: C.over)),
+            Text(
+              '有 $certain 条与已有记录完全相同（同日 · 同金额 · 同对方），已默认不勾 —— 想再导一遍可手动勾回来',
+              style: T.caption.copyWith(color: C.over),
+            ),
+          ],
+          if (similar > 0) ...[
+            const SizedBox(height: S.xs),
+            Text('有 $similar 条与已有记录相似，已标黄 —— 要不要算入由你定', style: T.caption.copyWith(color: C.over)),
           ],
           for (final w in p.warnings)
             Padding(
@@ -412,7 +429,12 @@ class _ImportBillPageState extends State<ImportBillPage> {
                         '${r.payMethod.isEmpty ? '' : ' · ${r.payMethod}'}',
                         style: T.caption.copyWith(color: C.ink4),
                       ),
-                      if (r.suspectedDuplicate)
+                      if (r.certainDuplicate)
+                        Text(
+                          '已存在（同日 · 同金额 · 同对方）',
+                          style: T.caption.copyWith(color: C.over),
+                        )
+                      else if (r.suspectedDuplicate)
                         Text(
                           '疑似与已有记录重复',
                           style: T.caption.copyWith(color: C.over),
