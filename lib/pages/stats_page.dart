@@ -27,7 +27,7 @@ class _StatsPageState extends State<StatsPage> {
     final s = Store.i;
     // day 是「区间内第几天」，不是「几号」—— 周期可以跨月，按 1 号起算会错
     final date = Fmt.date(
-      DateTime.parse(s.statFrom).add(Duration(days: day - 1)),
+      DateTime.parse(s.stats.from).add(Duration(days: day - 1)),
     );
     // 先切页再查库：切页是即时的，查询要走一次 SQL，先切能少一拍空等
     s.switchTab(0);
@@ -48,8 +48,8 @@ class _StatsPageState extends State<StatsPage> {
       TxnFilter(
         type: _type,
         categoryId: stat.categoryId,
-        dateFrom: s.statFrom.isEmpty ? null : s.statFrom,
-        dateTo: s.statTo.isEmpty ? null : s.statTo,
+        dateFrom: s.stats.from.isEmpty ? null : s.stats.from,
+        dateTo: s.stats.to.isEmpty ? null : s.stats.to,
       ),
     );
   }
@@ -59,10 +59,10 @@ class _StatsPageState extends State<StatsPage> {
     final s = Store.i;
     // 金额允许为负（净额记账），某分类合计可能 ≤0 —— 饼图和排行榜画不出负扇区，
     // 这类分类直接不参与，明细里仍然照常显示
-    final stats = (_type.isExpense ? s.statExpenseStats : s.statIncomeStats)
+    final stats = (_type.isExpense ? s.stats.expenseStats : s.stats.incomeStats)
         .where((e) => e.totalCents > 0)
         .toList();
-    final total = _type.isExpense ? s.statExpenseCents : s.statIncomeCents;
+    final total = _type.isExpense ? s.stats.expenseCents : s.stats.incomeCents;
 
     // 图例最多 5 行；超过就把尾部合并成「其余 N 类」——
     // 环形上有几个色块，图例里就必须有几个名字，否则用户找不到第 6 块是谁。
@@ -84,6 +84,10 @@ class _StatsPageState extends State<StatsPage> {
       ));
     }
 
+    // 「预算 vs 实际」只列**设过额度**的分类：没额度的没有对比对象，
+    // 塞进来只会让轨道恒满、把真正在追的那几个挤下去。
+    final budgeted = s.budgetStats.where((b) => b.budgetCents > 0).toList();
+
     return AnimatedBuilder(
       animation: s,
       builder: (context, _) {
@@ -96,10 +100,10 @@ class _StatsPageState extends State<StatsPage> {
             PageHeader(title: '图表', actions: _BasisSwitch()),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: S.lg),
-              child: s.statBasis == StatBasis.period
+              child: s.stats.byPeriod
                   ? CycleBar(
-                      from: s.statFrom,
-                      to: s.statTo,
+                      from: s.stats.from,
+                      to: s.stats.to,
                       onPrev: () => s.shiftStat(-1),
                       onNext: () => s.shiftStat(1),
                       // 点「10-15 至 11-14」也能弹日历：两条路都通
@@ -108,7 +112,7 @@ class _StatsPageState extends State<StatsPage> {
                       onReset: s.backToCurrentStat,
                     )
                   : MonthBar(
-                      month: s.month,
+                      month: s.stats.month,
                       onPrev: () => s.shiftStat(-1),
                       onNext: () => s.shiftStat(1),
                       onTapLabel: () =>
@@ -131,7 +135,7 @@ class _StatsPageState extends State<StatsPage> {
             if (stats.isEmpty)
               EmptyHint(
                 icon: 'pie',
-                text: s.statBasis == StatBasis.period ? '本期还没有数据' : '本月还没有数据',
+                text: s.stats.byPeriod ? '本期还没有数据' : '本月还没有数据',
                 hint: '记几笔之后这里会出现占比图',
               )
             else ...[
@@ -174,7 +178,7 @@ class _StatsPageState extends State<StatsPage> {
                             stats.isEmpty
                                 ? ''
                                 : '${stats.first.name}占 '
-                                    '${(stats.first.totalCents / (total == 0 ? 1 : total) * 100).round()}%，'
+                                    '${Fmt.percent(stats.first.totalCents / (total == 0 ? 1 : total))}，'
                                     '最大的一块',
                             style: T.body2.copyWith(
                               color: C.ink,
@@ -248,15 +252,35 @@ class _StatsPageState extends State<StatsPage> {
               ],
             ],
 
+            // 预算 vs 实际：与「计划页」分工明确 ——
+            // 计划页管**改额度**（点一行就能改），这里管**看差距**（一眼比完）。
+            // 没设过任何分类预算就整块不出现，不留空卡。
+            if (budgeted.isNotEmpty) ...[
+              const SectionTitle('预算 vs 实际'),
+              SectionCard(
+                padding: const EdgeInsets.symmetric(vertical: S.sm),
+                child: BudgetCompareBars(
+                  rows: [
+                    for (final b in budgeted)
+                      (
+                        name: b.name,
+                        spentCents: b.spentCents,
+                        budgetCents: b.budgetCents,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+
             // 下面两块和「支出/收入」切换无关，放在最后
-            SectionTitle(s.statBasis == StatBasis.period ? '近 6 期' : '近 6 个月'),
+            SectionTitle(s.stats.byPeriod ? '近 6 期' : '近 6 个月'),
             SectionCard(
-              child: s.statTrend.isEmpty
+              child: s.stats.trend.isEmpty
                   ? SizedBox(
                       height: 90,
                       child: Center(child: Text('还没有历史数据', style: T.caption)),
                     )
-                  : _MonthlyTrend(rows: s.statTrend),
+                  : _MonthlyTrend(rows: s.stats.trend),
             ),
 
             const SectionTitle('账户资产'),
@@ -278,7 +302,7 @@ class _BasisSwitch extends StatelessWidget {
     final s = Store.i;
 
     Widget item(StatBasis b, String label) {
-      final on = s.statBasis == b;
+      final on = s.stats.basis == b;
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => s.setStatBasis(b),
@@ -367,11 +391,11 @@ class _DailyTrend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    final from = DateTime.parse(s.statFrom);
-    final to = DateTime.parse(s.statTo);
+    final from = DateTime.parse(s.stats.from);
+    final to = DateTime.parse(s.stats.to);
     final dayCount = to.difference(from).inDays + 1;
     final values = <int, int>{};
-    for (final r in s.statDailyTotals) {
+    for (final r in s.stats.daily) {
       final idx = DateTime.parse(r.$1).difference(from).inDays + 1;
       if (idx >= 1 && idx <= dayCount) values[idx] = r.$2;
     }
@@ -402,11 +426,19 @@ class _DailyTrend extends StatelessWidget {
         const SizedBox(height: S.sm),
         Row(
           children: [
-            Text(s.statFrom.substring(5), style: T.caption),
-            const Spacer(),
-            Text('单日最高 ${Fmt.money(maxV)}', style: T.caption),
-            const Spacer(),
-            Text(s.statTo.substring(5), style: T.caption),
+            Text(s.stats.from.substring(5), style: T.caption),
+            // 中间这段是唯一可变长的：日期是定长，而「单日最高 + 金额」会随
+            // 金额位数一路变宽。给它弹性 + 单行收口，两端日期才守得住位置。
+            Expanded(
+              child: Text(
+                '单日最高 ${Fmt.money(maxV)}',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: T.caption,
+              ),
+            ),
+            Text(s.stats.to.substring(5), style: T.caption),
           ],
         ),
       ],
@@ -418,14 +450,27 @@ class _DailyTrend extends StatelessWidget {
 ///
 /// 只用一个颜色会让两组数分不清，用彩色又违反「黑白灰」——
 /// 所以按明度分工：支出是主角，用 ink；收入是配角，用 ink4。
-class _MonthlyTrend extends StatelessWidget {
+///
+/// 「折线」是 P2 新增的第二副面孔：柱子天生把「没记账」画成 0 高，
+/// 看上去就是「这个月一分没花」。折线会把 0 收 0 支的月份**断开**，
+/// 让"没有数据"和"花了 0"在图上不是同一个东西。
+class _MonthlyTrend extends StatefulWidget {
   const _MonthlyTrend({required this.rows});
 
   /// 月视图的 key 是 `2026-10`，周期视图是 `2026-10-15`
   final List<(String label, int expense, int income)> rows;
 
   @override
+  State<_MonthlyTrend> createState() => _MonthlyTrendState();
+}
+
+class _MonthlyTrendState extends State<_MonthlyTrend> {
+  /// false = 柱状（默认，沿用既有观感）；true = 折线（能看出断月）
+  bool _line = false;
+
+  @override
   Widget build(BuildContext context) {
+    final rows = widget.rows;
     var maxV = 1;
     for (final r in rows) {
       if (r.$2 > maxV) maxV = r.$2;
@@ -436,46 +481,101 @@ class _MonthlyTrend extends StatelessWidget {
     return Column(
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _legend('支出', C.ink),
-            const SizedBox(width: S.lg),
-            // ⚠️ 必须用 C.ink4 —— 柱子在下面画的就是这个色。图例是用户
-            // 「按色找柱」的唯一依据，图例色块和柱子不同色，等于给了错的
-            // 索引（1.4.21 之前这里写的是 C.ink3，比柱子深一档）。
-            _legend('收入', C.ink4),
+            if (!_line) ...[
+              const SizedBox(width: S.lg),
+              // ⚠️ 必须用 C.ink4 —— 柱子在下面画的就是这个色。图例是用户
+              // 「按色找柱」的唯一依据，图例色块和柱子不同色，等于给了错的
+              // 索引（1.4.21 之前这里写的是 C.ink3，比柱子深一档）。
+              _legend('收入', C.ink4),
+            ],
+            const Spacer(),
+            _modeToggle(),
           ],
         ),
         const SizedBox(height: S.md),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            for (final r in rows)
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        _bar(r.$2, maxV, barH, C.ink),
-                        const SizedBox(width: 3),
-                        _bar(r.$3, maxV, barH, C.ink4),
-                      ],
-                    ),
-                    const SizedBox(height: S.sm),
-                    Text(
-                      r.$1.length == 7
-                          ? '${int.parse(r.$1.substring(5))}月'
-                          : r.$1.substring(5),
-                      style: T.overline.copyWith(letterSpacing: 0),
-                    ),
-                  ],
+        if (_line) ...[
+          MonthTrendLine(
+            points: [
+              for (final r in rows)
+                (
+                  label: _labelOf(r.$1),
+                  // 收、支都是 0 = 这个月一条记录都没有 → 断开。
+                  // 账本里"整月一笔没记"和"整月花了 0 元"在数据上无法区分，
+                  // 但前者是常见事实，且把前者画成 0 会误导趋势判断。
+                  value: (r.$2 == 0 && r.$3 == 0) ? null : r.$2,
                 ),
-              ),
-          ],
+            ],
+          ),
+          const SizedBox(height: S.xs),
+          Text(
+            '0 收 0 支的月份断开 —— 多半是整月没记账',
+            style: T.caption.copyWith(color: C.ink4),
+          ),
+        ] else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (final r in rows)
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _bar(r.$2, maxV, barH, C.ink),
+                          const SizedBox(width: 3),
+                          _bar(r.$3, maxV, barH, C.ink4),
+                        ],
+                      ),
+                      const SizedBox(height: S.sm),
+                      Text(_labelOf(r.$1), style: T.overline.copyWith(letterSpacing: 0)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  String _labelOf(String key) =>
+      key.length == 7 ? '${int.parse(key.substring(5))}月' : key.substring(5);
+
+  /// 柱 / 折 切换。做成胶囊而不是图标：两个中文词自解释，
+  /// 不需要用户猜哪个图标代表折线（图标语义在这里没有共识）。
+  Widget _modeToggle() {
+    Widget pill(String label, bool on, VoidCallback onTap) => GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: S.sm, vertical: 4),
+        decoration: BoxDecoration(
+          color: on ? C.ink : Colors.transparent,
+          borderRadius: BorderRadius.circular(R.pill),
+          border: Border.all(color: on ? C.ink : C.line2),
         ),
+        child: Text(
+          label,
+          style: T.overline.copyWith(
+            letterSpacing: 0,
+            color: on ? C.bg : C.ink2,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        pill('柱状', !_line, () => setState(() => _line = false)),
+        const SizedBox(width: 4),
+        pill('折线', _line, () => setState(() => _line = true)),
       ],
     );
   }

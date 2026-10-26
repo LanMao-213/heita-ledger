@@ -96,11 +96,11 @@ class SummaryCard extends StatelessWidget {
     final s = Store.i;
     // 筛选态下这张卡整体换口径：周期换成结果摘要，数字改成筛选结果合计，
     // 预算进度条收起（预算按本期，跟跨期筛选没有关系）
-    final filtering = s.filtering;
-    final expense = filtering ? s.filteredExpenseCents : s.expenseCents;
-    final income = filtering ? s.filteredIncomeCents : s.incomeCents;
+    final filtering = s.filter.active;
+    final expense = filtering ? s.filter.expenseCents : s.expenseCents;
+    final income = filtering ? s.filter.incomeCents : s.incomeCents;
     // 笔数也用聚合里的真实值：列表可能被截到 500 条，但「共几笔」不该跟着少算
-    final count = filtering ? s.filterCount : s.txnCount;
+    final count = filtering ? s.filter.count : s.txnCount;
 
     // 次要文字的灰度：浅底上不能再用「白字压暗」，那是深色卡的做法
     final dim = C.ink2;
@@ -426,7 +426,7 @@ class _FilterHead extends StatelessWidget {
         const Spacer(),
         Flexible(
           child: Text(
-            s.filter.dateLabel ?? '全部时间',
+            s.filter.current.dateLabel ?? '全部时间',
             style: T.caption,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

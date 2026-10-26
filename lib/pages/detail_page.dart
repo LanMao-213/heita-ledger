@@ -145,13 +145,7 @@ class _DetailPageState extends State<DetailPage>
     );
     if (pick == null || !mounted) return;
 
-    final ids = picked.map((t) => t.id).toList();
-    final n = await Repo.batchSetCategory(
-      ledgerId: s.ledgerId,
-      txnIds: ids,
-      categoryId: pick.txnCategoryId,
-    );
-    await s.afterTxnChange();
+    final n = await s.setTxnsCategory(picked, pick.txnCategoryId);
     if (!mounted) return;
     Haptics.tap();
     _exitSelecting();
@@ -176,9 +170,7 @@ class _DetailPageState extends State<DetailPage>
     );
     if (!ok || !mounted) return;
 
-    final s = Store.i;
-    final n = await Repo.batchDeleteTxns(picked);
-    await s.afterTxnChange();
+    final n = await Store.i.deleteTxns(picked);
     if (!mounted) return;
     Haptics.warn();
     _exitSelecting();
@@ -203,7 +195,7 @@ class _DetailPageState extends State<DetailPage>
   /// 一下轻震 + 列表回顶。少任何一样，用户都会觉得「滑了没反应」。
   Future<void> _flip(int delta) async {
     final s = Store.i;
-    if (s.filtering) return; // 筛选和「哪一期」是两个维度，别互相踩
+    if (s.filter.active) return; // 筛选和「哪一期」是两个维度，别互相踩
     // 右边界：今天所在的期之后不许翻。
     // 未来的期不可能有账，翻过去只会看到一片 0.00 —— 分不清是「没记账」还是
     // 「翻过头了」。想提前给下一期设预算，走计划页或日历（那两条路没封）。
@@ -251,7 +243,7 @@ class _DetailPageState extends State<DetailPage>
             // 2) 类型筛选在筛选面板里已经有了，两套入口并存时状态容易混。
             // 现在「只看某类型」走筛选面板（那里也补了「转账」），
             // 筛选条会把「全部历史」写明，口径不再含糊。
-            if (s.filtering) _FilterBar(),
+            if (s.filter.active) _FilterBar(),
             Expanded(
               // 翻期的淡入挂在这一层：整块正文一起淡，而不是每张日卡各自淡
               child: FadeTransition(
@@ -270,7 +262,7 @@ class _DetailPageState extends State<DetailPage>
                     // 当成「同一个 widget」跳过重建，翻期后数字会停在旧口径
                     SliverToBoxAdapter(
                       child: SwipeFlip(
-                        enabled: !s.filtering,
+                        enabled: !s.filter.active,
                         onPrev: () => _flip(-1),
                         onNext: () => _flip(1),
                         child: SummaryCard(),
@@ -278,7 +270,7 @@ class _DetailPageState extends State<DetailPage>
                     ),
                     if (s.visibleTxns.isEmpty)
                       SliverToBoxAdapter(
-                        child: s.filtering
+                        child: s.filter.active
                             ? const EmptyHint(
                                 icon: 'list',
                                 text: '没有符合条件的记录',
@@ -425,7 +417,7 @@ class _TopBar extends StatelessWidget {
               icon: LineIcon(
                 'filter',
                 size: 20,
-                color: s.filtering ? C.ink : C.ink2,
+                color: s.filter.active ? C.ink : C.ink2,
               ),
               splashRadius: 20,
             ),
@@ -459,7 +451,7 @@ class _TopBar extends StatelessWidget {
 
   Future<void> _openFilter(BuildContext context) async {
     final s = Store.i;
-    final f = await showFilterSheet(context, s.filter);
+    final f = await showFilterSheet(context, s.filter.current);
     if (f == null) return;
     try {
       await s.applyFilter(f);
@@ -760,7 +752,7 @@ class _FilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    final f = s.filter;
+    final f = s.filter.current;
     final chips = <String>[
       // 口径写在脸上：明细的筛选一律跨**全部历史**，而上面的概览卡只算本期。
       // 不写明的话，筛完就会看到「上面本期 5,061、下面列出去年的收入」——
@@ -771,7 +763,7 @@ class _FilterBar extends StatelessWidget {
       if (f.accountId != null) s.accountOf(f.accountId)?.name ?? '已删除账户',
       if (f.amountLabel != null) f.amountLabel!,
       if (f.dateLabel != null) f.dateLabel!,
-      if (s.filterTruncated) '仅显示前 ${Repo.searchLimit} 条',
+      if (s.filter.truncated) '仅显示前 ${Repo.searchLimit} 条',
     ];
 
     return Container(

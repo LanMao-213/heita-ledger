@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/backup_compat.dart';
 import '../data/backup_service.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -63,7 +64,10 @@ Future<bool> runRestoreFlow(
 
   // 3. 写入 + 重载
   try {
-    final counts = await BackupService.restore(payload);
+    // 老备份可能少几个字段、或带着已经废弃的列：兼容动作记在这里，
+    // 恢复完一并告诉用户 —— 悄悄丢一列比明说「忽略了 2 个旧字段」危险得多。
+    final compat = ConformReport();
+    final counts = await BackupService.restore(payload, report: compat);
     await Store.i.reloadAfterRestore();
     if (!context.mounted) return true;
     await showAppNotice(
@@ -78,6 +82,10 @@ Future<bool> runRestoreFlow(
             '${counts['category'] ?? 0} 个分类',
             style: T.body,
           ),
+          if (compat.summary != null) ...[
+            const SizedBox(height: S.xs),
+            Text('这份备份较旧：${compat.summary}', style: T.caption),
+          ],
           const SizedBox(height: S.md),
           Text('覆盖前的数据已存到：', style: T.caption),
           const SizedBox(height: S.xs),

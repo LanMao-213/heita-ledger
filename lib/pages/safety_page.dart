@@ -171,9 +171,7 @@ class _SafetyPageState extends State<SafetyPage> {
     );
     if (fix != true) return;
 
-    final fixed = await Integrity.recalcBalances();
-    // 余额变了，内存里的账户副本还是旧的，首页/统计会继续显示错数字
-    await Store.i.afterAccountChange();
+    final fixed = await Store.i.recalcBalances();
     if (!mounted) return;
     showToast(context, fixed == 0 ? '没有需要修正的账户' : '已修正 $fixed 个账户的余额');
   }

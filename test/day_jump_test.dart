@@ -93,9 +93,9 @@ void main() {
 
     // 落到明细页，且条件条只筛那一天
     expect(Store.i.tabIndex, 0);
-    expect(Store.i.filtering, isTrue);
-    expect(Store.i.filter.dateFrom, '$month-03');
-    expect(Store.i.filter.dateTo, '$month-03');
+    expect(Store.i.filter.active, isTrue);
+    expect(Store.i.filter.current.dateFrom, '$month-03');
+    expect(Store.i.filter.current.dateTo, '$month-03');
     expect(find.text('筛选结果'), findsOneWidget);
   });
 }

@@ -62,15 +62,15 @@ void main() {
     // 本期口径
     await s.shiftStat(-2);
     await s.backToCurrentStat();
-    expect(s.statFrom, todayFrom);
+    expect(s.stats.from, todayFrom);
 
     // 月度口径：只该动 month，不该把周期游标也拽回今天
-    s.statBasis = StatBasis.month;
+    await s.setStatBasis(StatBasis.month);
     await s.shiftCycle(2);
     final movedCycleFrom = s.cycleFrom;
     await s.shiftStat(-3);
     await s.backToCurrentStat();
-    expect(s.month, thisMonth);
+    expect(s.stats.month, thisMonth);
     expect(s.cycleFrom, movedCycleFrom, reason: '月度口径不该动周期游标');
   });
 

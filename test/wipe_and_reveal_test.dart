@@ -176,7 +176,7 @@ void main() {
 
       // 筛一个这笔一定不满足的条件：≥ 100 元
       await s.applyFilter(const TxnFilter(minCents: 10000));
-      expect(s.filtering, isTrue);
+      expect(s.filter.active, isTrue);
       expect(s.visibleTxns, isEmpty);
 
       final date = Fmt.today();
@@ -186,7 +186,7 @@ void main() {
         periodStart: periodStartOf(date, s.cycleStartDay),
       );
 
-      expect(s.filtering, isFalse, reason: '刚记的一笔不能还被旧条件挡着');
+      expect(s.filter.active, isFalse, reason: '刚记的一笔不能还被旧条件挡着');
       expect(s.visibleTxns, hasLength(2));
     });
 

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart' hide Category;
 
 import 'data/db.dart';
 import 'data/cycle.dart' as cyc;
+import 'data/excel_service.dart';
+import 'data/integrity.dart';
 import 'data/models.dart';
 import 'data/repo.dart';
 import 'data/repo_stats.dart';
@@ -10,6 +12,10 @@ import 'data/ui_flags.dart';
 import 'design/haptics.dart';
 import 'design/palette.dart';
 import 'design/theme_ctrl.dart';
+part 'store/state.dart';
+part 'store/actions.dart';
+
+part 'store/views.dart';
 
 /// 统计页的归集口径。
 ///
@@ -24,17 +30,17 @@ class Store extends ChangeNotifier {
 
   static final Store i = Store._();
 
-  bool ready = false;
+  bool _ready = false;
 
   /// 触感反馈开关（我的 → 偏好）。真正的执行点在 `Haptics.enabled`，
   /// 这里只是给界面读的那份副本 + 落库。
-  bool hapticsEnabled = true;
+  bool _hapticsEnabled = true;
 
   static const _kHaptics = 'ui.haptics';
 
   /// 改开关：立即生效（内存）+ 落库（下次启动还记得）。
   Future<void> setHapticsEnabled(bool on) async {
-    hapticsEnabled = on;
+    _hapticsEnabled = on;
     Haptics.enabled = on;
     notifyListeners();
     await Repo.setSetting(_kHaptics, on ? '1' : '0');
@@ -44,16 +50,16 @@ class Store extends ChangeNotifier {
   ///
   /// 真正的执行点是 `ThemeCtrl`（设计层读的是它），这里同样是「界面读的副本 +
   /// 落库」。出厂默认 [kDefaultTheme]（黑塔·永夜），老库没有这个键就用它。
-  HeitaThemeId themeId = kDefaultTheme;
+  HeitaThemeId _themeId = kDefaultTheme;
 
   static const _kTheme = 'ui.theme';
 
   /// 换肤：先让 ThemeCtrl 通知整树重建，再落库。
   ///
   /// 顺序不能反 —— `apply()` 会触发 `app.dart` 的 AnimatedBuilder，
-  /// 此时 [themeId] 必须是新值，否则「我的」页那一行会先跳回旧值再跳回来。
+  /// 此时 [_themeId] 必须是新值，否则「我的」页那一行会先跳回旧值再跳回来。
   Future<void> setTheme(HeitaThemeId id) async {
-    themeId = id;
+    _themeId = id;
     ThemeCtrl.i.apply(id);
     notifyListeners();
     await Repo.setSetting(_kTheme, id.name);
@@ -62,7 +68,7 @@ class Store extends ChangeNotifier {
   /// 底部导航当前页：0 明细 / 1 图表 / 2 计划 / 3 我的。
   /// 放在 Store 里是为了让统计页「点某天看明细」能跨页切 Tab，
   /// 而不用给 HomeShell 开一个谁都能调的全局 key。
-  int tabIndex = 0;
+  int _tabIndex = 0;
 
   // ------------------------------------------------------- 通知合并（1.4.5）
   //
@@ -101,61 +107,61 @@ class Store extends ChangeNotifier {
   }
 
   void switchTab(int i) {
-    if (tabIndex == i) return;
-    tabIndex = i;
+    if (_tabIndex == i) return;
+    _tabIndex = i;
     notifyListeners();
   }
 
   // 账本
-  List<Ledger> ledgers = [];
-  int ledgerId = 0;
+  List<Ledger> _ledgers = [];
+  int _ledgerId = 0;
 
   // 账户
-  List<Account> accounts = [];
-  int netWorthCents = 0;
+  List<Account> _accounts = [];
+  int _netWorthCents = 0;
 
   // 分类
   //
-  // 两级分类（v6 起）：[allExpenseCats] 含「使用中」的全部节点（一级 + 子级），
-  // 用于按 id 反查；[expenseCats] 只留一级 —— 筛选面板、预算、分类管理、录入左轮
+  // 两级分类（v6 起）：[_allExpenseCats] 含「使用中」的全部节点（一级 + 子级），
+  // 用于按 id 反查；[_expenseCats] 只留一级 —— 筛选面板、预算、分类管理、录入左轮
   // 要的都是一级，混着子分类列出来会出现「餐饮」和「正餐」并排的怪状。
-  List<Category> allExpenseCats = [];
-  List<Category> allIncomeCats = [];
-  List<Category> expenseCats = [];
-  List<Category> incomeCats = [];
+  List<Category> _allExpenseCats = [];
+  List<Category> _allIncomeCats = [];
+  List<Category> _expenseCats = [];
+  List<Category> _incomeCats = [];
 
   // 已停用的分类单独放：选择器、预算、统计一律不碰它们，
   // 只有分类管理页要在「已停用」那一段里列出来好让用户恢复。
-  List<Category> archivedExpenseCats = [];
-  List<Category> archivedIncomeCats = [];
+  List<Category> _archivedExpenseCats = [];
+  List<Category> _archivedIncomeCats = [];
 
-  // 记账模板（templates 按管理页顺序，recentTemplates 按使用频率取前 3）
-  List<TxnTemplate> templates = [];
-  List<TxnTemplate> recentTemplates = [];
+  // 记账模板（_templates 按管理页顺序，_recentTemplates 按使用频率取前 3）
+  List<TxnTemplate> _templates = [];
+  List<TxnTemplate> _recentTemplates = [];
 
   // 储蓄目标
-  List<SavingGoal> goals = [];
+  List<SavingGoal> _goals = [];
 
   // ---------------------------------------------------------------- 周期 / 月
   //
-  // 明细页与计划页（预算）看的是**当前期**：`cycleFrom`–`cycleTo`。
+  // 明细页与计划页（预算）看的是**当前期**：`_cycleFrom`–`_cycleTo`。
   // 统计页可以在「本期 / 本月」之间切换，所以它另有一套 `stat*` 字段 ——
   // 两套分开存，切换统计数据时不会把明细页的数字带歪。
 
   /// 账单日（周期起始日），1–31，默认 1（= 自然月）
-  int cycleStartDay = 1;
+  int _cycleStartDay = 1;
 
   /// 当前期首尾日期（`YYYY-MM-DD`，含两端）
-  String cycleFrom = '';
-  String cycleTo = '';
+  String _cycleFrom = '';
+  String _cycleTo = '';
 
   /// 当前期是否包含今天
-  bool isCurrentPeriod = true;
+  bool _isCurrentPeriod = true;
 
   /// 当前期的收支与明细
-  int expenseCents = 0;
-  int incomeCents = 0;
-  int txnCount = 0;
+  int _expenseCents = 0;
+  int _incomeCents = 0;
+  int _txnCount = 0;
 
   /// 明细一次最多取多少条（安全上限，不是产品上限）。
   ///
@@ -170,26 +176,26 @@ class Store extends ChangeNotifier {
   static const txnPageLimit = 2000;
 
   /// 本期明细是否被 [txnPageLimit] 截断了 —— 截断了列表末尾要说明白
-  bool txnTruncated = false;
-  List<Txn> txns = [];
+  bool _txnTruncated = false;
+  List<Txn> _txns = [];
 
   /// 借贷往来（带派生的已还金额）。
   ///
   /// 明细行据此把流水显示成「借出 · 张三」而不是红色支出，往来卡片也读它 ——
   /// 共用一个缓存，避免两处各查一次、口径还不一致。
-  List<Debt> debts = [];
+  List<Debt> _debts = [];
   Map<int, Debt> _debtById = {};
 
   /// 按 id 取往来；普通流水返回 null（明细行据此决定用哪种渲染）
   Debt? debtOf(int? id) => id == null ? null : _debtById[id];
 
   /// 未结清的应收合计（别人欠我）
-  int get receivableCents => debts
+  int get receivableCents => _debts
       .where((d) => !d.isClosed && d.direction.isReceivable)
       .fold(0, (a, d) => a + d.remainingCents);
 
   /// 未结清的应付合计（我欠别人）
-  int get payableCents => debts
+  int get payableCents => _debts
       .where((d) => !d.isClosed && !d.direction.isReceivable)
       .fold(0, (a, d) => a + d.remainingCents);
 
@@ -198,10 +204,10 @@ class Store extends ChangeNotifier {
   /// 借出会让账户余额变少，但不该让「我有多少钱」跟着变少 —— 钱只是从
   /// 现金换成了「别人欠我」。只减余额不加应收，用户会以为钱丢了。
   int get netWorthWithDebtCents =>
-      netWorthCents + receivableCents - payableCents;
+      _netWorthCents + receivableCents - payableCents;
 
   /// 抬期池分类 id（工资/奖金/提成）：记一笔面板用它给开关一个默认值
-  Set<int> liftableCatIds = {};
+  Set<int> _liftableCatIds = {};
 
   /// 当前期的预算（预算也按周期，D13 已改）
   int? totalBudgetCents;
@@ -213,41 +219,53 @@ class Store extends ChangeNotifier {
   /// 一次记账要跑 loadCycle，不能为了一个不显示的文案给它加查询。
   ({int expense, int count, int days})? prevPeriod;
 
-  List<BudgetStat> budgetStats = [];
+  List<BudgetStat> _budgetStats = [];
+
+  // ---- 统计与筛选：状态私有，外部只能通过 views.dart 里的只读视图访问 ----
+  //
+  // 这一组字段原先平铺在这里（`_statBasis` / `_statFrom` / `filter` / `_filterCount`
+  // …），页面既能读也能写。改私有之后，写入只剩本文件里的
+  // `loadStats` / `setStatBasis` / `shiftStat` / `applyFilter`，
+  // 「页面误改统计口径」在编译期就通不过。
 
   /// 统计页的归集口径
-  StatBasis statBasis = StatBasis.period;
+  StatBasis _statBasis = StatBasis.period;
 
   /// 统计页当前看的区间（周期视图 = 当前期；月份视图 = 自然月）
-  String statFrom = '';
-  String statTo = '';
-
-  String month = Fmt.month(DateTime.now());
-  int statExpenseCents = 0;
-  int statIncomeCents = 0;
-  List<CatStat> statExpenseStats = [];
-  List<CatStat> statIncomeStats = [];
-  List<(String date, int expense, int income)> statDailyTotals = [];
+  String _statFrom = '';
+  String _statTo = '';
+  String _month = Fmt.month(DateTime.now());
+  int _statExpenseCents = 0;
+  int _statIncomeCents = 0;
+  List<CatStat> _statExpenseStats = [];
+  List<CatStat> _statIncomeStats = [];
+  List<(String date, int expense, int income)> _statDailyTotals = [];
 
   /// 近 6 段的收支（周期视图是「期」，月份视图是「月」），按时间升序。
   ///
   /// 放在 Store 而不是页面里，是因为它跟当前区间绑死：换期要重查，
   /// 页面组件只该读，不该自己管异步生命周期（否则测试里也等不到回包）。
-  List<(String label, int expense, int income)> statTrend = [];
+  List<(String label, int expense, int income)> _statTrend = [];
 
-  // 明细筛选。筛选生效时明细页看 filteredTxns，否则看 monthTxns
-  TxnFilter filter = TxnFilter.none;
-  List<Txn> filteredTxns = [];
-  bool filterTruncated = false;
+  /// 统计屏的只读视图：口径、区间、合计、分类聚合、每日、近 6 段
+  late final StatsView stats = StatsView._(this);
 
-  // 筛选合计走独立聚合（D20），不受 filteredTxns 的 500 条上限影响。
+  // 明细筛选。筛选生效时明细页看 `_filteredTxns`，否则看本期 `_txns`
+  TxnFilter _filter = TxnFilter.none;
+  List<Txn> _filteredTxns = [];
+  bool _filterTruncated = false;
+
+  // 筛选合计走独立聚合（D20），不受 500 条上限影响。
   // 存在这里而不是每次现算，是因为合计要在概览卡里同步显示。
   int _filterExpenseCents = 0;
   int _filterIncomeCents = 0;
-  int filterCount = 0;
+  int _filterCount = 0;
+
+  /// 筛选态的只读视图：条件、命中列表、合计、是否截断
+  late final FilterView filter = FilterView._(this);
 
   /// 启动时补记的周期账单条数（>0 时界面给一次提示）
-  int recurringJustAdded = 0;
+  int _recurringJustAdded = 0;
 
   /// 补记的第一道闸：**每个账本**最近一次扫到哪一天。
   ///
@@ -281,15 +299,15 @@ class Store extends ChangeNotifier {
   }
 
   /// 是否要提示「分类升级成两级了」。只在真的从老库升上来、且没提示过时为真。
-  bool catsUpgradeJustDone = false;
+  bool _catsUpgradeJustDone = false;
 
   static const _kCatsNotice = 'ui.cats_two_level_notice';
 
   Ledger? get currentLedger {
-    for (final l in ledgers) {
-      if (l.id == ledgerId) return l;
+    for (final l in _ledgers) {
+      if (l.id == _ledgerId) return l;
     }
-    return ledgers.isEmpty ? null : ledgers.first;
+    return _ledgers.isEmpty ? null : _ledgers.first;
   }
 
   /// 本期「计入预算」的借入本金合计。
@@ -299,12 +317,12 @@ class Store extends ChangeNotifier {
   /// 借出恒不计入 —— 钱出去了，不是可花的钱。
   int get borrowedInBudgetCents {
     var sum = 0;
-    for (final d in debts) {
+    for (final d in _debts) {
       if (d.direction.isReceivable) continue;
       if (!d.countInBudget) continue;
-      if (cycleFrom.isEmpty || cycleTo.isEmpty) continue;
+      if (_cycleFrom.isEmpty || _cycleTo.isEmpty) continue;
       // 只算本期借入的；上期借的钱不该抬这一期的额度
-      if (d.date.compareTo(cycleFrom) < 0 || d.date.compareTo(cycleTo) > 0) {
+      if (d.date.compareTo(_cycleFrom) < 0 || d.date.compareTo(_cycleTo) > 0) {
         continue;
       }
       sum += d.amountCents;
@@ -320,13 +338,13 @@ class Store extends ChangeNotifier {
       (totalBudgetCents ?? 0) + borrowedInBudgetCents;
 
   int get budgetLeftCents =>
-      totalBudgetCents == null ? 0 : budgetAvailableCents - expenseCents;
+      totalBudgetCents == null ? 0 : budgetAvailableCents - _expenseCents;
 
   bool get overBudget =>
-      totalBudgetCents != null && expenseCents > budgetAvailableCents;
+      totalBudgetCents != null && _expenseCents > budgetAvailableCents;
 
   int get overBudgetCents =>
-      overBudget ? expenseCents - budgetAvailableCents : 0;
+      overBudget ? _expenseCents - budgetAvailableCents : 0;
 
   /// 正在进行的 boot（并发去重用，结束即清空）
   Future<void>? _booting;
@@ -337,7 +355,7 @@ class Store extends ChangeNotifier {
   /// 切皮肤会通知 `ThemeCtrl`，`app.dart` 里 `_BootGate` 的 key 绑着主题 id，
   /// 一变整棵子树重建 —— 新 State 的 initState 会再调一次 `boot()`。
   /// 重复 boot 会把补记账单再跑一遍、再全量查一遍，测试里甚至直接卡在启动页。
-  /// 所以这里做单飞去重；`ready` 之后再次调用仍然照常重跑（测试要靠这个
+  /// 所以这里做单飞去重；`_ready` 之后再次调用仍然照常重跑（测试要靠这个
   /// 换库），只挡住「同时进行中的第二次」。
   Future<void> boot() {
     final inflight = _booting;
@@ -348,6 +366,10 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> _doBoot() async {
+    // 一次性提示标记的语义是「**本次启动**刚发生」，所以每次 boot 先清零。
+    // 不重置的话它只在「真从老库升上来」那一刻被置 true，之后永远为真 ——
+    // 进程内重复 boot（测试、以及热重启后的首次导航）就会重复弹。
+    _catsUpgradeJustDone = false;
     await Db.open();
     // v3 → v4 升级后 `period_start` 是空的，先补齐。账单日默认 1 时回填结果
     // 等于月初，与升级前完全一致 —— 这一步不改任何查询口径。
@@ -355,8 +377,8 @@ class Store extends ChangeNotifier {
     // 界面实验开关（空态第二行）从 setting 表读覆盖值
     await UiFlags.load();
     // 触感开关：只有存过 '0' 才算关。老库没有这个键 → 保持默认开
-    hapticsEnabled = (await Repo.getSetting(_kHaptics)) != '0';
-    Haptics.enabled = hapticsEnabled;
+    _hapticsEnabled = (await Repo.getSetting(_kHaptics)) != '0';
+    Haptics.enabled = _hapticsEnabled;
     // 主题：读不到（老库）或读到无效值都回落到出厂默认。
     //
     // 读到就立刻切（会通知全树重建），必须在这里切而不是等 boot 结束：
@@ -367,25 +389,25 @@ class Store extends ChangeNotifier {
     //
     // 此刻还在启动页，通知引起的整树重建看不出来（`boot()` 单飞，新 State
     // 复用同一个 Future，不会再跑一遍补记与查询）。
-    themeId = themeIdFromString(await Repo.getSetting(_kTheme));
-    ThemeCtrl.i.apply(themeId);
-    ledgerId = await Repo.currentLedgerId();
-    cycleStartDay = await Repo.cycleStartDay();
+    _themeId = themeIdFromString(await Repo.getSetting(_kTheme));
+    ThemeCtrl.i.apply(_themeId);
+    _ledgerId = await Repo.currentLedgerId();
+    _cycleStartDay = await Repo.cycleStartDay();
     resetCycleToToday();
     _seenDay = Fmt.date(DateTime.now());
-    _seenLedgerId = ledgerId;
-    recurringJustAdded = await catchUpRecurring();
+    _seenLedgerId = _ledgerId;
+    _recurringJustAdded = await catchUpRecurring();
 
     // 分类从「一级 + 名目」改成「分类 + 子分类」之后，老用户打开会看到一堆
     // 眼熟的分类换了名字（交通→出行、学习→成长），还多出一层子分类。
     // 不说一句，他会以为数据被改乱了。提示只出一次，落一个 setting 作标记。
     if (Db.upgradedToTwoLevel && await Repo.getSetting(_kCatsNotice) == null) {
-      catsUpgradeJustDone = true;
+      _catsUpgradeJustDone = true;
       await Repo.setSetting(_kCatsNotice, '1');
     }
 
     await loadAll();
-    ready = true;
+    _ready = true;
     notifyListeners();
   }
 
@@ -398,24 +420,24 @@ class Store extends ChangeNotifier {
   ///
   /// 返回补记的条数（0 = 没有新东西），交给界面决定要不要提示。
   Future<int> onAppResumed() async {
-    if (!ready) return 0;
+    if (!_ready) return 0;
     final today = Fmt.date(DateTime.now());
-    final ledgerChanged = ledgerId != _seenLedgerId;
+    final ledgerChanged = _ledgerId != _seenLedgerId;
     // 同一天 + 同一个账本：什么都不用做。这就是「按账本各自核对一次」
     if (today == _seenDay && !ledgerChanged) return 0;
 
     // 先记下「我当时停在哪一期」，再决定要不要拨 ——
-    // 拨完之后 isCurrentPeriod 就变了，判断会失真
-    final wasCurrent = isCurrentPeriod;
+    // 拨完之后 _isCurrentPeriod 就变了，判断会失真
+    final wasCurrent = _isCurrentPeriod;
     _seenDay = today;
-    _seenLedgerId = ledgerId;
+    _seenLedgerId = _ledgerId;
 
     // 只在用户本来就停在「当前期」时才把游标拨到今天。
     // 他若正翻 9 月的旧账，切出去回条微信再回来被拽回本月，等于抢方向盘。
     if (wasCurrent) resetCycleToToday();
 
     final added = await catchUpRecurring();
-    if (added > 0) recurringJustAdded = added;
+    if (added > 0) _recurringJustAdded = added;
     await loadCycle(); // 内部会 notify 一次，这里不再重复
     return added;
   }
@@ -428,7 +450,7 @@ class Store extends ChangeNotifier {
     final today = Fmt.date(DateTime.now());
 
     // 闸一：这个账本今天已经扫过
-    if (_recurringDoneOn[ledgerId] == today) {
+    if (_recurringDoneOn[_ledgerId] == today) {
       return _recurringInFlight ?? Future<int>.value(0);
     }
     // 闸二：已有一次在跑就复用它，不新开
@@ -443,24 +465,24 @@ class Store extends ChangeNotifier {
   }
 
   Future<int> _runCatchUp(String today) async {
-    final id = ledgerId;
+    final id = _ledgerId;
     final added = await Repo.runDueRecurring(id);
     _recurringDoneOn[id] = today;
 
     // 补记会动账户余额：界面上的净值必须跟着重算，
     // 否则用户看到的是「明细里多了一笔房租，余额却没动」
-    if (id == ledgerId) {
-      accounts = await Repo.listAccounts();
-      netWorthCents = await Repo.totalBalanceCents();
+    if (id == _ledgerId) {
+      _accounts = await Repo.listAccounts();
+      _netWorthCents = await Repo.totalBalanceCents();
     }
     return added;
   }
 
   /// 把当前期拨回「今天所在的那一期」
   void resetCycleToToday() {
-    final (from, to) = cyc.cycleRange(DateTime.now(), cycleStartDay);
-    cycleFrom = from;
-    cycleTo = to;
+    final (from, to) = cyc.cycleRange(DateTime.now(), _cycleStartDay);
+    _cycleFrom = from;
+    _cycleTo = to;
   }
 
   /// 回到「今天所在的期」。翻了好几期之后一键回来（双击周期条触发）。
@@ -474,22 +496,22 @@ class Store extends ChangeNotifier {
   /// 两种口径各回各的「当前」，不互相干扰 —— 按月看的时候双击不该把
   /// 周期口径的游标也一起挪了。
   Future<void> backToCurrentStat() async {
-    if (statBasis == StatBasis.period) {
+    if (_statBasis == StatBasis.period) {
       resetCycleToToday();
     } else {
-      month = Fmt.month(DateTime.now());
+      _month = Fmt.month(DateTime.now());
     }
     await loadStats();
   }
 
   Future<void> loadAll() async {
-    ledgers = await Repo.listLedgers();
-    accounts = await Repo.listAccounts();
-    netWorthCents = await Repo.totalBalanceCents();
+    _ledgers = await Repo.listLedgers();
+    _accounts = await Repo.listAccounts();
+    _netWorthCents = await Repo.totalBalanceCents();
     await _loadCategories();
     await _loadDebts();
-    goals = await Repo.listGoals();
-    liftableCatIds = await Repo.liftableCategoryIds(ledgerId);
+    _goals = await Repo.listGoals();
+    _liftableCatIds = await Repo.liftableCategoryIds(_ledgerId);
     await loadTemplates();
     await loadCycle();
     await loadStats();
@@ -500,15 +522,15 @@ class Store extends ChangeNotifier {
   /// 比 loadAll 多做两件事：`current_ledger_id` 可能也变了要重取；
   /// 筛选条件里引用的分类/账户可能已经不存在，直接清掉。
   Future<void> reloadAfterRestore() async {
-    ledgerId = await Repo.currentLedgerId();
+    _ledgerId = await Repo.currentLedgerId();
     _resetFilter();
     await loadAll();
     notifyListeners();
   }
 
   Future<void> loadTemplates() async {
-    templates = await Repo.listTemplates(ledgerId);
-    recentTemplates = await Repo.recentTemplates(ledgerId);
+    _templates = await Repo.listTemplates(_ledgerId);
+    _recentTemplates = await Repo.recentTemplates(_ledgerId);
   }
 
   /// 取上一期的支出合计（只给「没设预算的期」的小总结用）。
@@ -516,17 +538,17 @@ class Store extends ChangeNotifier {
   /// **有预算的期直接清空、一次都不查** —— `loadCycle` 每次记账都要跑，
   /// 不能为了一条不显示的文案给它加一次查询。
   Future<void> _loadPrevPeriod() async {
-    if (totalBudgetCents != null || cycleFrom.isEmpty) {
+    if (totalBudgetCents != null || _cycleFrom.isEmpty) {
       prevPeriod = null;
       return;
     }
-    final prevFrom = cyc.shiftCycleDate(cycleFrom, cycleStartDay, -1);
+    final prevFrom = cyc.shiftCycleDate(_cycleFrom, _cycleStartDay, -1);
     final prevTo = Fmt.date(
       cyc
-          .shiftCycle(DateTime.parse(prevFrom), cycleStartDay, 1)
+          .shiftCycle(DateTime.parse(prevFrom), _cycleStartDay, 1)
           .subtract(const Duration(days: 1)),
     );
-    final t = await RepoStats.rangeTotals(ledgerId, prevFrom, prevTo);
+    final t = await RepoStats.rangeTotals(_ledgerId, prevFrom, prevTo);
     prevPeriod = (
       expense: t.$1,
       count: t.$3,
@@ -538,78 +560,78 @@ class Store extends ChangeNotifier {
 
   /// 载入当前期：明细页、计划页、预算都看这一份
   Future<void> loadCycle() async {
-    final totals = await RepoStats.rangeTotals(ledgerId, cycleFrom, cycleTo);
-    expenseCents = totals.$1;
-    incomeCents = totals.$2;
-    txnCount = totals.$3;
-    totalBudgetCents = await Repo.totalBudgetCents(ledgerId, cycleFrom);
+    final totals = await RepoStats.rangeTotals(_ledgerId, _cycleFrom, _cycleTo);
+    _expenseCents = totals.$1;
+    _incomeCents = totals.$2;
+    _txnCount = totals.$3;
+    totalBudgetCents = await Repo.totalBudgetCents(_ledgerId, _cycleFrom);
     await _loadPrevPeriod();
-    budgetStats = await RepoStats.budgetStats(
-      ledgerId: ledgerId,
-      periodStart: cycleFrom,
-      from: cycleFrom,
-      to: cycleTo,
+    _budgetStats = await RepoStats.budgetStats(
+      ledgerId: _ledgerId,
+      periodStart: _cycleFrom,
+      from: _cycleFrom,
+      to: _cycleTo,
     );
     // 多取一条只为判断有没有被截断：只比较条数的话，
     // 「正好 500 条」和「500 条之外还有」在调用方无法区分
-    txns = await Repo.rangeListTxns(
-      ledgerId: ledgerId,
-      from: cycleFrom,
-      to: cycleTo,
+    _txns = await Repo.rangeListTxns(
+      ledgerId: _ledgerId,
+      from: _cycleFrom,
+      to: _cycleTo,
       limit: txnPageLimit + 1,
     );
-    txnTruncated = txns.length > txnPageLimit;
-    if (txnTruncated) txns = txns.sublist(0, txnPageLimit);
-    isCurrentPeriod = cyc.isCurrentCycle(cycleFrom, cycleTo);
+    _txnTruncated = _txns.length > txnPageLimit;
+    if (_txnTruncated) _txns = _txns.sublist(0, txnPageLimit);
+    _isCurrentPeriod = cyc.isCurrentCycle(_cycleFrom, _cycleTo);
     notifyListeners();
   }
 
-  /// 载入统计页数据。口径由 [statBasis] 决定，字段也单独存（`stat*`），
+  /// 载入统计页数据。口径由 [_statBasis] 决定，字段也单独存（`stat*`），
   /// 所以切换口径不会动到明细页的数字。
   Future<void> loadStats() async {
-    final byPeriod = statBasis == StatBasis.period;
-    statFrom = byPeriod ? cycleFrom : Fmt.monthStart(month);
-    statTo = byPeriod ? cycleTo : Fmt.monthEnd(month);
+    final byPeriod = _statBasis == StatBasis.period;
+    _statFrom = byPeriod ? _cycleFrom : Fmt.monthStart(_month);
+    _statTo = byPeriod ? _cycleTo : Fmt.monthEnd(_month);
     final basis = byPeriod ? DateBasis.period : DateBasis.date;
 
     final totals = await RepoStats.rangeTotals(
-      ledgerId,
-      statFrom,
-      statTo,
+      _ledgerId,
+      _statFrom,
+      _statTo,
       basis: basis,
     );
-    statExpenseCents = totals.$1;
-    statIncomeCents = totals.$2;
-    statExpenseStats = await RepoStats.rangeCategoryStats(
-      ledgerId: ledgerId,
-      from: statFrom,
-      to: statTo,
+    _statExpenseCents = totals.$1;
+    _statIncomeCents = totals.$2;
+    _statExpenseStats = await RepoStats.rangeCategoryStats(
+      ledgerId: _ledgerId,
+      from: _statFrom,
+      to: _statTo,
       type: TxnType.expense,
       basis: basis,
     );
-    statIncomeStats = await RepoStats.rangeCategoryStats(
-      ledgerId: ledgerId,
-      from: statFrom,
-      to: statTo,
+    _statIncomeStats = await RepoStats.rangeCategoryStats(
+      ledgerId: _ledgerId,
+      from: _statFrom,
+      to: _statTo,
       type: TxnType.income,
       basis: basis,
     );
-    statDailyTotals = await RepoStats.rangeDailyTotals(
-      ledgerId,
-      statFrom,
-      statTo,
+    _statDailyTotals = await RepoStats.rangeDailyTotals(
+      _ledgerId,
+      _statFrom,
+      _statTo,
       basis: basis,
     );
-    statTrend = byPeriod
+    _statTrend = byPeriod
         ? await RepoStats.recentPeriods(
-            ledgerId: ledgerId,
-            endFrom: cycleFrom,
-            startDay: cycleStartDay,
+            ledgerId: _ledgerId,
+            endFrom: _cycleFrom,
+            startDay: _cycleStartDay,
             count: 6,
           )
         : await RepoStats.recentMonths(
-            ledgerId: ledgerId,
-            endMonth: month,
+            ledgerId: _ledgerId,
+            endMonth: _month,
             count: 6,
           );
     notifyListeners();
@@ -617,56 +639,56 @@ class Store extends ChangeNotifier {
 
   /// 切换统计口径（统计页的「本期 / 本月」）
   Future<void> setStatBasis(StatBasis b) async {
-    if (statBasis == b) return;
-    statBasis = b;
+    if (_statBasis == b) return;
+    _statBasis = b;
     await loadStats();
   }
 
   /// 统计页翻一段：周期视图翻一期，月份视图翻一个月
   Future<void> shiftStat(int delta) async {
-    if (statBasis == StatBasis.period) {
+    if (_statBasis == StatBasis.period) {
       await shiftCycle(delta);
       return;
     }
-    month = Fmt.shiftMonth(month, delta);
+    _month = Fmt.shiftMonth(_month, delta);
     await loadStats();
   }
 
   /// 明细页 / 计划页翻一期
   Future<void> shiftCycle(int delta) async {
-    cycleFrom = cyc.shiftCycleDate(cycleFrom, cycleStartDay, delta);
-    cycleTo = Fmt.date(
+    _cycleFrom = cyc.shiftCycleDate(_cycleFrom, _cycleStartDay, delta);
+    _cycleTo = Fmt.date(
       cyc
-          .shiftCycle(DateTime.parse(cycleFrom), cycleStartDay, 1)
+          .shiftCycle(DateTime.parse(_cycleFrom), _cycleStartDay, 1)
           .subtract(const Duration(days: 1)),
     );
     await loadCycle();
     // 统计页停在周期视图时要跟着翻，否则切回图表页数字还停在上一期
-    if (statBasis == StatBasis.period) await loadStats();
+    if (_statBasis == StatBasis.period) await loadStats();
   }
 
   /// 跳到某个日期所在的那一期（日历里点某天用）
   Future<void> goToCycleOf(String date) async {
-    final (from, to) = cyc.cycleRange(DateTime.parse(date), cycleStartDay);
-    if (from == cycleFrom && to == cycleTo) return;
-    cycleFrom = from;
-    cycleTo = to;
+    final (from, to) = cyc.cycleRange(DateTime.parse(date), _cycleStartDay);
+    if (from == _cycleFrom && to == _cycleTo) return;
+    _cycleFrom = from;
+    _cycleTo = to;
     await loadCycle();
-    if (statBasis == StatBasis.period) await loadStats();
+    if (_statBasis == StatBasis.period) await loadStats();
   }
 
   /// 跳到某个月（统计页的月份视图里点日历用）。
   ///
   /// 只动 `month` 与统计数据：明细页/预算走的是「期」，不该被月份跳转带偏。
   Future<void> goToMonth(String ym) async {
-    if (month == ym) return;
-    month = ym;
+    if (_month == ym) return;
+    _month = ym;
     await loadStats();
   }
 
   /// 切账本。返回补记的周期账单条数（0 = 这本账没有欠账）。
   Future<int> switchLedger(int id) async {
-    ledgerId = id;
+    _ledgerId = id;
     // 分类 ID 属于账本：带着旧条件切过去只会筛出空结果或错数据
     _resetFilter();
     await Repo.setSetting('current_ledger_id', '$id');
@@ -678,7 +700,7 @@ class Store extends ChangeNotifier {
     _seenLedgerId = id;
     final added = await catchUpRecurring();
     if (added > 0) {
-      recurringJustAdded = added;
+      _recurringJustAdded = added;
       await loadCycle(); // 补进来的记录要立刻出现在列表和概览里
     }
     return added;
@@ -690,14 +712,14 @@ class Store extends ChangeNotifier {
     // （`loadCycle` / `loadStats` 内部都会 notify）。合并成一次重建，
     // 界面看到的最终结果完全一样，中间那几次是白建的。
     await batchNotify(() async {
-      accounts = await Repo.listAccounts();
-      netWorthCents = await Repo.totalBalanceCents();
+      _accounts = await Repo.listAccounts();
+      _netWorthCents = await Repo.totalBalanceCents();
       // 借贷的「已还多少」是按流水算的，动过流水就得重算
       await _loadDebts();
       await loadCycle();
       await loadStats();
       // 筛选态下必须重跑，否则删掉的记录还会挂在结果里
-      if (filtering) await applyFilter(filter);
+      if (_filter.isNotEmpty) await applyFilter(_filter);
     });
   }
 
@@ -721,22 +743,16 @@ class Store extends ChangeNotifier {
     required String periodStart,
   }) async {
     _resetFilter();
-    if (periodStart != cycleFrom) {
+    if (periodStart != _cycleFrom) {
       final (from, to) = cyc.cycleRange(
         DateTime.parse(periodStart),
-        cycleStartDay,
+        _cycleStartDay,
       );
-      cycleFrom = from;
-      cycleTo = to;
+      _cycleFrom = from;
+      _cycleTo = to;
     }
     // 从图表/计划页的 FAB 记的账也一样：跳回明细，否则「记完看不见」只是换个形式
-    tabIndex = 0;
-    await afterTxnChange();
-  }
-
-  /// 删除一笔（会同时回滚账户余额，由 Repo 负责）
-  Future<void> deleteTxn(Txn t) async {
-    await Repo.deleteTxn(t);
+    _tabIndex = 0;
     await afterTxnChange();
   }
 
@@ -751,41 +767,41 @@ class Store extends ChangeNotifier {
   /// 加载时机不一致，改分类时界面会闪一下。
   Future<void> _loadCategories() async {
     final expAll = await Repo.listCategories(
-      ledgerId,
+      _ledgerId,
       type: TxnType.expense,
       includeArchived: true,
     );
     final incAll = await Repo.listCategories(
-      ledgerId,
+      _ledgerId,
       type: TxnType.income,
       includeArchived: true,
     );
-    // 停用的不进 [allExpenseCats]：那些列表喂的是选择器、预算和统计，
+    // 停用的不进 [_allExpenseCats]：那些列表喂的是选择器、预算和统计，
     // 停用的分类出现在那里就等于没停用。
-    archivedExpenseCats = [
+    _archivedExpenseCats = [
       for (final c in expAll)
         if (c.archived) c,
     ];
-    archivedIncomeCats = [
+    _archivedIncomeCats = [
       for (final c in incAll)
         if (c.archived) c,
     ];
-    allExpenseCats = [
+    _allExpenseCats = [
       for (final c in expAll)
         if (!c.archived) c,
     ];
-    allIncomeCats = [
+    _allIncomeCats = [
       for (final c in incAll)
         if (!c.archived) c,
     ];
-    expenseCats = _topOnly(allExpenseCats);
-    incomeCats = _topOnly(allIncomeCats);
+    _expenseCats = _topOnly(_allExpenseCats);
+    _incomeCats = _topOnly(_allIncomeCats);
   }
 
-  /// 借贷列表与索引一起重建，保证 `debts` 与 `debtOf` 永远一致
+  /// 借贷列表与索引一起重建，保证 `_debts` 与 `debtOf` 永远一致
   Future<void> _loadDebts() async {
-    debts = await Repo.listDebts(ledgerId: ledgerId);
-    _debtById = {for (final d in debts) d.id: d};
+    _debts = await Repo.listDebts(ledgerId: _ledgerId);
+    _debtById = {for (final d in _debts) d.id: d};
   }
 
   static List<Category> _topOnly(List<Category> all) => [
@@ -794,13 +810,13 @@ class Store extends ChangeNotifier {
   ];
 
   Future<void> afterAccountChange() async {
-    accounts = await Repo.listAccounts();
-    netWorthCents = await Repo.totalBalanceCents();
+    _accounts = await Repo.listAccounts();
+    _netWorthCents = await Repo.totalBalanceCents();
     notifyListeners();
   }
 
   Future<void> afterGoalChange() async {
-    goals = await Repo.listGoals();
+    _goals = await Repo.listGoals();
     notifyListeners();
   }
 
@@ -810,32 +826,33 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> afterBudgetChange() async {
-    totalBudgetCents = await Repo.totalBudgetCents(ledgerId, cycleFrom);
+    totalBudgetCents = await Repo.totalBudgetCents(_ledgerId, _cycleFrom);
     // 预算被删掉时这个期会切到「小总结」底栏，环比数据要跟着补上
     await _loadPrevPeriod();
-    budgetStats = await RepoStats.budgetStats(
-      ledgerId: ledgerId,
-      periodStart: cycleFrom,
-      from: cycleFrom,
-      to: cycleTo,
+    _budgetStats = await RepoStats.budgetStats(
+      ledgerId: _ledgerId,
+      periodStart: _cycleFrom,
+      from: _cycleFrom,
+      to: _cycleTo,
     );
     notifyListeners();
   }
 
+
   Category? categoryOf(int? id) {
     if (id == null) return null;
-    for (final c in allExpenseCats) {
+    for (final c in _allExpenseCats) {
       if (c.id == id) return c;
     }
-    for (final c in allIncomeCats) {
+    for (final c in _allIncomeCats) {
       if (c.id == id) return c;
     }
     // 停用的也要能反查到：历史流水、模板、周期账单都还指着它，
     // 查不到就会被渲染成「已删除分类」。
-    for (final c in archivedExpenseCats) {
+    for (final c in _archivedExpenseCats) {
       if (c.id == id) return c;
     }
-    for (final c in archivedIncomeCats) {
+    for (final c in _archivedIncomeCats) {
       if (c.id == id) return c;
     }
     return null;
@@ -845,22 +862,22 @@ class Store extends ChangeNotifier {
   List<Category> childrenOf(int? parentId) {
     if (parentId == null) return const [];
     return [
-      for (final c in allExpenseCats)
+      for (final c in _allExpenseCats)
         if (c.parentId == parentId) c,
-      for (final c in allIncomeCats)
+      for (final c in _allIncomeCats)
         if (c.parentId == parentId) c,
     ];
   }
 
   /// 某一类型下已停用的一级分类 —— 只有分类管理页用得上
   List<Category> archivedTopCats(TxnType type) =>
-      _topOnly(type.isExpense ? archivedExpenseCats : archivedIncomeCats);
+      _topOnly(type.isExpense ? _archivedExpenseCats : _archivedIncomeCats);
 
   /// 某个一级分类下已停用的子分类
   List<Category> archivedChildrenOf(int parentId) => [
-    for (final c in archivedExpenseCats)
+    for (final c in _archivedExpenseCats)
       if (c.parentId == parentId) c,
-    for (final c in archivedIncomeCats)
+    for (final c in _archivedIncomeCats)
       if (c.parentId == parentId) c,
   ];
 
@@ -871,7 +888,7 @@ class Store extends ChangeNotifier {
 
   Account? accountOf(int? id) {
     if (id == null) return null;
-    for (final a in accounts) {
+    for (final a in _accounts) {
       if (a.id == id) return a;
     }
     return null;
@@ -879,20 +896,11 @@ class Store extends ChangeNotifier {
 
   // ------------------------------------------------------------------ 筛选
 
-  bool get filtering => filter.isNotEmpty;
-
-  /// 明细页的展示源：筛选生效时看筛选结果，否则看当月全部
-  List<Txn> get visibleTxns => filtering ? filteredTxns : txns;
-
-  /// 筛选结果的支出合计。
+  /// 明细页的展示源：筛选生效时看筛选结果，否则看本期全部。
   ///
-  /// 来自 SQL 聚合（[Repo.sumFiltered]），**不是**把 [filteredTxns] 相加 ——
-  /// 列表最多 500 条，相加会把合计算小（D20）。负数按交叉归集：
-  /// 支出里的负数算收入，反之亦然；转账两侧都不参与。
-  int get filteredExpenseCents => _filterExpenseCents;
-
-  /// 筛选结果的收入合计（同上口径）
-  int get filteredIncomeCents => _filterIncomeCents;
+  /// 这是「筛选 × 期」两个维度的组合，所以留在 Store 而不是 FilterView ——
+  /// 视图只描述自己那一维，跨维度的事由 Store 拼。
+  List<Txn> get visibleTxns => _filter.isNotEmpty ? _filteredTxns : _txns;
 
   /// 应用筛选。空条件等价于「清空筛选」。
   ///
@@ -908,39 +916,39 @@ class Store extends ChangeNotifier {
     // 用 record 的 .wait 而不是两次 await，是为了「筛选只等一次 I/O」——
     // 时序上也更自然：两者本来就该同时发起。
     final ((items, truncated), (expense, income, count)) = await (
-      Repo.searchTxns(ledgerId: ledgerId, filter: f),
-      Repo.sumFiltered(ledgerId: ledgerId, filter: f),
+      Repo.searchTxns(ledgerId: _ledgerId, filter: f),
+      Repo.sumFiltered(ledgerId: _ledgerId, filter: f),
     ).wait;
-    filter = f;
-    filteredTxns = items;
-    filterTruncated = truncated;
+    _filter = f;
+    _filteredTxns = items;
+    _filterTruncated = truncated;
     _filterExpenseCents = expense;
     _filterIncomeCents = income;
-    filterCount = count;
+    _filterCount = count;
     notifyListeners();
   }
 
   Future<void> clearFilter() => applyFilter(TxnFilter.none);
 
   void _resetFilter() {
-    filter = TxnFilter.none;
-    filteredTxns = [];
-    filterTruncated = false;
+    _filter = TxnFilter.none;
+    _filteredTxns = [];
+    _filterTruncated = false;
     _filterExpenseCents = 0;
     _filterIncomeCents = 0;
-    filterCount = 0;
+    _filterCount = 0;
   }
 
   /// 把当前期明细按日期分组（日期倒序，组内 id 倒序）
-  List<(String date, List<Txn> items)> get groupedByDay => _group(txns);
+  List<(String date, List<Txn> items)> get groupedByDay => _group(_txns);
 
   /// 筛选态下的按日分组，与 groupedByDay 同构
   List<(String date, List<Txn> items)> get groupedVisibleByDay =>
       _group(visibleTxns);
 
-  List<(String date, List<Txn> items)> _group(List<Txn> txns) {
+  List<(String date, List<Txn> items)> _group(List<Txn> items) {
     final map = <String, List<Txn>>{};
-    for (final t in txns) {
+    for (final t in items) {
       map.putIfAbsent(t.date, () => []).add(t);
     }
     final keys = map.keys.toList()..sort((a, b) => b.compareTo(a));
@@ -959,11 +967,11 @@ class Store extends ChangeNotifier {
 
   /// 账单日改动后：重算归属期 + 挪预算 + 拨回今天所在的那一期 + 全量重载
   Future<void> applyCycleStartDay(int day) async {
-    cycleStartDay = day.clamp(1, 31);
-    await Repo.setSetting(Repo.cycleStartDayKey, '$cycleStartDay');
-    await Repo.rebuildPeriods(ledgerId);
+    _cycleStartDay = day.clamp(1, 31);
+    await Repo.setSetting(Repo.cycleStartDayKey, '$_cycleStartDay');
+    await Repo.rebuildPeriods(_ledgerId);
     // 预算的 key 是期首日，账单日变了必须跟着挪，否则历史预算全部「悬空」
-    await Repo.remapBudgetPeriods(cycleStartDay);
+    await Repo.remapBudgetPeriods(_cycleStartDay);
     resetCycleToToday();
     await loadCycle();
     await loadStats();

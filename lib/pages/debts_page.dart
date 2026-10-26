@@ -42,12 +42,10 @@ class DebtsPage extends StatelessWidget {
           final closed = s.debts.where((d) => d.isClosed).toList();
           // 未结清按**人**汇总：主业是「谁欠我多少」，单笔只是背后的来龙去脉
           final groups = groupDebtsByCounterparty(open);
-          final receivable = open
-              .where((d) => d.direction.isReceivable)
-              .fold<int>(0, (a, d) => a + d.remainingCents);
-          final payable = open
-              .where((d) => !d.direction.isReceivable)
-              .fold<int>(0, (a, d) => a + d.remainingCents);
+          // 合计直接取 Store 的派生值：这两个数在计划页的往来摘要卡上也要用，
+          // 各算一遍的话，「部分还款」的口径一变就会两处不一致。
+          final receivable = s.receivableCents;
+          final payable = s.payableCents;
 
           return ListView(
             padding: const EdgeInsets.only(bottom: S.xxl),
@@ -472,8 +470,7 @@ Future<void> showDebtDetail(BuildContext context, Debt debt) {
                       minimumSize: const Size(0, 44),
                     ),
                     onPressed: () async {
-                      await Repo.setDebtClosed(d.id, closed: !d.isClosed);
-                      await s.afterTxnChange();
+                      await s.setDebtClosed(d.id, closed: !d.isClosed);
                       if (ctx.mounted) Navigator.pop(ctx);
                     },
                     child: Text(d.isClosed ? '撤销结清' : '标记已结清'),
@@ -531,8 +528,7 @@ Future<void> _confirmDeleteDebt(
   );
   if (!ok) return;
 
-  await Repo.deleteDebt(d.id);
-  await Store.i.afterTxnChange();
+  await Store.i.deleteDebt(d.id);
   if (sheetContext.mounted) Navigator.pop(sheetContext);
   if (pageContext.mounted) showToast(pageContext, '已删除');
 }
@@ -570,7 +566,7 @@ class _RepaySheet extends StatefulWidget {
 
 class _RepaySheetState extends State<_RepaySheet> {
   late final TextEditingController _amount = TextEditingController(
-    text: _yuan(widget.debt.remainingCents),
+    text: Fmt.input(widget.debt.remainingCents),
   );
   // 默认账户优先取这笔借贷当时用的账户（钱从哪儿出去就回哪儿），
   // 没有才退到列表第一个。不然从微信借出去的钱，还款默认记到现金上，
@@ -586,12 +582,6 @@ class _RepaySheetState extends State<_RepaySheet> {
   late String _date = Fmt.today();
   bool _saving = false;
   String? _error;
-
-  /// 分 → 输入框里的元，去掉多余的 .00
-  static String _yuan(int cents) {
-    final s = (cents / 100).toStringAsFixed(2);
-    return s.endsWith('.00') ? s.substring(0, s.length - 3) : s;
-  }
 
   @override
   void dispose() {
@@ -620,13 +610,12 @@ class _RepaySheetState extends State<_RepaySheet> {
       _error = null;
     });
     try {
-      await Repo.repayDebt(
+      await Store.i.repayDebt(
         debt: widget.debt,
         amountCents: cents,
         accountId: _accountId!,
         date: _date,
       );
-      await Store.i.afterTxnChange();
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {

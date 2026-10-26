@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'backup_compat.dart';
 import 'db.dart';
 import 'integrity.dart';
 import 'repo.dart';
@@ -226,7 +227,13 @@ abstract final class BackupService {
   /// 校验并恢复。返回每张表写入的行数。
   ///
   /// 调用方务必先弹二次确认，并留一份 [writeSnapshot] —— 这是覆盖式写入。
-  static Future<Map<String, int>> restore(Map<String, Object?> payload) async {
+  ///
+  /// [report] 可选：记录「旧字段被忽略 / 换名 / 类型纠正」。老备份里有一列
+  /// 现表已经没有时，以前会整次失败（`no such column`），现在只丢那一列并记账。
+  static Future<Map<String, int>> restore(
+    Map<String, Object?> payload, {
+    ConformReport? report,
+  }) async {
     final tables = _validate(payload);
 
     // 机器状态类的设置（应用名、实验开关）既不从备份恢复，也不能被清掉：
@@ -237,7 +244,17 @@ abstract final class BackupService {
         if (!_restoredSettingKeys.contains(e.key)) e.key: e.value,
     };
 
-    final counts = await Repo.replaceTables(tables, keepSettings: keep);
+    final Map<String, int> counts;
+    try {
+      counts = await Repo.replaceTables(
+        tables,
+        keepSettings: keep,
+        report: report,
+      );
+    } on BackupFieldException catch (e) {
+      // 事务已回滚，数据未被改动 —— 把技术错误翻成用户能读懂的一句话
+      throw BackupException(e.message);
+    }
 
     // 旧备份里的分类是扁平的一套（交通 / 通讯 / 医疗…）。灌进新库之后，
     // 走一遍升级迁移把它们并进两级体系 —— 否则恢复出来的账本在分类管理页里

@@ -251,6 +251,11 @@ class Db {
       'CREATE INDEX idx_txn_ledger_period ON txn (ledger_id, period_start)',
       'CREATE INDEX idx_txn_category ON txn (category_id)',
       'CREATE INDEX idx_txn_account ON txn (account_id)',
+      // ★ 借贷流水按 debt_id 反查（借贷详情页、结清校验）。
+      //   这条索引原先只在 `_addDebtTable`（**升级路径**）里建，
+      //   于是「全新装机的库」一直缺它 —— 由 `schema_equivalence_test` 当场抓到。
+      //   写成 IF NOT EXISTS 是为了与升级路径重复执行时也不报错。
+      'CREATE INDEX IF NOT EXISTS idx_txn_debt ON txn (debt_id)',
 
       '''
       CREATE TABLE budget (

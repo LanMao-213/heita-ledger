@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../data/category_seed.dart';
 import '../data/models.dart';
-import '../data/repo.dart';
 import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
@@ -157,15 +156,13 @@ class _CatsPageState extends State<CatsPage> {
     final item = list.removeAt(oldIndex);
     final at = newIndex > list.length ? list.length : newIndex;
     list.insert(at, item);
-    await Repo.reorderCategories(list.map((e) => e.id).toList());
-    await Store.i.afterCategoryChange();
+    await Store.i.reorderCategories(list.map((e) => e.id).toList());
   }
 
   /// 切换停用状态。停用后它从选择器、预算、统计里一起消失，
   /// 但历史流水仍然指着它，明细里照常显示原名。
   Future<void> _setArchived(Category c, {required bool archived}) async {
-    await Repo.setCategoryArchived(c.id, archived: archived);
-    await Store.i.afterCategoryChange();
+    await Store.i.setCategoryArchived(c.id, archived: archived);
     if (!mounted) return;
     showToast(context, archived ? '已停用「${c.name}」' : '已恢复「${c.name}」');
   }
@@ -214,8 +211,7 @@ class _CatsPageState extends State<CatsPage> {
               onTap: () async {
                 final ok = await _confirmDelete(context, c, subCount: n);
                 if (!ok) return;
-                await Repo.deleteCategory(c.id);
-                await Store.i.afterCategoryChange();
+                await Store.i.deleteCategory(c.id);
                 if (context.mounted) showToast(context, '已删除');
               },
             ),
@@ -324,7 +320,7 @@ class _CatsPageState extends State<CatsPage> {
       final siblings = parent == null
           ? (type.isExpense ? s.expenseCats : s.incomeCats)
           : s.childrenOf(parent.id);
-      await Repo.insertCategory(
+      await s.saveCategory(
         Category(
           id: 0,
           ledgerId: s.ledgerId,
@@ -337,9 +333,8 @@ class _CatsPageState extends State<CatsPage> {
         ),
       );
     } else {
-      await Repo.updateCategory(cat.copyWith(name: name, icon: icon));
+      await s.saveCategory(cat.copyWith(name: name, icon: icon));
     }
-    await s.afterCategoryChange();
     if (context.mounted) showToast(context, '已保存');
   }
 
@@ -468,13 +463,11 @@ class _SubCatsPageState extends State<_SubCatsPage> {
     final item = list.removeAt(oldIndex);
     final at = newIndex > list.length ? list.length : newIndex;
     list.insert(at, item);
-    await Repo.reorderCategories(list.map((e) => e.id).toList());
-    await Store.i.afterCategoryChange();
+    await Store.i.reorderCategories(list.map((e) => e.id).toList());
   }
 
   Future<void> _setArchived(Category c, {required bool archived}) async {
-    await Repo.setCategoryArchived(c.id, archived: archived);
-    await Store.i.afterCategoryChange();
+    await Store.i.setCategoryArchived(c.id, archived: archived);
     if (!mounted) return;
     showToast(context, archived ? '已停用「${c.name}」' : '已恢复「${c.name}」');
   }
@@ -511,8 +504,7 @@ class _SubCatsPageState extends State<_SubCatsPage> {
                   danger: true,
                 );
                 if (!ok) return;
-                await Repo.deleteCategory(c.id);
-                await Store.i.afterCategoryChange();
+                await Store.i.deleteCategory(c.id);
                 if (context.mounted) showToast(context, '已删除');
               },
             ),

@@ -11,6 +11,8 @@
 //
 // ⚠️ 写这类测试的一个坑：`await showMenuSheet(...)` 会**一直等**到弹层被
 // 关掉才返回。想断言弹层里的东西，只能先存下 Future、pump，最后再 await。
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/design/palette.dart';
@@ -36,7 +38,7 @@ void main() {
   group('二级菜单的形状', () {
     testWidgets('弹层底是页面底，菜单组装在卡面圆角卡里', (tester) async {
       final ctx = await pumpHost(tester);
-      showMenuSheet<void>(
+      unawaited(showMenuSheet<void>(
         context: ctx,
         title: '招商银行',
         groups: [
@@ -44,7 +46,7 @@ void main() {
             actions: [MenuAction(icon: 'tpl', title: '编辑资料', onTap: () {})],
           ),
         ],
-      );
+      ));
       await tester.pumpAndSettle();
 
       // 弹层底：SheetShell 画的那一层必须是页面底
@@ -107,7 +109,7 @@ void main() {
 
     testWidgets('分割线内缩到 46，不横穿整行', (tester) async {
       final ctx = await pumpHost(tester);
-      showMenuSheet<void>(
+      unawaited(showMenuSheet<void>(
         context: ctx,
         title: '标题',
         groups: [
@@ -118,7 +120,7 @@ void main() {
             ],
           ),
         ],
-      );
+      ));
       await tester.pumpAndSettle();
 
       final dividers = tester
@@ -133,7 +135,7 @@ void main() {
 
     testWidgets('危险项图标与文字一起转 C.over', (tester) async {
       final ctx = await pumpHost(tester);
-      showMenuSheet<void>(
+      unawaited(showMenuSheet<void>(
         context: ctx,
         title: '标题',
         groups: [
@@ -141,7 +143,7 @@ void main() {
             actions: [MenuAction(icon: 'trash', title: '删除账户', danger: true)],
           ),
         ],
-      );
+      ));
       await tester.pumpAndSettle();
 
       final text = tester.widget<Text>(find.text('删除账户'));
@@ -183,7 +185,7 @@ void main() {
 
     testWidgets('两个按钮等宽，中间一道竖线', (tester) async {
       final ctx = await pumpHost(tester);
-      showAppConfirm(ctx, title: '确定吗');
+      unawaited(showAppConfirm(ctx, title: '确定吗'));
       await tester.pumpAndSettle();
 
       expect(

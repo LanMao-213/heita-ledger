@@ -130,34 +130,34 @@ void main() {
     await pumpDetail(tester);
     final s = Store.i;
 
-    expect(s.filtering, isFalse);
+    expect(s.filter.active, isFalse);
 
     await tester.runAsync(
       () => s.applyFilter(TxnFilter.none.withType(TxnType.expense)),
     );
     await settle(tester);
-    expect(s.filtering, isTrue);
-    expect(s.filter.type, TxnType.expense);
-    expect(s.filteredTxns.length, 2);
+    expect(s.filter.active, isTrue);
+    expect(s.filter.current.type, TxnType.expense);
+    expect(s.filter.txns.length, 2);
 
     // 先设一个分类条件，再改类型 —— 分类条件必须还在
     await tester.runAsync(() => s.applyFilter(TxnFilter(categoryId: foodId)));
     await settle(tester);
-    expect(s.filter.categoryId, foodId);
+    expect(s.filter.current.categoryId, foodId);
 
     await tester.runAsync(
-      () => s.applyFilter(s.filter.withType(TxnType.income)),
+      () => s.applyFilter(s.filter.current.withType(TxnType.income)),
     );
     await settle(tester);
-    expect(s.filter.type, TxnType.income);
-    expect(s.filter.categoryId, foodId, reason: '改类型不该清掉分类条件');
+    expect(s.filter.current.type, TxnType.income);
+    expect(s.filter.current.categoryId, foodId, reason: '改类型不该清掉分类条件');
 
     // 回到「不限类型」：同样只去掉 type
-    await tester.runAsync(() => s.applyFilter(s.filter.withType(null)));
+    await tester.runAsync(() => s.applyFilter(s.filter.current.withType(null)));
     await settle(tester);
-    expect(s.filter.type, isNull);
-    expect(s.filter.categoryId, foodId);
-    expect(s.filteredTxns.length, 2);
+    expect(s.filter.current.type, isNull);
+    expect(s.filter.current.categoryId, foodId);
+    expect(s.filter.txns.length, 2);
   });
 
   testWidgets('明细顶部只有周期、没有左右翻期，点它弹日历', (tester) async {
@@ -277,7 +277,7 @@ void main() {
     expect(s.isCurrentPeriod, isFalse);
     // 上个月没有记录，明细清空但不该顺手筛出东西来
     expect(s.txns, isEmpty);
-    expect(s.filtering, isFalse);
+    expect(s.filter.active, isFalse);
   });
 
   testWidgets('底部 tab 能点，也能左右滑', (tester) async {

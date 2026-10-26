@@ -44,13 +44,13 @@ Future<void> showCalendarAndGo(
   bool byMonth = false,
 }) async {
   final s = Store.i;
-  final from = byMonth ? Fmt.monthStart(s.month) : s.cycleFrom;
-  final to = byMonth ? Fmt.monthEnd(s.month) : s.cycleTo;
+  final from = byMonth ? Fmt.monthStart(s.stats.month) : s.cycleFrom;
+  final to = byMonth ? Fmt.monthEnd(s.stats.month) : s.cycleTo;
   final date = await showCalendarPicker(
     context,
     from: from,
     to: to,
-    initialMonth: byMonth ? s.month : null,
+    initialMonth: byMonth ? s.stats.month : null,
   );
   if (date == null) return;
   if (byMonth) {

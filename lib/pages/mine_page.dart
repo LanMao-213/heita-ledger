@@ -395,11 +395,11 @@ class MinePage extends StatelessWidget {
   /// 导出「当前筛选结果」。
   ///
   /// 和上面的整本导出是两件事：那个是备份，这个是交付（「把这个月的餐饮发我」）。
-  /// 筛选条件由明细页设置、存在 [Store.filter] 里 —— 所以这里不需要再选一次，
+  /// 筛选条件由明细页设置、存在 [Store.filter.current] 里 —— 所以这里不需要再选一次，
   /// 但要**先确认筛选是开着的**，否则用户会以为导出了筛选结果、其实是整本。
   static Future<void> _exportFiltered(BuildContext context) async {
     final s = Store.i;
-    if (s.filter.isEmpty) {
+    if (s.filter.current.isEmpty) {
       showToast(context, '先在明细页设置筛选条件');
       return;
     }
@@ -407,7 +407,7 @@ class MinePage extends StatelessWidget {
       final path = await ExcelService.exportAll(
         s.ledgerId,
         ledgerName: s.currentLedger?.name,
-        filter: s.filter,
+        filter: s.filter.current,
       );
       if (!context.mounted) return;
       await ExcelService.share(path, text: '$kAppName 筛选结果导出');
@@ -422,14 +422,13 @@ class MinePage extends StatelessWidget {
     final s = Store.i;
     ImportResult? result;
     try {
-      result = await ExcelService.pickAndImport(s.ledgerId);
+      result = await s.importExcel();
     } catch (e) {
       if (context.mounted) showToast(context, '导入失败：$e');
       return;
     }
     final done = result;
     if (done == null) return; // 用户取消了
-    await s.afterTxnChange();
     if (!context.mounted) return;
 
     await showAppNotice(
@@ -723,12 +722,11 @@ class MinePage extends StatelessWidget {
 
     if (ok != true || !context.mounted) return;
     if (empty) {
-      await Repo.deleteAccount(a.id);
+      await s.deleteAccount(a.id);
     } else {
       if (target == null) return;
-      await Repo.mergeAccount(from: a.id, to: target!);
+      await s.mergeAccount(from: a.id, to: target!);
     }
-    await s.afterAccountChange();
     if (context.mounted) {
       showToast(context, empty ? '已删除' : '已删除，余额和记录已并入目标账户');
     }
@@ -737,7 +735,7 @@ class MinePage extends StatelessWidget {
   static Future<void> _accountSheet(BuildContext context, Account? acc) async {
     final nameCtl = TextEditingController(text: acc?.name ?? '');
     final balCtl = TextEditingController(
-      text: acc == null ? '' : (acc.balanceCents / 100).toStringAsFixed(2),
+      text: acc == null ? '' : Fmt.plain(acc.balanceCents),
     );
     var kind = acc?.kind ?? AccountKind.cash;
     var include = acc?.includeInTotal ?? true;
@@ -814,36 +812,29 @@ class MinePage extends StatelessWidget {
     // 名称为空视为删除（仅编辑态）
     final name = nameCtl.text.trim();
     if (acc != null && name.isEmpty) {
-      await Repo.deleteAccount(acc.id);
-      await Store.i.afterAccountChange();
+      await Store.i.deleteAccount(acc.id);
       if (context.mounted) showToast(context, '已删除');
       return;
     }
     if (name.isEmpty) return;
 
     final balance = Fmt.parseCents(balCtl.text);
-    if (acc == null) {
-      // 新账户还没有流水，手填的余额就是期初值 —— v8 起必须显式写，
-      // 否则默认 0 会让「余额 = 期初 + 流水合计」当场不成立
-      await Repo.insertAccount(
-        Account(
-          id: 0,
-          name: name,
-          kind: kind,
-          balanceCents: balance,
-          openingCents: balance,
-          includeInTotal: include,
-          sortOrder: 999,
-        ),
-      );
-    } else {
-      // 手填余额改的是期初（opening_cents），不是余额本身，见 Repo.saveAccount
-      await Repo.saveAccount(
-        acc.copyWith(name: name, kind: kind, includeInTotal: include),
-        balance,
-      );
-    }
-    await Store.i.afterAccountChange();
+    // 新账户还没有流水，手填的余额就是期初值 —— v8 起必须显式写，
+    // 否则默认 0 会让「余额 = 期初 + 流水合计」当场不成立。
+    // 这两种情况在 `Store.saveAccount` 里已经收束（新建写期初、编辑走
+    // `Repo.saveAccount`），这里只描述"要存成什么样"。
+    await Store.i.saveAccount(
+      acc == null
+          ? Account(
+              id: 0,
+              name: name,
+              kind: kind,
+              includeInTotal: include,
+              sortOrder: 999,
+            )
+          : acc.copyWith(name: name, kind: kind, includeInTotal: include),
+      balanceCents: balance,
+    );
     if (context.mounted) showToast(context, '已保存');
   }
 
@@ -907,8 +898,7 @@ class MinePage extends StatelessWidget {
       ],
     );
     if (name == null || name.isEmpty) return;
-    final id = await Repo.insertLedger(Ledger(id: 0, name: name));
-    final added = await s.switchLedger(id);
+    final added = await s.addLedger(name);
     if (added > 0 && context.mounted) {
       showToast(context, '已补记 $added 笔周期账单');
     }

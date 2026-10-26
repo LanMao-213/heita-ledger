@@ -80,7 +80,7 @@ void main() {
       // 同理，tabIndex 也会带过来。上一个用例横滑切到了图表页的话，
       // 这一条里「(195,70) 那一下」会落在统计页的周期条上 —— 那里的
       // 横滑是 shiftStat，会真的把期翻掉。踩过，别删。
-      s.tabIndex = 0;
+      s.switchTab(0);
     });
   }
 
@@ -194,7 +194,7 @@ void main() {
       await s.applyFilter(const TxnFilter(type: TxnType.expense));
     });
     await tester.pump();
-    expect(s.filtering, isTrue, reason: '前提：得先进筛选态');
+    expect(s.filter.active, isTrue, reason: '前提：得先进筛选态');
 
     // 筛选态下卡片矮了一截（周期条换成「筛选结果」），中心点要现算
     final card = tester.getCenter(find.byType(SummaryCard));

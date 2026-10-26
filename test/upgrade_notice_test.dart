@@ -47,8 +47,8 @@ void main() {
       reason: '提示过的标记要落库，否则每次启动都会再弹',
     );
 
-    // 第二次启动：标记已在，且本次没有真的迁移
-    Store.i.catsUpgradeJustDone = false;
+    // 第二次启动：标记已在，且本次没有真的迁移。
+    // 不用手工把 catsUpgradeJustDone 清零 —— `_doBoot` 每次启动都会重置。
     Db.upgradedToTwoLevel = false;
     await Store.i.boot();
     expect(Store.i.catsUpgradeJustDone, isFalse);

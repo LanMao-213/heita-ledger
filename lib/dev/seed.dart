@@ -314,6 +314,7 @@ Future<void> seedDemoData(int ledgerId) async {
   // 灌完把内存里的 Store 拉到最新，否则界面还停在「空账本」。
   // 不用手动 notify：这段跑在启动 future 里，HomeShell 的首帧在这之后才建。
   await s.afterTxnChange();
-  s.templates = await Repo.listTemplates(ledgerId);
-  s.recentTemplates = await Repo.recentTemplates(ledgerId);
+  // 模板列表也要拉一次：`afterTxnChange` 只重算当期投影，不碰模板。
+  // 走 `loadTemplates()` 而不是给两个字段赋值 —— 后者在「结构整理」之后编译不过（字段已私有化）。
+  await s.loadTemplates();
 }

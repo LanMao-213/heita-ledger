@@ -5,7 +5,7 @@ import '../data/calc.dart';
 import '../data/category_seed.dart';
 import '../data/cycle.dart';
 import '../data/models.dart';
-import '../data/repo.dart';
+import '../data/record_draft.dart';
 import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/motion.dart';
@@ -154,7 +154,7 @@ class _RecordSheetState extends State<RecordSheet> {
     _date = e?.date ?? Fmt.today();
     _note = TextEditingController(text: e?.note ?? '');
     if (e != null) {
-      _amountInput = _amountText(e.amountCents);
+      _amountInput = Fmt.input(e.amountCents);
     }
     // 编辑时若原记录没分类，落到该类型的第一个分类
     _categoryId ??= _firstCategoryId();
@@ -170,12 +170,6 @@ class _RecordSheetState extends State<RecordSheet> {
     if (e != null && e.periodStart != null) {
       _liftOverride = e.periodStart != periodStartOf(e.date, s.cycleStartDay);
     }
-  }
-
-  /// 分 → 输入框里的字符串：「1200」显示成「12」，避免一串 .00 干扰输入
-  static String _amountText(int cents) {
-    final s = (cents / 100).toStringAsFixed(2);
-    return s.endsWith('.00') ? s.substring(0, s.length - 3) : s;
   }
 
   List<Category> get _cats =>
@@ -334,7 +328,7 @@ class _RecordSheetState extends State<RecordSheet> {
         _categoryId = t.categoryId ?? _firstCategoryId();
       }
       if (t.accountId != null) _accountId = t.accountId;
-      if (t.hasAmount) _amountInput = _amountText(t.amountCents);
+      if (t.hasAmount) _amountInput = Fmt.input(t.amountCents);
       if (t.note.isNotEmpty) _note.text = t.note;
     });
   }
@@ -383,7 +377,7 @@ class _RecordSheetState extends State<RecordSheet> {
     ctl.dispose();
     if (ok != true) return;
 
-    await Repo.insertTemplate(
+    await Store.i.saveTemplate(
       TxnTemplate(
         id: 0,
         ledgerId: Store.i.ledgerId,
@@ -396,7 +390,6 @@ class _RecordSheetState extends State<RecordSheet> {
         note: _note.text.trim(),
       ),
     );
-    await Store.i.afterTemplateChange();
     if (!mounted) return;
     setState(() {}); // 让顶部那排模板立刻带上新的
     showToast(context, '已存为模板');
@@ -418,98 +411,65 @@ class _RecordSheetState extends State<RecordSheet> {
     final detailValues = pruneDetails(Store.i.categoryOf(_categoryId)?.name, {
       for (final f in TxnField.values) f: _detailCtl[f]!.text,
     });
-    String d(TxnField f) => detailValues[f]!;
+
+    // 表单 → 草稿：拼 Txn / 判分支的规则都在 `RecordDraft` 里（可单测）。
+    // 这里只负责「把界面上的东西读出来」，不再写业务判断。
+    final draft = RecordDraft(
+      ledgerId: store.ledgerId,
+      type: _type,
+      // 借贷恒为正：方向由 type 表示，不靠符号
+      amountCents: _isLending ? cents.abs() : cents,
+      date: _date,
+      accountId: _accountId,
+      categoryId: _categoryId,
+      note: note,
+      details: detailValues,
+      // 编辑时不走借贷路径：对方与应还日属于「往来」，要改去往来详情
+      debt: (!_isEdit && _isLending)
+          ? Debt(
+              id: 0,
+              ledgerId: store.ledgerId,
+              direction: _mode.direction,
+              counterparty: _counterparty.text.trim(),
+              amountCents: cents.abs(),
+              date: _date,
+              accountId: _accountId,
+              dueDate: _dueDate,
+              // 借出恒不计预算；借入按开关
+              countInBudget: _mode == _RecordMode.lendIn && _countInBudget,
+              note: note,
+            )
+          : null,
+      editing: widget.editing,
+      templateId: tplId,
+    );
 
     try {
-      // 借出 / 借入：建一条往来 + 一笔本金流水（同一事务），不走普通记账路径。
-      // 编辑已有借贷流水时不走这里 —— 对方与应还日属于「往来」，改它要去往来详情。
-      if (!_isEdit && _isLending) {
-        await Repo.createDebt(
-          Debt(
-            id: 0,
-            ledgerId: store.ledgerId,
-            direction: _mode.direction,
-            counterparty: _counterparty.text.trim(),
-            amountCents: cents.abs(),
-            date: _date,
-            accountId: _accountId,
-            dueDate: _dueDate,
-            // 借出恒不计预算；借入按开关
-            countInBudget: _mode == _RecordMode.lendIn && _countInBudget,
-            note: note,
-          ),
-          Txn(
-            id: 0,
-            ledgerId: store.ledgerId,
-            type: _type,
-            amountCents: cents.abs(),
-            date: _date,
-            accountId: _accountId,
-          ),
-        );
-        final periodStart = periodStartOf(_date, store.cycleStartDay);
-        await store.afterTxnInserted(date: _date, periodStart: periodStart);
-        if (!mounted) return;
-        Navigator.pop(context, _outcomeOf(periodStart));
-        return;
-      }
-      if (_isEdit) {
-        final old = widget.editing!;
-        final now = Txn(
-          id: old.id,
-          ledgerId: old.ledgerId,
-          type: _type,
-          amountCents: cents,
-          date: _date,
-          categoryId: _categoryId,
-          accountId: _accountId,
-          note: note,
-          placeFrom: d(TxnField.from),
-          placeTo: d(TxnField.to),
-          person: d(TxnField.person),
-          subject: d(TxnField.subject),
-          templateId: old.templateId,
-          recurringId: old.recurringId,
-          createdAt: old.createdAt,
-        );
-        await Repo.updateTxn(old, now, liftToNext: _liftOverride);
-      } else {
-        await Repo.insertTxn(
-          Txn(
-            id: 0,
-            ledgerId: store.ledgerId,
-            type: _type,
-            amountCents: cents,
-            date: _date,
-            categoryId: _categoryId,
-            accountId: _accountId,
-            note: note,
-            placeFrom: d(TxnField.from),
-            placeTo: d(TxnField.to),
-            person: d(TxnField.person),
-            subject: d(TxnField.subject),
-            templateId: tplId,
-          ),
-          liftToNext: _liftOverride,
-        );
-        if (tplId != null) {
-          await Repo.touchTemplate(tplId);
-          await store.afterTemplateChange();
-        }
-      }
-      // 新记的一笔：刷新 + 把视角搬到这笔身上（清筛选、对齐期、回明细）
-      // 编辑走 [afterTxnChange] 就够 —— 用户正在看的就是那一行，跳期反而打断
-      // 这笔落在哪一期：和 `Repo.periodFor` 同一口径（含抬期）。
-      // 提示文案和「跳期跳到哪里」都用它，不另算一遍。
-      final periodStart = periodStartOf(
-        _date,
-        store.cycleStartDay,
-        liftToNext: _liftOn,
-      );
-      if (_isEdit) {
-        await store.afterTxnChange();
-      } else {
-        await store.afterTxnInserted(date: _date, periodStart: periodStart);
+      final String periodStart;
+      switch (draft.action) {
+        case RecordAction.lend:
+          periodStart = await store.addDebt(draft.debt!, draft.toTxn());
+        case RecordAction.update:
+          // 编辑走原地刷新（不跳期）：用户正在看的就是那一行
+          await store.updateTxn(
+            draft.editing!,
+            draft.toTxn(),
+            liftToNext: _liftOverride,
+          );
+          // 提示文案仍要说「这笔在哪一期」；编辑不改归属期，按当前日期算即可
+          periodStart = periodStartOf(
+            _date,
+            store.cycleStartDay,
+            liftToNext: _liftOn,
+          );
+        case RecordAction.insert:
+          // 归属期由 `Store.addTxn` 返回（内部走 `Repo.periodFor`：抬期白名单
+          // + 用户手动开关），面板不再按自己的规则算第二遍。
+          periodStart = await store.addTxn(
+            draft.toTxn(),
+            liftToNext: _liftOverride,
+            touchTemplateId: tplId,
+          );
       }
       if (!mounted) return;
       Navigator.pop(context, _outcomeOf(periodStart));

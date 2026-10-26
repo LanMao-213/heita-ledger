@@ -107,9 +107,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(Store.i.filtering, isTrue);
-    expect(Store.i.filter.categoryId, foodId);
-    expect(Store.i.filteredTxns.length, 3);
+    expect(Store.i.filter.active, isTrue);
+    expect(Store.i.filter.current.categoryId, foodId);
+    expect(Store.i.filter.txns.length, 3);
     // 明细页的头卡切成了筛选口径
     expect(find.text('筛选结果'), findsOneWidget);
     expect(find.byType(CategoryGrid), findsNothing);
@@ -117,7 +117,7 @@ void main() {
     // 重置回到按月浏览
     await tester.tap(find.text('重置'));
     await tester.pumpAndSettle();
-    expect(Store.i.filtering, isFalse);
+    expect(Store.i.filter.active, isFalse);
 
     // ---- 筛选态下记一笔：走的是 afterTxnChange 重跑筛选这条路 ----
     // 不符合当前条件的记录不该混进结果，但必须进当月明细 ——
@@ -126,7 +126,7 @@ void main() {
       await Store.i.applyFilter(TxnFilter(categoryId: foodId));
     });
     await tester.pumpAndSettle();
-    expect(Store.i.filteredTxns.length, 3);
+    expect(Store.i.filter.txns.length, 3);
 
     await tester.runAsync(() async {
       final cats = await Repo.listCategories(
@@ -153,8 +153,8 @@ void main() {
     });
     await tester.pumpAndSettle();
 
-    expect(Store.i.filteredTxns.length, 3);
-    expect(Store.i.filteredTxns.any((t) => t.note == '打车'), isFalse);
+    expect(Store.i.filter.txns.length, 3);
+    expect(Store.i.filter.txns.any((t) => t.note == '打车'), isFalse);
     expect(Store.i.txns.any((t) => t.note == '打车'), isTrue);
     expect(find.text('3 笔'), findsOneWidget);
   });

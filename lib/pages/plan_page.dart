@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../data/models.dart';
 import '../data/pacing.dart';
-import '../data/repo.dart';
 import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
@@ -65,12 +64,8 @@ class _DebtsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Store.i;
     final open = s.debts.where((d) => !d.isClosed).toList();
-    final receivable = open
-        .where((d) => d.direction.isReceivable)
-        .fold<int>(0, (a, d) => a + d.remainingCents);
-    final payable = open
-        .where((d) => !d.direction.isReceivable)
-        .fold<int>(0, (a, d) => a + d.remainingCents);
+    final receivable = s.receivableCents;
+    final payable = s.payableCents;
     final dueSoon = open.where((d) {
       final due = d.dueDate;
       return due != null &&
@@ -217,19 +212,27 @@ class _TotalBudgetCard extends StatelessWidget {
               child: Text('还没有设预算。设一个数，超支时会用红色提醒你。', style: T.body2),
             )
           else ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  Fmt.money(s.expenseCents),
-                  style: T.hero,
-                ),
-                Text(
-                  '  /  ${Fmt.money(cap)}',
-                  style: T.body2,
-                ),
-              ],
+            // 这一行是「已花 / 额度」两段数字并排，两段都不可收口：
+            // 截断大数字等于把「花了多少」说错，而中文环境下字宽本来就大。
+            // 用 FittedBox 整体等比缩小 —— 宁可字小一点，也不能把卡片撑破。
+            // （七位数的支出就会触发；原先这一行没有任何约束。）
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    Fmt.money(s.expenseCents),
+                    style: T.hero,
+                  ),
+                  Text(
+                    '  /  ${Fmt.money(cap)}',
+                    style: T.body2,
+                  ),
+                ],
+              ),
             ),
             // 借入计入预算时，卡片上的额度直接显示成「额度 + 借入」（9000），
             // 下面小字说明这多出来的 3000 是借的 —— 借来的钱确实能花，
@@ -250,7 +253,7 @@ class _TotalBudgetCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  '已用 ${(used * 100).toStringAsFixed(0)}%',
+                  '已用 ${Fmt.percent(used)}',
                   style: T.caption,
                 ),
                 const Spacer(),
@@ -327,12 +330,7 @@ class _TotalBudgetCard extends StatelessWidget {
       initial: s.totalBudgetCents ?? 0,
     );
     if (v == null) return;
-    await Repo.setBudget(
-      ledgerId: s.ledgerId,
-      periodStart: s.cycleFrom,
-      amountCents: v,
-    );
-    await s.afterBudgetChange();
+    await s.setBudget(periodStart: s.cycleFrom, amountCents: v);
     if (context.mounted) showToast(context, v <= 0 ? '已清除预算' : '预算已更新');
   }
 }
@@ -412,13 +410,11 @@ class _CategoryBudgets extends StatelessWidget {
       initial: b.budgetCents,
     );
     if (v == null) return;
-    await Repo.setBudget(
-      ledgerId: s.ledgerId,
+    await s.setBudget(
       periodStart: s.cycleFrom,
       categoryId: b.categoryId,
       amountCents: v,
     );
-    await s.afterBudgetChange();
     if (context.mounted) showToast(context, v <= 0 ? '已清除' : '已更新');
   }
 
@@ -436,13 +432,11 @@ class _CategoryBudgets extends StatelessWidget {
 
     final v = await _askAmount(context, title: '${cat.name} 的预算', initial: 0);
     if (v == null) return;
-    await Repo.setBudget(
-      ledgerId: s.ledgerId,
+    await s.setBudget(
       periodStart: s.cycleFrom,
       categoryId: cat.id,
       amountCents: v,
     );
-    await s.afterBudgetChange();
     if (context.mounted) showToast(context, v <= 0 ? '已清除' : '已设置');
   }
 }
@@ -500,7 +494,7 @@ class _BudgetRow extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    '${(ratio * 100).toStringAsFixed(0)}%',
+                    Fmt.percent(ratio),
                     style: T.caption.copyWith(color: C.over),
                   ),
                 ],
@@ -604,7 +598,7 @@ class _Goals extends StatelessWidget {
     final s = Store.i;
     final nameCtl = TextEditingController(text: goal?.name ?? '');
     final targetCtl = TextEditingController(
-      text: goal == null ? '' : (goal.targetCents / 100).toStringAsFixed(0),
+      text: goal == null ? '' : Fmt.plain(goal.targetCents, decimals: 0),
     );
     var icon = goal?.icon ?? 'flag';
 
@@ -680,22 +674,17 @@ class _Goals extends StatelessWidget {
       return;
     }
 
-    if (goal == null) {
-      await Repo.insertGoal(
-        SavingGoal(
-          id: 0,
-          name: name,
-          icon: icon,
-          targetCents: target,
-          savedCents: 0,
-        ),
-      );
-    } else {
-      await Repo.updateGoal(
-        goal.copyWith(name: name, icon: icon, targetCents: target),
-      );
-    }
-    await s.afterGoalChange();
+    await s.saveGoal(
+      goal == null
+          ? SavingGoal(
+              id: 0,
+              name: name,
+              icon: icon,
+              targetCents: target,
+              savedCents: 0,
+            )
+          : goal.copyWith(name: name, icon: icon, targetCents: target),
+    );
     if (context.mounted) showToast(context, '已保存');
   }
 }
@@ -801,7 +790,7 @@ class _GoalCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  '${(goal.progress * 100).toStringAsFixed(1)}%',
+                  Fmt.percent(goal.progress, decimals: 1),
                   style: T.caption,
                 ),
                 const SizedBox(width: S.sm),
@@ -830,8 +819,7 @@ class _GoalCard extends StatelessWidget {
     final s = Store.i;
     final v = await _askAmount(context, title: '存入「${g.name}」', initial: 0);
     if (v == null || v == 0) return;
-    await Repo.addFunds(g.id, v);
-    await s.afterGoalChange();
+    await s.addFunds(g.id, v);
     if (context.mounted) showToast(context, '已存入 ${Fmt.money(v)}');
   }
 
@@ -853,8 +841,7 @@ class _GoalCard extends StatelessWidget {
               title: '取出全部',
               subtitle: Fmt.money(goal.savedCents),
               onTap: () async {
-                await Repo.addFunds(goal.id, -goal.savedCents);
-                await s.afterGoalChange();
+                await s.addFunds(goal.id, -goal.savedCents);
               },
             ),
             MenuAction(
@@ -862,8 +849,7 @@ class _GoalCard extends StatelessWidget {
               title: '删除目标',
               danger: true,
               onTap: () async {
-                await Repo.deleteGoal(goal.id);
-                await s.afterGoalChange();
+                await s.deleteGoal(goal.id);
               },
             ),
           ],
@@ -882,7 +868,7 @@ Future<int?> _askAmount(
   required int initial,
 }) async {
   final ctl = TextEditingController(
-    text: initial <= 0 ? '' : (initial / 100).toStringAsFixed(0),
+    text: initial <= 0 ? '' : Fmt.plain(initial, decimals: 0),
   );
   final ok = await showAppDialog<bool>(
     context: context,

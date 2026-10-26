@@ -108,7 +108,7 @@ void main() {
       // `borrowedInBudgetCents` 还是 0（踩过：断言 9,000 却只看到 6,000）
       await s.loadAll();
       await s.clearFilter();
-      s.tabIndex = 0;
+      s.switchTab(0);
     });
   }
 

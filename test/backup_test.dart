@@ -138,8 +138,8 @@ void main() {
       return (r.first['c'] as int?) ?? 0;
     }
 
-    final totals = await RepoStats.monthTotals(s.ledgerId, s.month);
-    final budgets = await Repo.totalBudgetCents(s.ledgerId, s.month);
+    final totals = await RepoStats.monthTotals(s.ledgerId, s.stats.month);
+    final budgets = await Repo.totalBudgetCents(s.ledgerId, s.stats.month);
     return (
       txns: totals.$3,
       expenses: totals.$1,
@@ -249,6 +249,6 @@ void main() {
     expect(Store.i.txnCount, before.txns);
     expect(Store.i.netWorthCents, before.netWorth);
     expect(Store.i.accounts, isNotEmpty);
-    expect(Store.i.filtering, isFalse, reason: '恢复后要清掉可能失效的筛选条件');
+    expect(Store.i.filter.active, isFalse, reason: '恢复后要清掉可能失效的筛选条件');
   });
 }

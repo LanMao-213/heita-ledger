@@ -38,6 +38,13 @@ class _RecurringPageState extends State<RecurringPage> {
     _load();
   }
 
+  /// 定时账单是**页面局部状态**，不进 `Store`。
+  ///
+  /// 这也是本页仍然直接调 `Repo.insertRecurring` 等写接口的原因：
+  /// 「写库 → 刷新」的刷新对象是这里的 [_rules]，而不是 Store 里的某块投影。
+  /// 给它套一个 `Store.saveRecurring()` 只会得到一个没有刷新语义的空壳，
+  /// 反而掩盖「这条规则改了，当前名单要重载」这件事。
+  /// 每次写完都必须 `await _load()`（编辑、开关、删除三处都遵循）。
   Future<void> _load() async {
     final rows = await Repo.listRecurring(Store.i.ledgerId);
     if (!mounted) return;
@@ -97,7 +104,7 @@ class _RecurringPageState extends State<RecurringPage> {
   Future<void> _edit(BuildContext context, RecurringRule? rule) async {
     final s = Store.i;
     final amountCtl = TextEditingController(
-      text: rule == null ? '' : (rule.amountCents / 100).toStringAsFixed(2),
+      text: rule == null ? '' : Fmt.plain(rule.amountCents),
     );
     final noteCtl = TextEditingController(text: rule?.note ?? '');
     var type = rule?.type ?? TxnType.expense;

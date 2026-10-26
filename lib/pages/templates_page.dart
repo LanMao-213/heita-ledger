@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/models.dart';
-import '../data/repo.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
@@ -53,8 +52,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
               onTap: () async {
                 final ok = await _confirmDelete(t);
                 if (!ok) return;
-                await Repo.deleteTemplate(t.id);
-                await Store.i.afterTemplateChange();
+                await Store.i.deleteTemplate(t.id);
                 if (mounted) showToast(context, '已删除');
               },
             ),
@@ -82,8 +80,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
     // 列表末尾还挂着一行说明文字，拖到它下面时 newIndex 会越界
     final at = newIndex > list.length ? list.length : newIndex;
     list.insert(at, item);
-    await Repo.reorderTemplates(list.map((e) => e.id).toList());
-    await Store.i.afterTemplateChange();
+    await Store.i.reorderTemplates(list.map((e) => e.id).toList());
   }
 
   @override
@@ -370,12 +367,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
       sortOrder: widget.initial?.sortOrder ?? 0,
     );
 
-    if (_isNew) {
-      await Repo.insertTemplate(t);
-    } else {
-      await Repo.updateTemplate(t);
-    }
-    await s.afterTemplateChange();
+    await s.saveTemplate(t);
     if (mounted) Navigator.pop(context, true);
   }
 

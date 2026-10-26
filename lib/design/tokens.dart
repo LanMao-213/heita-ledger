@@ -180,6 +180,14 @@ abstract final class E {
 /// 用彩色会让人以为颜色本身有含义。
 List<Color> get kChart => ThemeCtrl.i.palette.chart;
 
+/// 饼图切片取色：按金额从大到小套色阶，保证深浅有意义。
+///
+/// 为什么在这里而不在 `data/models.dart`：取色是**展示决定**，与实体字段无关。
+/// 它原先待在 models 里，逼着数据层 `import flutter/material.dart` 和
+/// `design/tokens.dart` —— 于是「数据层」既离不开 Flutter，又反向依赖设计层。
+/// 挪到这里之后，`lib/data` 不再 import 任何 Flutter/design 符号。
+Color monoSlot(int index) => kChart[index % kChart.length];
+
 /// 圆角。
 ///
 /// 整体比旧值（9/13/16/20）放大一档：圆角越大，矩形的「盒子感」越弱。

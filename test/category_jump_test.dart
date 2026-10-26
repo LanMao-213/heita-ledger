@@ -93,23 +93,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(Store.i.tabIndex, 0, reason: '落到明细页');
-    expect(Store.i.filtering, isTrue);
-    expect(Store.i.filter.categoryId, foodId, reason: '筛的是根分类');
-    expect(Store.i.filter.type, TxnType.expense);
+    expect(Store.i.filter.active, isTrue);
+    expect(Store.i.filter.current.categoryId, foodId, reason: '筛的是根分类');
+    expect(Store.i.filter.current.type, TxnType.expense);
     expect(
-      Store.i.filteredTxns.length,
+      Store.i.filter.txns.length,
       2,
       reason: '两笔记在子分类上的交易都要命中（连带子分类）',
     );
     expect(
-      Store.i.filterCount,
+      Store.i.filter.count,
       2,
       reason: '合计也只算这两笔，不能把出行的 1000 算进来',
     );
     expect(find.text('筛选结果'), findsOneWidget);
 
     // 区间跟统计页走，否则图表数字和明细对不上
-    expect(Store.i.filter.dateFrom, Store.i.statFrom);
-    expect(Store.i.filter.dateTo, Store.i.statTo);
+    expect(Store.i.filter.current.dateFrom, Store.i.stats.from);
+    expect(Store.i.filter.current.dateTo, Store.i.stats.to);
   });
 }
