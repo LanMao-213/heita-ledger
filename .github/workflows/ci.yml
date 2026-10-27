@@ -40,6 +40,15 @@ jobs:
       - name: 取依赖
         run: flutter pub get
 
+      # 截图测试会把界面真的渲染出来，所以必须装中文字体。
+      # ubuntu runner 默认没有 CJK 字体，缺了中文会渲染成方块；方块的字宽和
+      # 真实汉字不同，会让布局断言报出「溢出 95px」这类**假阳性**（1.4.6 踩过）。
+      # 反过来更要命：`test/ui_shot_test.dart` 的 `_loadChineseFont` 找不到字体时
+      # **只警告不报错**，于是「没有字体也全绿」——中文字体下的真实溢出检不出来。
+      # 字体路径与该测试里的加载路径一一对应。
+      - name: 安装中文字体
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-droid-fallback
+
       # --fatal-infos：`flutter analyze` 默认**不把 info 当失败**（退出码仍是 0），
       # 于是「未使用的插值、多余的 import」这类提示会一路溜进 main。
       # 本机与 CI 都固定在 3.47.7，info 集合一致，因此可以把它当硬门禁。
@@ -56,13 +65,17 @@ jobs:
       - name: 测试（露露缇雅·泽金配色）
         run: flutter test --dart-define=HEITA=1 --reporter expanded
 
-  # 产物级门禁：源码扫描可能被绕过（反射、动态拼接），但**APK 里没有 INTERNET
+  # 产物级门禁：源码扫描可能被绕过（反射、动态拼接），但**发布包里没有 INTERNET
   # 权限**是系统级的硬事实 —— 发不出去就是发不出去。
-  # 只在 main 上跑：build 要几分钟，每个分支都跑性价比太低。
-  apk-permission:
-    if: github.ref == 'refs/heads/main'
+  #
+  # 换成检查「合并后的清单」而不是打整包：权限只来自清单，而 aapt2 dump badging
+  # 读的也就是这个清单，所以两者证明的是同一件事；但清单任务跳掉了 Dart AOT 与
+  # 打包，实测 296s → 20s 量级。省下来的时间换成了「PR 上也跑」——原来只在 main
+  # 上跑，等于问题合进来了才报警。
+  release-permissions:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -73,14 +86,33 @@ jobs:
           channel: stable
           cache: true
 
+      # 只缓存 gradle 本体（~200MB），不缓存 ~/.gradle/caches。实测过：把 caches
+      # 一起缓存，第二次跑虽然快（75s vs 172s），但 AGP 在配置阶段装 NDK 会失败
+      # （报 commons-compress 的 ZipFile 异常，即安装包被判为损坏）。稳定优先。
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper
+          key: gradle-wrapper-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-wrapper-${{ runner.os }}-
+
       - run: flutter pub get
 
-      # 仓库里没有 release.jks / key.properties，会退回 debug 签名 ——
-      # 这条 job 只关心「权限清单」，不关心签名。
-      - name: 构建 release APK
-        run: flutter build apk --release --target-platform android-arm64
+      # 只生成构建配置（写出 android/local.properties，gradle 靠它找 flutter.sdk），
+      # 不编译 Dart、不打 APK。没有这一步 gradle 会报 flutter.sdk 未设置。
+      - name: 生成构建配置
+        run: flutter build apk --release --target-platform android-arm64 --config-only
 
-      - name: 检查 APK 权限
+      - name: 合并 release 清单
+        run: cd android && ./gradlew :app:processReleaseManifest --console=plain
+
+      - name: 检查合并后的权限
         run: |
-          APK=$(ls build/app/outputs/flutter-apk/*-release.apk | head -1)
-          bash tools/check_no_network.sh "$APK"
+          M=$(find build/app/intermediates -ipath '*merged_manifests/release*' -name AndroidManifest.xml | head -1)
+          if [ -z "$M" ]; then
+            echo "::error::没找到合并后的清单 —— 构建目录结构可能随 AGP 版本变了，先看下面列出来的"
+            find build/app/intermediates -name AndroidManifest.xml | head -20
+            exit 1
+          fi
+          echo "清单：$M"
+          bash tools/check_no_network.sh "$M"
