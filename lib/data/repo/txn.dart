@@ -210,6 +210,17 @@ Future<List<Txn>> _repoListTxns({
 );
 
   /// 某一期的明细，条件打在 `period_start` 上；排序仍按真实 `date`。
+  ///
+  /// 翻页有两种方式，不要混用：
+  /// - **[offset]**：简单，但翻页期间只要有新流水插进来，「第 2 页」就会整体
+  ///   后移一位 —— 用户会看到某条重复出现、另一条被跳过。只在「一次取完、
+  ///   不翻页」的场合用它（比如导入时比对重复）。
+  /// - **游标 [afterDate] + [afterId]**：从「上一页最后一条」之后继续取。
+  ///   排序是 `date DESC, id DESC`，所以条件是
+  ///   `date < 游标日 OR (date = 游标日 AND id < 游标 id)`。
+  ///   翻页期间插入的新流水只会出现在列表**顶部**，不会把后面几页顶歪。
+  ///
+  /// 两个游标必须成对出现；只给一个会退回 offset 模式（避免拼出半截条件）。
 Future<List<Txn>> _repoRangeListTxns({
   required int ledgerId,
   required String from,
@@ -220,6 +231,8 @@ Future<List<Txn>> _repoRangeListTxns({
   int limit = 500,
   int offset = 0,
   DateBasis basis = DateBasis.period,
+  String? afterDate,
+  int? afterId,
 }) async {
   final db = await Db.open();
   final where = StringBuffer(
@@ -241,13 +254,24 @@ Future<List<Txn>> _repoRangeListTxns({
     where.write(' AND $kwSql');
     args.addAll(kwArgs);
   }
+  // 游标翻页：接着上一页最后一条往后取。条件必须和 orderBy
+  // （`date DESC, id DESC`）严格对应，差一项就会漏行或重复。
+  final hasCursor = afterDate != null && afterId != null;
+  if (hasCursor) {
+    where.write(' AND (date < ? OR (date = ? AND id < ?))');
+    args
+      ..add(afterDate)
+      ..add(afterDate)
+      ..add(afterId);
+  }
   final rows = await db.query(
     'txn',
     where: where.toString(),
     whereArgs: args,
     orderBy: 'date DESC, id DESC',
     limit: limit,
-    offset: offset,
+    // 有游标时不能再叠加 offset：两个一起用会跳过整整一页
+    offset: hasCursor ? 0 : offset,
   );
   return rows.map(Txn.fromMap).toList();
 }

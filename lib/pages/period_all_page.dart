@@ -65,12 +65,17 @@ class _PeriodAllPageState extends State<PeriodAllPage> {
   Future<void> _loadMore() async {
     if (_loading || _done) return;
     _loading = true;
+    // 游标翻页：接着上一页最后一条往后取。
+    // 原先用 `offset: _txns.length`，只要用户在翻页过程中又记了一笔，
+    // 第二页就会整体后移一位 —— 某条重复出现、另一条被跳过。
+    final last = _txns.isEmpty ? null : _txns.last;
     final batch = await Repo.rangeListTxns(
       ledgerId: _ledgerId,
       from: _from,
       to: _to,
       limit: _batch,
-      offset: _txns.length,
+      afterDate: last?.date,
+      afterId: last?.id,
     );
     if (!mounted) return;
     setState(() {

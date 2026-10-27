@@ -302,6 +302,9 @@ class Repo {
   }) => _repoListTxns(ledgerId: ledgerId, month: month, type: type, categoryId: categoryId, keyword: keyword, limit: limit, offset: offset);
 
   /// 某一期的明细，条件打在 `period_start` 上；排序仍按真实 `date`。
+  ///
+  /// 翻页优先用游标 [afterDate] + [afterId]（取上一页最后一条），
+  /// 而不是 [offset] —— 理由见 `_repoRangeListTxns` 的文档。
   static Future<List<Txn>> rangeListTxns({
     required int ledgerId,
     required String from,
@@ -312,7 +315,21 @@ class Repo {
     int limit = 500,
     int offset = 0,
     DateBasis basis = DateBasis.period,
-  }) => _repoRangeListTxns(ledgerId: ledgerId, from: from, to: to, type: type, categoryId: categoryId, keyword: keyword, limit: limit, offset: offset, basis: basis);
+    String? afterDate,
+    int? afterId,
+  }) => _repoRangeListTxns(
+    ledgerId: ledgerId,
+    from: from,
+    to: to,
+    type: type,
+    categoryId: categoryId,
+    keyword: keyword,
+    limit: limit,
+    offset: offset,
+    basis: basis,
+    afterDate: afterDate,
+    afterId: afterId,
+  );
 
   /// 批量改分类：一条 UPDATE，要么全中要么全不动。
   ///
