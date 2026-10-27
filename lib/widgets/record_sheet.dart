@@ -577,7 +577,61 @@ class _RecordSheetState extends State<RecordSheet> {
     // 0.90：顶部多了「最近模板」那排之后，0.88 会把备注框切掉一条。
     final maxH = (media.size.height - reserved) * 0.90;
 
-    final body = LayoutBuilder(
+    // 键盘弹出 / 收起时面板整体让位。
+    //
+    // 这里**故意不加 AnimatedPadding / AnimatedSize**：`viewInsets` 是键盘
+    // 升起过程中逐帧变化的，每变一帧就会重建一次。加了 180ms 动画，等于每帧
+    // 都把动画重新起步，面板永远追不上键盘 —— 表现就是「先僵硬地缩一下、
+    // 卡半拍、再突然跳到终点」，观感正是「关掉一页又开了一页」。
+    //
+    // 直接跟随 viewInsets 反而最顺：键盘推多少，面板就让多少，两者同帧同步。
+    // 代价是「切换收支导致模板条出现/消失」时高度是突变的，但那一下本来也
+    // 不该有慢动作。
+    // 布局完成之后才知道有没有溢出，所以滚动提示只能在下一帧同步。
+    // [_syncScrollHint] 自带「值没变就不 setState」，不会打转。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollHint());
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: reserved),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: maxH,
+          // 钉住高度：数字键盘收起时若让面板跟着塌，就是那一下「缩回去」
+          minHeight: typingNote ? maxH : 0,
+        ),
+        child: ClipRRect(
+          // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
+          // 留白不会跟着变白
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.lg)),
+          // 面板面用卡面（纯白），不是页面底（纸白）：底与面同色会糊成一片
+          child: Container(
+            color: C.cardBg,
+            child: _sheetBody(
+              context,
+              keyboard: keyboard,
+              typingNote: typingNote,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 面板主体：头部 → 模板条 → 模式页签 → 金额 → 可滚动信息区 → 数字键盘。
+  ///
+  /// 单独抽出来，是为了让 [build] 只剩「让位计算 + 外壳」这十几行 —— 那部分每个
+  /// 数值（`reserved` / `maxH` / `typingNote`）背后都是一段真机上的踩坑记录，混在
+  /// 三百行的 widget 树里根本读不出来，改一行要靠猜。
+  ///
+  /// 键高要等 layout 结果才知道，所以整块仍留在 `LayoutBuilder` 里。`keyboard` 与
+  /// `typingNote` 是上面算好的让位结论，往下传而不重算 —— 重算等于把「输入法升起
+  /// 的那 3~5 帧」那段判断写成两份，迟早走岔。
+  Widget _sheetBody(
+    BuildContext context, {
+    required double keyboard,
+    required bool typingNote,
+  }) {
+    return LayoutBuilder(
       builder: (context, box) {
         // 键高跟着可用高度走：先给头部 / 金额 / 信息区留 380，剩下 5 排均分。
         // 56 是设计值（46 → 52 → 56，键偏矮不好按），只有矮屏才往下收 ——
@@ -643,7 +697,7 @@ class _RecordSheetState extends State<RecordSheet> {
               },
             ),
             _AmountDisplay(input: _amountInput),
-            Divider(height: 1, thickness: hairlineOf(context), color: C.line),
+            _hairline(context),
             // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
             // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
             Flexible(
@@ -673,22 +727,14 @@ class _RecordSheetState extends State<RecordSheet> {
                             onCountChanged: (v) =>
                                 setState(() => _countInBudget = v),
                           ),
-                          Divider(
-                            height: 1,
-                            thickness: hairlineOf(context),
-                            color: C.line,
-                          ),
+                          _hairline(context),
                           _NoteField(
                             key: _noteKey,
                             controller: _note,
                             focusNode: _noteFocus,
                             onSubmitted: (_) => _noteFocus.unfocus(),
                           ),
-                          Divider(
-                            height: 1,
-                            thickness: hairlineOf(context),
-                            color: C.line,
-                          ),
+                          _hairline(context),
                         ] else ...[
                           _CategoryNoteRow(
                             category: Store.i.categoryOf(_categoryId),
@@ -698,11 +744,7 @@ class _RecordSheetState extends State<RecordSheet> {
                             note: _note,
                             onTap: _pickCategory,
                           ),
-                          Divider(
-                            height: 1,
-                            thickness: hairlineOf(context),
-                            color: C.line,
-                          ),
+                          _hairline(context),
                         ],
                         // 有详情字段时，备注框提到分类下面（它不是必填项，
                         // 藏起来用户就当它不存在了）。
@@ -713,11 +755,7 @@ class _RecordSheetState extends State<RecordSheet> {
                             focusNode: _noteFocus,
                             onSubmitted: (_) => _noteFocus.unfocus(),
                           ),
-                          Divider(
-                            height: 1,
-                            thickness: hairlineOf(context),
-                            color: C.line,
-                          ),
+                          _hairline(context),
                         ],
                         // 日期 / 账户**必须在详情区前面**。
                         // 原来顺序是「备注 → 详情 → 日期账户」，一展开详情，
@@ -747,11 +785,7 @@ class _RecordSheetState extends State<RecordSheet> {
                         // 详情区放最后：它展开时只会往下长，不会把上面任何
                         // 一行挤走。
                         if (!_isLending && _fields.isNotEmpty) ...[
-                          Divider(
-                            height: 1,
-                            thickness: hairlineOf(context),
-                            color: C.line,
-                          ),
+                          _hairline(context),
                           _DetailBlock(
                             fields: _fields,
                             folded: _folded,
@@ -843,11 +877,7 @@ class _RecordSheetState extends State<RecordSheet> {
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Divider(
-                          height: 1,
-                          thickness: hairlineOf(context),
-                          color: C.line,
-                        ),
+                        _hairline(context),
                         CalcKeypad(
                           onKey: _pressKey,
                           onConfirm: _save,
@@ -861,37 +891,13 @@ class _RecordSheetState extends State<RecordSheet> {
         );
       },
     );
-
-    // 键盘弹出 / 收起时面板整体让位。
-    //
-    // 这里**故意不加 AnimatedPadding / AnimatedSize**：`viewInsets` 是键盘
-    // 升起过程中逐帧变化的，每变一帧就会重建一次。加了 180ms 动画，等于每帧
-    // 都把动画重新起步，面板永远追不上键盘 —— 表现就是「先僵硬地缩一下、
-    // 卡半拍、再突然跳到终点」，观感正是「关掉一页又开了一页」。
-    //
-    // 直接跟随 viewInsets 反而最顺：键盘推多少，面板就让多少，两者同帧同步。
-    // 代价是「切换收支导致模板条出现/消失」时高度是突变的，但那一下本来也
-    // 不该有慢动作。
-    // 布局完成之后才知道有没有溢出，所以滚动提示只能在下一帧同步。
-    // [_syncScrollHint] 自带「值没变就不 setState」，不会打转。
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollHint());
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: reserved),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: maxH,
-          // 钉住高度：数字键盘收起时若让面板跟着塌，就是那一下「缩回去」
-          minHeight: typingNote ? maxH : 0,
-        ),
-        child: ClipRRect(
-          // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
-          // 留白不会跟着变白
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.lg)),
-          // 面板面用卡面（纯白），不是页面底（纸白）：底与面同色会糊成一片
-          child: Container(color: C.cardBg, child: body),
-        ),
-      ),
-    );
   }
 }
+
+/// 1 物理像素的分隔线。
+///
+/// `Divider` 的三个参数在这个文件里出现七次，每次都是同一组值。重复七遍的代价不是
+/// 多敲几个字，而是「改分隔线颜色」要改七处 —— 漏一处就只有那一条颜色不对，肉眼
+/// 极难发现。
+Widget _hairline(BuildContext context) =>
+    Divider(height: 1, thickness: hairlineOf(context), color: C.line);
