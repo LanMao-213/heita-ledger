@@ -177,4 +177,73 @@ void main() {
       }
     });
   });
+
+  group('record_sheet 的分部边界', () {
+    /// 「记一笔」拆成三份：门面 + 状态机、行为方法、展示型组件。
+    ///
+    /// 拆的理由写在三个文件的注释头里。这里守的是**拆完之后又长回去**：
+    /// 下次要加一个展示型 widget，最顺手的位置是主文件末尾；要加一个动作
+    /// 方法，最顺手的是塞回状态类。这两种「顺手」都不会让任何行为测试变红，
+    /// 半年后这个文件就重新变回一千六百行。
+    const facade = 'lib/widgets/record_sheet.dart';
+
+    test('主文件只放状态机与布局，展示型组件在 rows.dart、行为方法在 actions.dart', () {
+      // 允许的顶层声明，只有这三个
+      const allowed = {
+        'class RecordOutcome {',
+        'class RecordSheet extends StatefulWidget {',
+        'class _RecordSheetState extends State<RecordSheet> {',
+      };
+      final decls = _read(facade)
+          .split('\n')
+          .map((l) => l.trimRight())
+          .where((l) => l.startsWith('class ') || l.startsWith('enum '))
+          .toSet();
+      expect(
+        decls.difference(allowed),
+        isEmpty,
+        reason: '新的类/枚举请放进 record_sheet/ 下的分部：'
+            '${decls.difference(allowed).join(' | ')}',
+      );
+      expect(
+        allowed.difference(decls),
+        isEmpty,
+        reason: '主文件少了预期声明（被改名或搬走了？改完请同步这条守卫）',
+      );
+    });
+
+    test('行为方法只经 _rebuild 触发重建（extension 调不了 setState）', () {
+      final src = _read('lib/widgets/record_sheet/actions.dart');
+      expect(
+        src.contains('setState('),
+        isFalse,
+        reason: 'extension 不是 State 子类，setState 是 @protected；'
+            '请改用 _rebuild(...)，它在状态类里只做转发',
+      );
+    });
+
+    test('主文件的 part 声明与 record_sheet/ 目录一致', () {
+      final declared = RegExp(r"part 'record_sheet/([a-z_]+)\.dart';")
+          .allMatches(_read(facade))
+          .map((m) => '${m.group(1)}.dart')
+          .toSet();
+      final onDisk = Directory('lib/widgets/record_sheet')
+          .listSync()
+          .whereType<File>()
+          .map((f) => f.uri.pathSegments.last)
+          .where((n) => n.endsWith('.dart'))
+          .toSet();
+      expect(declared, isNotEmpty);
+      expect(
+        onDisk.difference(declared),
+        isEmpty,
+        reason: '目录里有文件没被 part，永远不会被编译',
+      );
+      expect(
+        declared.difference(onDisk),
+        isEmpty,
+        reason: 'part 指向了不存在的文件',
+      );
+    });
+  });
 }
