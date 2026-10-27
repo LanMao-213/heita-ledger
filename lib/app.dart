@@ -1,10 +1,9 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'design/icons.dart';
+import 'design/splash_spec.dart';
 import 'design/theme_ctrl.dart';
 import 'design/tokens.dart';
 import 'dev/seed.dart';
@@ -116,28 +115,25 @@ class _BootGateState extends State<_BootGate> {
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
 
-  /// 深色启动页的径向渐变。
+  /// 深色启动页的径向渐变。参数在 `design/splash_spec.dart`（Dart 侧唯一来源）。
   ///
-  /// ⚠️ 这四个参数必须与
+  /// ⚠️ 那几个参数必须与
   /// `android/app/src/main/res/drawable-v21/launch_background.xml` 完全一致
-  /// （中心 50%/44%、半径 95% 短边、#2C323E → #07080B）。任何一边改动都要同步，
+  /// （中心 50%/44%、半径 95% 短边、#2C323E → #07080B）。原生那份是 XML，
+  /// 跨语言共享不了，任何一边改动都要手工同步，
   /// 否则冷启动时「原生窗口 → Flutter 首帧」会看到渐变位置跳动。
-  static const gradient = RadialGradient(
-    center: Alignment(0, -0.12), // y = (44% - 50%) * 2
-    radius: 0.95,
-    colors: [Color(0xFF2C323E), Color(0xFF07080B)],
-    stops: [0.0, 1.0],
-  );
+  static const gradient = kSplashGradient;
 
   /// 渐变最外圈的颜色，用作无渐变时的兜底底色
-  static const edge = Color(0xFF07080B);
+  static const edge = kSplashEdge;
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    // 用户选定的「D · 留白 88%」：标志宽 = 屏宽 × 0.88，
-    // 高度按标志自身比例 455:944 推导；再夹一道屏高上限，防止平板上撑爆。
-    final markH = math.min(size.width * 0.88 * 944 / 455, size.height * 0.92);
+    // 方案①「D · 留白 88%」：宽 = 屏宽 × 0.88，高按标志自身比例 455:944 推导，
+    // 再夹一道屏高上限（平板 / 折叠屏）。三个参数见 design/splash_spec.dart，
+    // 测试与实现共用同一份，不各写一套。
+    final markH = splashMarkHeight(size);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       // 深色底必须配浅色状态栏图标，否则时间和电量会看不见

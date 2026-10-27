@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/app.dart' show kAppName;
 import 'package:ledger/design/icons.dart';
+import 'package:ledger/design/splash_spec.dart';
 import 'package:ledger/design/tokens.dart';
 
 final _key = GlobalKey();
@@ -33,23 +34,15 @@ Future<void> _loadFont() async {
   }
 }
 
-/// 与 lib/app.dart 中 _SplashScreen 完全一致的视觉参数
-const _gradient = RadialGradient(
-  center: Alignment(0, -0.12),
-  radius: 0.95,
-  colors: [Color(0xFF2C323E), Color(0xFF07080B)],
-  stops: [0.0, 1.0],
-);
-
 Widget _splash(double markH) => MaterialApp(
   debugShowCheckedModeBanner: false,
   home: RepaintBoundary(
     key: _key,
     child: Scaffold(
-      backgroundColor: const Color(0xFF07080B),
+      backgroundColor: kSplashEdge,
       body: SizedBox.expand(
         child: DecoratedBox(
-          decoration: const BoxDecoration(gradient: _gradient),
+          decoration: const BoxDecoration(gradient: kSplashGradient),
           child: Center(
             child: BrandMark(
               height: markH,
@@ -71,8 +64,10 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    const screenW = 390.0;
-    const markH = screenW * 0.88 * 944 / 455; // 与 app.dart 同一公式
+    const screen = Size(390, 844);
+    // 尺寸从 design/splash_spec.dart 取，不再抄一遍公式 ——
+    // 抄公式的版本漏掉了屏高钳制，改实现它不会红。
+    final markH = splashMarkHeight(screen);
 
     await tester.pumpWidget(_splash(markH));
     // 等淡入 + 缩放动画走完，截到的是终态
@@ -92,13 +87,15 @@ void main() {
           .writeAsBytesSync(data!.buffer.asUint8List());
     });
 
-    // 打印关键尺寸，便于核对是否等于「宽 88%」
+    // 方案①「D · 留白 88%」：19.5:9 的屏上钳制不介入，宽度应恰好是 88%
     final size = tester.getSize(find.byType(BrandMark));
+    expect(size.width / screen.width, closeTo(kSplashMarkWidthRatio, 0.005));
+    expect(size.height, closeTo(markH, 0.5));
     // ignore: avoid_print
     print(
       '$kAppName 启动页 —— 标志 ${size.width.toStringAsFixed(1)} × '
       '${size.height.toStringAsFixed(1)}，占屏宽 '
-      '${(size.width / screenW * 100).toStringAsFixed(1)}%',
+      '${(size.width / screen.width * 100).toStringAsFixed(1)}%',
     );
   });
 }
