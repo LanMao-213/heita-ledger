@@ -65,6 +65,7 @@
 
 | 版本 | 日期 | Git 标签 | 当时怎么签的名 | 这一版的关键变化 |
 | --- | --- | --- | --- | --- |
+| 未发版 · 记一笔拆分 | 2026-10-27 | — | 正式密钥 | **只动结构，不改行为**：`record_sheet.dart` 1627 → 621 行（行为方法 → `record_sheet/actions.dart`，展示型组件 → `record_sheet/rows.dart`）；`build` 350 → 71 行；7 处重复分隔线收成一个 `_hairline`；结构护栏 7 → 10 条。每步截图对拍 27 张 0 差异。**未打版，`pubspec.yaml` 仍是 1.5.0+24** |
 | 未发版 · 数据完整性 | 2026-10-27 | — | 正式密钥 | **schema v8 → v9**：加两条部分唯一索引，周期账单重复生成、同一账本同一期两份总预算，从此在数据库层面插不进（原先只靠代码挡）；迁移先清存量重复再建索引，周期流水一条不删、金额一分不动。明细分页由 offset 改游标，翻页期间记账不再重复或漏行。测试 525 → 535。**未打版，`pubspec.yaml` 仍是 1.5.0+24** |
 | 未发版 · 结构整理 | 2026-10-26 | — | 正式密钥 | **只动结构，不改行为**：`repo.dart` 1869 → 门面 502 + 12 分部；`bill_csv.dart` 885 → 门面 74 + 5 分部；`models.dart` 1143 → 库入口 16 + 5 分部；`Store` 31 个公开可变字段全私有化（外部只能读）、用例方法抽成 `store/actions.dart`；新增 7 条结构护栏测试；布局回归网抓到 2 个真实溢出并修；另有账单解析三处缺陷修复（引号内换行、列错位、指纹幂等）。**未打版，`pubspec.yaml` 仍是 1.5.0+24** |
 | **1.5.0+24** | 2026-10-26 | 待打 | 正式密钥 | **支付宝/微信账单 CSV 导入**（逐行「算入」开关、收入默认不勾、疑似重复标黄但保留、导入不改余额而是调期初、编码不硬解）；**明细页多选**（顶栏 + 长按菜单两个入口、全选可见行、批量改分类/批量删除）；导出当前筛选；出包七项校验 + 隐私扫描扩到「工作树 + 历史 + 交付物」；统计聚合拆出 `repo_stats.dart`；**隐私文案与实现对齐**（「卸载即清空」改为「卸载会删本机数据，但系统备份可能留副本」，并可点开看数据存哪）；**schema 仍 v8** —— **未发版，等真机确认** |
@@ -92,6 +93,62 @@
 - **1.2.0 没有独立的包**，做完了直接并进 1.3.0 一起发。`git log` 里看不到 1.2.0 这个版本号。
 
 发版流程、签名文件放哪、换机器怎么出包，见 `docs/交接说明.md` 第 5 节。
+
+---
+
+## 未发布 · 记一笔拆分 — 2026-10-27
+
+> `pubspec.yaml` 仍是 `1.5.0+24`（真机没过不升版本）。
+> **只动结构，不改行为**：每拆一步都跑截图对拍，27 张逐像素一致（容差 0）。
+
+`record_sheet.dart` 是全项目最长的文件（1627 行）。拆完之后：
+
+| 文件 | 行数 | 装什么 |
+| --- | --- | --- |
+| `widgets/record_sheet.dart` | 621 | 门面、`RecordOutcome`、`showRecordSheet`、状态字段、派生 getter、生命周期、布局 |
+| `widgets/record_sheet/actions.dart` | 317 | 14 个行为方法（`extension _RecordSheetActions`） |
+| `widgets/record_sheet/rows.dart` | 750 | 12 个展示型组件 |
+
+按**职责**切，而不是按「详情字段区 / 键盘区 / 顶部金额区」切。后者看着更直观，
+但三个区域共享同一批局部变量（`typingNote`、`keyboard`、`reserved`），按区域切
+只会把它们变成一层层往下传的参数；按职责切是「状态机 / 行为 / 组件」三条真正
+独立的边界。
+
+### 三处值得写下来的细节
+
+1. **`State.setState` 带 `@protected`，extension 不算子类**。所以行为方法搬进
+   extension 后，12 处 `setState(...)` 全部会触发
+   `invalid_use_of_protected_member` —— 本项目门禁是 `--fatal-infos`，这是硬错误。
+   解法是状态类里留一行转发 `_rebuild([VoidCallback? fn])`，语义完全相同。
+   动手前先用三个探针（临时文件 + `flutter analyze`）确认了：私有字段可读写、
+   方法 tear-off 能解析、`widget` / `context` / `mounted` 都没有 `@protected`。
+   不先确认 tear-off 那条，一搬就是全线报错。
+
+2. **`build` 350 → 71 行**。原来的 `final body = LayoutBuilder(` 改成
+   `return LayoutBuilder(`，在**同一缩进列**，所以 260 行的 widget 树连缩进都不用
+   动就能整体搬进 `_sheetBody`。这种切法能用「逐字 diff」验证，比事后靠肉眼可靠。
+
+3. **7 处同构的 `Divider(height: 1, thickness: hairlineOf(context), color: C.line)`
+   收成 `_hairline(context)`**。重复七遍的代价不是多敲几个字，而是改分隔线颜色
+   要改七处，漏一处只有那一条不对，肉眼几乎发现不了。
+
+### 新增 3 条结构护栏（7 → 10）
+
+拆完最怕的是「下次又长回去」：加组件最顺手的位置是主文件末尾，加方法最顺手的是
+塞回状态类。这两种顺手**都不会让任何行为测试变红**，所以补了三条读源码的守卫：
+
+- 主文件的顶层 `class` / `enum` 只能有 `RecordOutcome`、`RecordSheet`、
+  `_RecordSheetState` 三个；
+- `actions.dart` 里不许出现 `setState(`（必须走 `_rebuild`）；
+- 主文件的 `part` 声明与 `record_sheet/` 目录里的文件双向一致（防止有文件没被
+  `part`、永远不会被编译）。
+
+### 验证
+
+`flutter analyze --fatal-infos` 0 issue；`flutter test` **535 条全绿**（其中结构
+护栏 10 条）；三处搬迁各自做了逐字 diff（731 行 / 260 行 / 292 行，除预期的
+`final body =` → `return`、`setState(` → `_rebuild(`、`Divider(` → `_hairline(`
+之外完全一致）；截图对拍 27 张全部 0 差异。
 
 ---
 
@@ -131,6 +188,10 @@ ux_budget_total        ON budget (ledger_id, period_start) WHERE category_id IS 
 
 **升级影响**：v8 及更早的库首次打开会跑一次 v9 迁移，只清重复 + 建索引，不动金额。
 装回 v8 及更早的包会被 `onDowngrade` 拦住并给出「账目都还在，先装回新版」的提示（既有行为）。
+
+顺带补掉一处历史遗留：`txn.debt_id` 的索引在「v7/v8 时期全新安装、之后没再升级」
+的设备上一直是缺的（当年的建表脚本没有它，`_addDebtTable` 也不会再对这批设备跑），
+表现为借还款流水攒多之后往来页变慢，且**没有任何报错**。v9 迁移里补建一次。
 
 ### 明细分页：offset → 游标（keyset）
 

@@ -163,6 +163,8 @@ lib/
     brand_paths.dart   品牌标志路径
   pages/               明细 / 图表 / 计划 / 我的 / 分类 / 周期账单 / 模板
   widgets/             公共组件、图表、记一笔面板
+    record_sheet.dart      记一笔面板：状态机 + 布局
+    record_sheet/          行为方法(actions) / 展示型组件(rows)，part 分部
 docs/
   交接说明.md          落地文档:环境、坑、代码地图、当前进度
   版本对比.md          原版 vs 一次「从零重写」的逐项对比与决策记录
