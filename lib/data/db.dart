@@ -54,7 +54,13 @@ class Db {
   /// 8：`account` 增加 `opening_cents`（期初 / 手工校准值）。
   ///    **余额从此可对账**：`balance_cents = opening_cents + 流水合计`。
   ///    老库按 `opening = 余额 − 流水合计` 回填，升级后余额一分不变。
-  static const _version = 8;
+  /// 9：加两条**部分唯一索引**，把两类重复从「代码里挡」变成「物理上不可能」：
+  ///    · `txn(recurring_id, date)`：同一周期同一天生成两条流水；
+  ///    · `budget(ledger_id, period_start) WHERE category_id IS NULL`：
+  ///      同一账本同一期存两份总预算（表级 UNIQUE 对 NULL 不生效，这是漏洞所在）。
+  ///    迁移前先清存量重复：周期流水只把多余那条的 `recurring_id` 置 NULL
+  ///    （**不删流水，钱一分不动**）；重复的总预算保留最新一条（预算是设置项）。
+  static const _version = 9;
 
   /// 当前 schema 版本。备份文件里会记下来，恢复时用来判断兼容性。
   static int get schemaVersion => _version;
@@ -114,6 +120,9 @@ class Db {
         }
         if (oldVersion < 8) {
           await _addOpeningBalanceColumn(db);
+        }
+        if (oldVersion < 9) {
+          await _addUniqueIndexes(db);
         }
       },
       // 装了旧版本（库里的 schema 比这个包新）时走到这里。sqflite 默认会直接
@@ -256,6 +265,13 @@ class Db {
       //   于是「全新装机的库」一直缺它 —— 由 `schema_equivalence_test` 当场抓到。
       //   写成 IF NOT EXISTS 是为了与升级路径重复执行时也不报错。
       'CREATE INDEX IF NOT EXISTS idx_txn_debt ON txn (debt_id)',
+      // ★ v9：把「同一周期同一天生成两条流水」变成物理不可能。
+      //   `WHERE recurring_id IS NOT NULL` 是必需的，不是保险措施 ——
+      //   SQLite 的唯一索引不比较 NULL，手工记的流水 `recurring_id` 全是 NULL，
+      //   不加 WHERE 的话任意多条 NULL 组合都能插进去，等于没加。
+      '''
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_txn_recurring_date
+        ON txn (recurring_id, date) WHERE recurring_id IS NOT NULL''',
 
       '''
       CREATE TABLE budget (
@@ -266,6 +282,14 @@ class Db {
         amount_cents INTEGER NOT NULL DEFAULT 0,
         UNIQUE (ledger_id, period_start, category_id)
       )''',
+
+      // ★ v9：上面那条表级 UNIQUE 对 NULL 不生效 —— `category_id IS NULL` 表示
+      //   「总预算」，而 NULL 彼此永不相等，于是同一账本同一期能插出多份总预算，
+      //   「可用额度」的分母就不唯一了。这条部分唯一索引把总预算钉成一份。
+      //   （分类预算已被表级 UNIQUE 覆盖，不需要再加一条等价的索引。）
+      '''
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_budget_total
+        ON budget (ledger_id, period_start) WHERE category_id IS NULL''',
 
       '''
       CREATE TABLE saving_goal (
@@ -432,7 +456,63 @@ class Db {
     ''');
   }
 
-  /// 首次安装的默认数据：一个账本、几个常用账户、原型里的全套分类。  /// **不预置任何交易记录** —— 账本应该从用户自己的第一笔开始。
+  /// v9：加两条部分唯一索引，把两类重复从「代码里挡」改成「物理上不可能」。
+  ///
+  /// 顺序必须是**先清存量重复、再建索引**：老库若已存在重复行，直接
+  /// `CREATE UNIQUE INDEX` 会让整条迁移抛异常，用户看到的是启动页打不开。
+  ///
+  /// 两类重复的代价完全不同，所以处理方式也必须不同：
+  /// - **周期流水**：重复生成的那条，钱已经记进余额了，**绝不能删**。只把多余那条
+  ///   的 `recurring_id` 置 NULL —— 它降级成一笔普通流水，余额、统计、明细全不变，
+  ///   只是不再被「周期」认领。每组保留 id 最小的一条作为周期归属。
+  /// - **总预算**：预算是设置项不是账目，重复的两条最终只有一份生效，
+  ///   保留 id 最大（最近一次设置）的一条。
+  ///
+  /// 幂等：两张表都先探测存在再操作（测试会造只含单表的极简库），
+  /// 索引一律 `IF NOT EXISTS`，重复执行不报错。
+  static Future<void> _addUniqueIndexes(Database db) async {
+    final hasTxn = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'txn'",
+    );
+    if (hasTxn.isNotEmpty) {
+      await db.execute('''
+        UPDATE txn SET recurring_id = NULL
+        WHERE recurring_id IS NOT NULL
+          AND id NOT IN (
+            SELECT MIN(id) FROM txn
+            WHERE recurring_id IS NOT NULL
+            GROUP BY recurring_id, date
+          )
+      ''');
+      await db.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_txn_recurring_date
+          ON txn (recurring_id, date) WHERE recurring_id IS NOT NULL
+      ''');
+    }
+
+    final hasBudget = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'budget'",
+    );
+    if (hasBudget.isNotEmpty) {
+      await db.execute('''
+        DELETE FROM budget
+        WHERE category_id IS NULL
+          AND id NOT IN (
+            SELECT MAX(id) FROM budget
+            WHERE category_id IS NULL
+            GROUP BY ledger_id, period_start
+          )
+      ''');
+      await db.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_budget_total
+          ON budget (ledger_id, period_start) WHERE category_id IS NULL
+      ''');
+    }
+  }
+
+  /// 首次安装的默认数据：一个账本、几个常用账户、原型里的全套分类。
+  ///
+  /// **不预置任何交易记录** —— 账本应该从用户自己的第一笔开始。
   ///
   /// 参数是 [DatabaseExecutor] 而不是 `Database`：清空数据时它要在**事务里**
   /// 重建（见 [wipeAllData]），事务对象同样满足这个接口。
