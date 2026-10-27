@@ -152,7 +152,7 @@ lib/
   app.dart             主题、启动闸门、开屏、版本号常量
   store.dart           全局状态(ChangeNotifier),页面都读它
   data/
-    db.dart            建表 / 种子数据 / 版本迁移(schema v8)
+    db.dart            建表 / 种子数据 / 版本迁移(schema v9)
     models.dart        数据模型 + 格式化工具 Fmt
     repo.dart          所有 SQL 都在这里,页面不直接碰库
     excel_service.dart 导入导出 xlsx
