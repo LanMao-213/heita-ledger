@@ -310,4 +310,28 @@ void main() {
     expect((await Db.cached!.query('txn')).length, 1);
     expect((await Db.cached!.query('budget')).length, 1);
   });
+
+  test('v7/v8 装机后未再升级的设备：升到 v9 时补回 idx_txn_debt', () async {
+    // 这一批设备的状态很特殊：建表脚本当年没有这条索引，`_addDebtTable`（v6→v7）
+    // 又只对更老的库跑 —— 两边的补偿都轮不到它们。所以升 v9 时必须顺手补一次，
+    // 否则 `txn.debt_id` 永远没索引，借还款攒多之后往来页越用越慢。
+    await Db.open();
+    final db = Db.cached!;
+
+    await db.execute('DROP INDEX IF EXISTS idx_txn_debt');
+    await db.execute('PRAGMA user_version = 8');
+
+    final before = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_txn_debt'",
+    );
+    expect(before, isEmpty, reason: '前置条件：模拟的设备上确实没有该索引');
+
+    await Db.close();
+    await Db.open(); // 这一步触发 v8 → v9
+
+    final after = await Db.cached!.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_txn_debt'",
+    );
+    expect(after, hasLength(1), reason: 'v9 迁移要把这条历史遗留索引补上');
+  });
 }

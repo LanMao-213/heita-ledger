@@ -488,6 +488,18 @@ class Db {
         CREATE UNIQUE INDEX IF NOT EXISTS ux_txn_recurring_date
           ON txn (recurring_id, date) WHERE recurring_id IS NOT NULL
       ''');
+
+      // 顺带补一条历史遗留：**v7/v8 时期全新安装**的设备，建表时用的
+      // `_createSchema` 还没有这条索引，而 `_addDebtTable`（v6→v7）对它们
+      // 不会再跑第二次 —— 于是 `txn.debt_id` 一直裸着。借还款流水攒多之后，
+      // 往来页按 `debt_id` 回查会走全表扫描。迁移时补一次，代价只有一次
+      // `CREATE INDEX IF NOT EXISTS`。
+      //
+      // 位置必须在 `hasTxn` 里面：极简老库可能没有 `txn` 表。
+      // 而任何升到 v9 的库都已经过 v6→v7，`debt_id` 列一定在。
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_txn_debt ON txn (debt_id)',
+      );
     }
 
     final hasBudget = await db.rawQuery(
