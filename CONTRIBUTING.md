@@ -15,8 +15,8 @@
 
 - [ ] `git push` 成功，远端能看到自己的分支
 - [ ] `flutter analyze` 输出 `No issues found!`
-- [ ] `flutter test` 全过（当前 **306 条**）
-- [ ] 知道哪些文件**绝对不能**提交（见第 7 节）
+- [ ] `flutter test` 全过（条数以 `CHANGELOG.md` 最新一条为准，别在这里写死）
+- [ ] 知道哪些文件**绝对不能**提交（见第 7 节），也知道**提交信息本身也是公开的**（见 6.1）
 
 ---
 
@@ -214,6 +214,25 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy -u ALL_PROXY \
 $env:HTTP_PROXY=""; $env:HTTPS_PROXY=""; $env:NO_PROXY="127.0.0.1,localhost"
 flutter test
 ```
+
+### 6.1 提交信息也算公开内容
+
+仓库是 public，**commit message 一推上去就永久可见**，而且它比文件更难清：
+
+- `git filter-repo --replace-text` 只改**文件内容**，对 message **无效** ——
+  必须用 `--replace-message`。2026-10-24 那次脱敏就是漏在这里：文件树清干净了，
+  三条提交信息里还留着 `C:/Users/<本机用户名>/...`，全程没人发现。
+- 扫描器已经能查：`python tools/privacy_scan.py --messages`（CI 里是
+  `--history --messages`，每次 push 与 PR 都跑）。
+
+写提交信息时的红线，和写代码一样：
+
+| 别写 | 改成 |
+| --- | --- |
+| 本机绝对路径（含真实用户名；反斜杠、双斜杠、结尾无分隔符都算） | `C:/Users/<用户名>/...` 或直接写「本机路径」 |
+| 内网地址、真实 IP | `127.0.0.1` / 「内网地址」 |
+| 手机号、邮箱、真实姓名 | 「用户反馈」「协作者」 |
+| 令牌、口令（哪怕只是举例） | `ghp_xxx` 这种明显占位 |
 
 ---
 

@@ -6,7 +6,8 @@
 .gitignore 挡住了）。命中即打印并退出码 1；干净则打印汇总。
 
     python tools/privacy_scan.py                    # 只看工作树
-    python tools/privacy_scan.py --history          # 再加上历史
+    python tools/privacy_scan.py --messages         # 再加上提交信息
+    python tools/privacy_scan.py --history --messages   # 三处都扫（CI 用这条）
     python tools/privacy_scan.py --history --artifacts ../x.bundle ../y.apk
 
 ## 为什么现在多了 --history 和 --artifacts
@@ -24,6 +25,22 @@
 
 教训不是"脚本写得不好"，而是**扫描范围要靠穷举来定义，不能默认**：
 被跟踪的文件只是三种载体之一，另两种是历史与打包产物。
+
+## 为什么又多了一个 --messages（2026-10-28）
+
+因为**历史树干净 ≠ 历史消息干净**，而上一版只扫树：
+
+`scan_history` 的实现是 `git grep <pattern> <commit>` —— 它读的是每个提交的
+**文件树**，commit message 完全不在射程内。于是 2026-10-28 出现了一个荒唐的
+局面：三条提交信息在解释"已经把本机路径脱敏了"，而它们自己就写着那个路径；
+扫描器却一路报 clean，因为树里确实一个都没剩。
+
+这已经是同型事故的第三次（工作树 → 历史树 → 提交信息），所以这回不再靠
+"记得加参数"，而是把 message 也做成默认会被检查的载体：CI 直接跑
+`--history --messages`。
+
+补充一句更要紧的：commit message 一旦推上公开仓库就是永久可见的，
+`--replace-text` 改不动它（那只作用于文件内容），必须 `--replace-message`。
 
 ## 为什么按「形态」而不是「关键词」扫
 
@@ -71,7 +88,11 @@ PATTERNS: list[tuple[str, re.Pattern]] = [
     # `<用户名>` / `<用户>`（HTML 里会转义成 `&lt;用户名&gt;`）已经是占位符 ——
     # 那正说明脱敏做过了，不算命中
     ('Windows 个人路径', re.compile(
-        r'[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/](?!<|&lt;)[^\\/\s"\'<>]+[\\/]',
+        # 两处都写成 `+` / `?`：实际泄漏过的两种写法是 `C:/Users/12345/` 与
+        # `C://Users//12345`（双斜杠、且结尾没有分隔符）。旧正则只认单斜杠+
+        # 结尾分隔符，于是后者一路漏掉 —— 扫了三遍都报 clean。
+        r'[A-Za-z]:[\\/]+(?:Users|Documents and Settings)[\\/]+(?!<|&lt;)'
+        r'[^\\/\s"\'<>]+[\\/]?',
         re.IGNORECASE)),
     ('macOS/Linux 个人路径', re.compile(
         r'/(?:Users|home)/(?!<|&lt;)[a-z0-9._\-]{2,}/', re.IGNORECASE)),
@@ -220,6 +241,56 @@ def scan_history(cwd: Path) -> list[str]:
     hits = _grep_commits(cwd, revs, '历史 ')
     if truncated:
         hits.append(f'  （历史只扫了最近 {_REV_LIMIT} 个提交，共超过 {_REV_LIMIT} 个）')
+    return hits
+
+
+# 提交信息里会复述的自测样本（不是泄漏）。见 scan_messages 里的用法。
+_MESSAGE_SAMPLE_NOISE = ('3.6.1.8', '/Users/alice', '/home/bob')
+
+
+def scan_messages(cwd: Path, limit: int = 40) -> list[str]:
+    """扫提交信息（commit message）与标签信息。
+
+    为什么要单独一个函数：`scan_history` 用 `git grep <commit>` 只覆盖文件树，
+    message 不在它的射程内 —— 2026-10-28 的三处泄漏就是这么漏掉的
+    （三条消息在解释"已脱敏"，而它们自己写着真实路径）。
+
+    为什么不复用 `_grep_commits` 的粗筛：message 的长度通常只有几百字节，
+    直接逐行精判比再起一个 `git grep` 更快，也省掉一层"ERE 不支持 lookahead"
+    的坑（那个坑见 `_grep_commits` 的注释）。
+
+    分隔符用 `%x1f`（单元分隔）与 `%x1e`（记录分隔）：它们不会出现在正常
+    提交信息里，而 `\n\n` 会 —— 用空行切会把一条消息切成好几段。
+    """
+    r = subprocess.run(
+        ['git', 'log', '--all', '--format=%H%x1f%B%x1e'],
+        cwd=cwd, capture_output=True, text=True, errors='replace')
+    if r.returncode != 0:
+        # 同 _grep_commits：宁可说"扫不了"，也不能报"干净"
+        return [f'  提交信息扫描失败 rc={r.returncode}: {r.stderr.strip()[:160]}']
+
+    hits: list[str] = []
+    for rec in r.stdout.split('\x1e'):
+        rec = rec.strip()
+        if not rec or '\x1f' not in rec:
+            continue
+        sha, _, body = rec.partition('\x1f')
+        for line in body.splitlines():
+            # 这三样是本仓库**自测用例里固定使用的样本值**（见 selftest 与注释），
+            # 于是「讲规则」的提交信息会把它们原样念一遍 —— 那不是泄漏。
+            #
+            # 只在 message 扫描里放行，**不放宽 false_positive**：那条路是文件扫描
+            # 与自测共用的，一放宽，自测里"真实 macOS 用户目录必须命中"那两条
+            # 立刻失效（试过，自测当场红）。
+            if any(s in line for s in _MESSAGE_SAMPLE_NOISE):
+                continue
+            judged = _judge(line)
+            if judged is None:
+                continue
+            hits.append(f'  提交 {sha[:9]}  [{judged[0]}]  {line.strip()[:120]}')
+            if len(hits) >= limit:
+                hits.append('  命中过多，已截断')
+                return hits
     return hits
 
 
@@ -372,12 +443,15 @@ def main() -> int:
         return selftest()
 
     do_history = False
+    do_messages = False
     art_paths: list[str] = []
     i = 0
     while i < len(argv):
         a = argv[i]
         if a == '--history':
             do_history = True
+        elif a == '--messages':
+            do_messages = True
         elif a == '--artifacts':
             i += 1
             while i < len(argv) and not argv[i].startswith('--'):
@@ -415,6 +489,11 @@ def main() -> int:
         h = scan_history(ROOT)
         print(f'[历史]   {len(h)} 处' if h else '[历史]   干净（全部提交的文件树）')
         hits.extend(h)
+
+    if do_messages:
+        m = scan_messages(ROOT)
+        print(f'[提交信息] {len(m)} 处' if m else '[提交信息] 干净（全部提交与标签的信息）')
+        hits.extend(m)
 
     for p in art_paths:
         ap = Path(p).resolve()

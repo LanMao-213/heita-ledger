@@ -24,12 +24,27 @@ jobs:
     timeout-minutes: 25
 
     steps:
+      # fetch-depth: 0 是**必须**的，不是顺手加的。
+      #
+      # 默认 checkout 只拉 1 个提交，`--history` 于是只看得见这一个 ——
+      # 扫描器会报「历史干净」，而它根本没看过历史。这个仓库已经因为
+      # 「范围默认错了」栽过三次（工作树→历史树→提交信息），所以这里
+      # 不留任何默认值。
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # 先跑这条：它不依赖 Flutter，几秒钟就能判断「有没有混进联网的东西」。
       # 放在最前面是为了让这类问题在最便宜的地方失败，而不是等到测试跑完。
       - name: 不联网门禁
         run: bash tools/check_no_network.sh
+
+      # 与上一条同级的「便宜且致命」检查：密钥/令牌/本机路径/个人信息。
+      # --history 扫每个提交的文件树，--messages 扫提交信息 —— 后者是
+      # 2026-10-28 补上的，起因是三条提交信息在解释「已脱敏」时自己写着
+      # 真实路径，而当时的脚本只扫树，全程报 clean。
+      - name: 隐私扫描（文件树 + 历史 + 提交信息）
+        run: python tools/privacy_scan.py --history --messages
 
       - uses: subosito/flutter-action@v2
         with:
