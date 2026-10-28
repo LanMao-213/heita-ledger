@@ -2,7 +2,8 @@
 
 一个**不联网**的 Android 记账 App。所有账目存在手机的 SQLite 里,不注册、不上传、没有云同步;
 换机靠先导出备份、再在新机导入。卸载会删掉本机数据,但安卓的系统备份可能留一份副本,所以换机前
-请先「导出账单」存到电脑。界面是「纸墨」——纸白底、暖灰墨字,不引入装饰色。
+请先「导出账单」存到电脑。界面默认是「纸墨」——纸白底、暖灰墨字,不引入装饰色;
+另外五套皮肤(App 内「我的 → 主题」可切)只换色不改布局,其中两套是深色。
 
 包名 `com.heita.ledger`,Flutter 3.47 / Dart 3.13,Android 7.0(API 24)以上。
 
@@ -12,15 +13,20 @@
 
 | | |
 |---|---|
-| 默认分支 | **`feat/v2-merge`**,版本 **`1.4.6+14`**(未发版) |
-| 已发版 | **`1.4.4+12`**,在 `main`(是 `feat/v2-merge` 的祖先,可 `--ff-only` 快进) |
-| 质量闸门 | `flutter analyze` 0 issue、**310 条测试**全绿(含 24 张界面截图自检) |
-| 规模 | `lib/` 约 1.9 万行、`test/` 约 1.1 万行,无第三方状态管理(就是 `ChangeNotifier`) |
+| 默认分支 | **`main`**,版本 **`1.5.0+24`**(已发版,标签 `v1.5.0`) |
+| 开发分支 | `feat/*`,合进 `main` 后按版本打标签(旧的 `feat/v2-merge` 已并入 `main` 并删除) |
+| 已发版 | **`v1.5.0`**:[Release 页](https://github.com/LanMao-213/heita-ledger/releases/tag/v1.5.0) 带 arm64 APK(19.6 MB) |
+| 质量闸门 | `flutter analyze --fatal-infos` 0 issue、**563 条测试**全绿(含界面截图自检)、出包七项校验、隐私扫描四处载体 |
+| 规模 | `lib/` 约 2.6 万行、`test/` 约 1.7 万行(76 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
 | 许可 | [MIT](LICENSE) |
-| 待办 | 视觉五项(圆角描边 → 字号 → 间距 → 图标 → 动效)已在 **1.4.6** 全部收口;1.4.2 以来十二条行为的**真机验证**未逐条打勾 |
+| 待办 | **1.5.0 没有真机验收**(`adb devices` 全程为空)。要验的四处列在 [`CHANGELOG.md`](CHANGELOG.md) 顶部「待处理事项」第 1 条 |
 
-> 1.4.5 起**只出一套配色**。原先那套「露露缇雅·泽金」和它的编译期开关 `--dart-define=HEITA=1`
-> 已删除,不再需要打两个包 —— 详见 [`CHANGELOG.md`](CHANGELOG.md) 的「未发版」一节。
+> **六套皮肤**在 App 内切换(中性冷灰 / 纸墨暖米 / 露露缇雅·泽金 / 黑塔·永夜 / 血族·深红 / 圣地),
+> 只换色不改布局。1.4.5 曾短暂收成单套配色并把「泽金」连同 `--dart-define=HEITA=1` 编译期开关一起删掉,
+> 1.4.21 起改为运行时换肤,不再需要打两个包。
+>
+> **动过历史的仓库**:提交历史在 2026-10-24 / 10-25 / 10-28 改写过三次(清个人路径与提交信息里的主机名)。
+> 旧克隆不要直接提交,重新 `git clone` 或 `git fetch --all && git reset --hard origin/main`。
 
 ---
 
@@ -47,11 +53,12 @@
 | 明细 | 按日分组、月度概览、多条件筛选、关键词搜索;长按弹出「编辑 / 多选 / 删除」菜单;周期条横扫翻期、双击回本期;keyset 分页 |
 | 多选 | 顶栏「多选」按钮或长按菜单进入;全选(仅当前可见)、批量改分类、批量删除(一次事务、余额逐笔回滚) |
 | 账单导入 | 支付宝 / 微信账单 **CSV**:四步过目、逐行可切换「算入」、收入行默认不勾、相似记录标黄;**不改余额**(历史账,按账户反向调期初) |
-| 图表 | 分类甜甜圈 + 排行(点排行下钻到该分类明细)+ 近 6 期趋势 |
+| 图表 | 分类甜甜圈 + 排行(点排行下钻到该分类明细)+ 近 6 期趋势(点卡片在柱状/折线间切换) |
 | 预算 | 总预算与分类预算、按期归集、节奏(每天能花多少)、借入计入可用额度 |
+| 储蓄目标 | 目标金额与截止日、存钱/取钱记流水、进度环、归档;与预算同在「计划」页 |
 | 借贷往来 | 借出/借入、对方与应还日、剩余按流水算、记还款核销、**可整笔删除(连带回滚余额)**;不计入收支 |
 | Excel | 导出 **12 列** `.xlsx`(含往来列),支持**按当前筛选**导出;按**表头名**定位导入,兼容旧 6 列文件 |
-| 我的 | 备份、恢复、清空、数据安全(自动快照可回滚)、数据体检、关于 |
+| 我的 | 备份(明文 JSON,导出前会提示未加密)、恢复、清空、数据安全(自动快照可回滚)、数据体检、主题切换、关于 |
 
 **明确不做**:云同步、多端、密码锁与生物识别、多币种、年视图、按账户统计、还款提醒(见 PRD 的「不做清单」)。
 
@@ -110,11 +117,15 @@ cd /c/hb/hl && flutter pub get
 flutter build apk --release --target-platform android-arm64
 ```
 
-出包后必须验一遍,**没有这条扫描就别发**:
+出包后必须验两遍,**两条都过才算能发**:
 
 ```bash
+python tools/verify_apk.py <apk路径>                 # 七项:包名/版本/kAppVersion/签名/权限/图标/ABI
 python tools/privacy_scan.py --artifacts <apk路径>   # 应输出「干净」
 ```
+
+`verify_apk.py` 还会核对 `pubspec.yaml`、`lib/app.dart` 的 `kAppVersion` 与包内真实版本三者一致 ——
+改版本时漏改一处,这里会拦住。
 
 `flutter test` 会真的把界面渲染成 PNG 到 `build/visual/`,可直接核对观感;
 布局溢出(文字撑破卡片一类)会让测试失败,比肉眼可靠。
@@ -149,19 +160,24 @@ python tools/privacy_scan.py --artifacts <apk路径>   # 应输出「干净」
 ```
 lib/
   main.dart            入口
-  app.dart             主题、启动闸门、开屏、版本号常量
+  app.dart             主题、启动闸门(**没有启动页**,等待期只铺底色)、版本号常量
   store.dart           全局状态(ChangeNotifier),页面都读它
   data/
     db.dart            建表 / 种子数据 / 版本迁移(schema v9)
-    models.dart        数据模型 + 格式化工具 Fmt
-    repo.dart          所有 SQL 都在这里,页面不直接碰库
-    excel_service.dart 导入导出 xlsx
+    models.dart        数据模型(库入口) + models/ 分部；格式化工具 Fmt
+    repo.dart          SQL 门面(页面不直接碰库) + repo/ 12 个分部
+    repo_stats.dart    统计聚合(与列表查询分开)
+    backup_service.dart 备份 / 恢复 / 自动快照
+    bill_csv.dart      支付宝与微信账单 CSV 解析(门面 + bill/ 分部)
+    integrity.dart     数据体检：余额自洽、孤儿行
   design/
     tokens.dart        配色、间距、圆角、字号(唯一来源)
+    palette.dart       六套皮肤的色值表
+    theme_ctrl.dart    当前皮肤(持久化 + 通知重绘)
     icons.dart         线稿图标库
     svg_path.dart      SVG 路径解析器(手写)
     brand_paths.dart   品牌标志路径
-  pages/               明细 / 图表 / 计划 / 我的 / 分类 / 周期账单 / 模板
+  pages/               明细 / 图表 / 计划 / 我的 / 分类 / 周期账单 / 模板 / 账单导入 / 数据安全
   widgets/             公共组件、图表、记一笔面板
     record_sheet.dart      记一笔面板：状态机 + 布局
     record_sheet/          行为方法(actions) / 展示型组件(rows)，part 分部
@@ -185,8 +201,8 @@ docs/
 ## 协作方式
 
 ```bash
-git checkout feat/v2-merge      # 日常开发都在这一条线上
-git pull --ff-only
+git clone https://github.com/LanMao-213/heita-ledger.git   # 旧克隆请重新克隆,见下
+cd heita-ledger
 git checkout -b feat/your-thing
 # ……写代码……
 flutter analyze && flutter test
@@ -195,6 +211,9 @@ git push -u origin feat/your-thing
 ```
 
 - 分支命名 `feat/` `fix/` `docs/` `chore/`;**`main` 只放已发版**,任何时刻都必须能 analyze + test 全过。
+- **提交信息也是公开内容**:`C:/Users/<用户名>`、内网地址、真实邮箱手机号不要写进 message ——
+  `filter-repo --replace-text` 改不了它(那只作用于文件内容),漏了就得再改写一次历史。
+  CI 会跑 `python tools/privacy_scan.py --history --messages` 拦这一类。
 - 界面有改动的,把 `build/visual/` 里的截图贴进 PR。
 - 新机器配环境(认证、出网、依赖、已知坑)看 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
