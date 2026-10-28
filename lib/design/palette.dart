@@ -132,9 +132,20 @@ const List<Palette> kPalettes = [
 
 /// 出厂默认主题。
 ///
-/// App 叫「黑塔消费日记」，默认就给黑塔那一套（深色）。用户换过之后
-/// 由 `ui.theme` 记住；老版本没有这个键 → 也是这一套。
-const HeitaThemeId kDefaultTheme = HeitaThemeId.tower;
+/// 默认给「圣地 · 审判白」（亮色）。用户换过之后由 `ui.theme` 记住；
+/// 老版本没有这个键 → 也是这一套。
+///
+/// 为什么从「黑塔 · 永夜」改成它（1.6.0）：
+/// 1. 原生启动窗口取 `@color/app_background` = `#F3F4F7`（浅色）。默认深色皮肤时，
+///    冷启动必然出现一次「浅窗口 → 深界面」的跳变，这是 1.5.0 实测留下的已知缺陷。
+///    默认换成亮色后，默认路径上这条跳变自然消失，不需要动 `MainActivity`。
+/// 2. 六套皮肤里只有它把「冷白底 + 钢灰武装 + 法庭铁红」做成了完整的亮色体系，
+///    作为首次启动的第一印象更接近产品定位（制度化的可见性，不是装饰）。
+///
+/// 注意：`app.dart` 的 `ValueKey(ThemeCtrl.i.id)` 依赖这个值做首帧重建，
+/// 改它不影响那套机制；但 `paletteOf()` 的兜底、`themeIdFromString()` 的回落
+/// 都指向它，测试里断言默认值的用例要一起改。
+const HeitaThemeId kDefaultTheme = HeitaThemeId.holy;
 
 /// 按 id 取色板。
 ///
@@ -154,7 +165,7 @@ Palette paletteOf(HeitaThemeId id) {
 
 /// 把持久化字符串解析回 id。
 ///
-/// 老版本没有 `ui.theme` 这个键 → 回落出厂默认（黑塔·永夜），
+/// 老版本没有 `ui.theme` 这个键 → 回落出厂默认（圣地 · 审判白），
 /// 与 [kDefaultTheme] 保持同一处定义，不在这里再抄一遍枚举值。
 HeitaThemeId themeIdFromString(String? s) {
   for (final t in HeitaThemeId.values) {

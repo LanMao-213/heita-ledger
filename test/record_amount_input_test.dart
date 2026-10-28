@@ -105,7 +105,8 @@ void main() {
     expect(_amount(tester), '1.', reason: '小数点按两次不该变成 1..');
 
     await _key(tester, '5');
-    expect(_amount(tester), '1.50', reason: '金额区一律两位小数（既有口径）');
+    // 1.6.0 起不再补零：输入 1.5 就显示 1.5（旧口径一律两位小数 → 1.50）
+    expect(_amount(tester), '1.5', reason: '小数位按用户敲的原样显示，不补零');
   });
 
   testWidgets('按运算符之后，已经敲进去的数字不能消失', (tester) async {
@@ -132,7 +133,7 @@ void main() {
     expect(_amount(tester), '0.', reason: '行首按小数点自动补 0');
 
     await _key(tester, '5');
-    expect(_amount(tester), '0.50');
+    expect(_amount(tester), '0.5', reason: '同样不补零');
   });
 
   testWidgets('负数：行首负号后仍能看到自己敲的数字', (tester) async {

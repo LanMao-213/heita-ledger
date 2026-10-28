@@ -45,14 +45,14 @@ void main() {
     if (f.existsSync()) f.deleteSync();
   });
 
-  test('老库没有 ui.theme → 出厂默认黑塔·永夜，且落到设计层', () async {
+  test('老库没有 ui.theme → 出厂默认圣地 · 审判白，且落到设计层', () async {
     await Store.i.boot();
     expect(Store.i.themeId, kDefaultTheme);
-    expect(Store.i.themeId, HeitaThemeId.tower);
-    expect(ThemeCtrl.i.id, HeitaThemeId.tower,
+    expect(Store.i.themeId, HeitaThemeId.holy);
+    expect(ThemeCtrl.i.id, HeitaThemeId.holy,
         reason: '设计层没跟上，界面就还是原来那套色');
-    expect(ThemeCtrl.i.dark, isTrue);
-    expect(C.bg, paletteOf(HeitaThemeId.tower).bg);
+    expect(ThemeCtrl.i.dark, isFalse);
+    expect(C.bg, paletteOf(HeitaThemeId.holy).bg);
   });
 
   test('换肤后落库，冷启动仍然是换过的那一套', () async {

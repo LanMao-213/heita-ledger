@@ -49,7 +49,7 @@ class Store extends ChangeNotifier {
   /// 当前主题（我的 → 偏好 → 主题）。
   ///
   /// 真正的执行点是 `ThemeCtrl`（设计层读的是它），这里同样是「界面读的副本 +
-  /// 落库」。出厂默认 [kDefaultTheme]（黑塔·永夜），老库没有这个键就用它。
+  /// 落库」。出厂默认 [kDefaultTheme]（圣地 · 审判白），老库没有这个键就用它。
   HeitaThemeId _themeId = kDefaultTheme;
 
   static const _kTheme = 'ui.theme';

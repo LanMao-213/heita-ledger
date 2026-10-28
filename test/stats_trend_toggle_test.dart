@@ -92,9 +92,12 @@ void main() {
     await tester.tap(find.text('图表'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    // 趋势卡在页面下方，先滚到它露出来
+    // 趋势卡在页面下方，先滚到它露出来。
+    // 1.6.0 起卡片下面那句「点卡片切到柱状/折线」的常驻提示被去掉了，
+    // 所以滚动与点击都以整卡为锚点（ValueKey），不再靠那句提示定位。
+    const trendCard = ValueKey('stats_trend_card');
     await tester.scrollUntilVisible(
-      find.text('点卡片切到折线').first,
+      find.byKey(trendCard),
       200,
       scrollable: find.byType(Scrollable).first,
     );
@@ -104,12 +107,13 @@ void main() {
     expect(find.text('柱状'), findsNothing, reason: '右上角不该再有「柱状」选择');
     expect(find.text('折线'), findsNothing, reason: '右上角不该再有「折线」选择');
 
-    // 2) 默认柱状；提示句说明点一下会变成什么
+    // 2) 默认柱状；且**不再有任何操作提示文字**（1.6.0 用户要求取消）
     expect(find.byType(MonthTrendLine), findsNothing);
-    expect(find.text('点卡片切到折线'), findsOneWidget);
+    expect(find.textContaining('点卡片切到'), findsNothing,
+        reason: '常驻的切换提示已被移除');
 
     // 3) 点卡片 → 折线
-    await tester.tap(find.text('点卡片切到折线'));
+    await tester.tap(find.byKey(trendCard));
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
 
     expect(
@@ -117,16 +121,16 @@ void main() {
       findsOneWidget,
       reason: '点卡片没切到折线 —— 开关没挂在整卡上',
     );
-    expect(find.text('点卡片切到柱状'), findsOneWidget);
+    expect(find.textContaining('点卡片切到'), findsNothing,
+        reason: '切换后也不该冒出提示');
     expect(find.text('柱状'), findsNothing, reason: '切换后也不能冒出胶囊');
     expect(tester.takeException(), isNull);
 
     // 4) 再点回来（反向同样要能切，不然就是单向开关）
-    await tester.tap(find.text('点卡片切到柱状'));
+    await tester.tap(find.byKey(trendCard));
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
 
     expect(find.byType(MonthTrendLine), findsNothing);
-    expect(find.text('点卡片切到折线'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

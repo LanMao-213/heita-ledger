@@ -351,18 +351,51 @@ class _CategoryBudgets extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xxl),
         child: EmptyHint(
           icon: 'tag',
-          text: '还没有分类预算或支出',
-          hint: '可以在下方为常用分类单独设额度',
+          text: '还没有设置分类预算',
+          hint: '点下方「为分类设置额度」开始',
           padding: EdgeInsets.zero,
         ),
       );
     }
 
-    // 分成两组：设了额度的看进度，没设额度的直接可以点去设。
-    // 原来混在一张列表里，没额度的只有「未设预算」四个字，既没有进度
-    // 也没有动作 —— 而花得最多的分类往往正在这一组里（房租这类）。
+    // 1.6.0 按用户要求：**只显示设了额度的分类**。
+    //
+    // 以前没额度的分类也占一行（只有金额和「设额度」四个字），花得最多的那个
+    // 往往正躺在这组里 —— 但它既没有进度条也没有可比对象，放在「分类预算」
+    // 这个标题下会让人误以为「这也是一笔预算」。要设额度走底部那颗按钮，
+    // 那里是明确的「新增动作」，不是「已经存在的预算」。
     final budgeted = rows.where((b) => b.budgetCents > 0).toList();
-    final unbudgeted = rows.where((b) => b.budgetCents <= 0).toList();
+
+    if (budgeted.isEmpty) {
+      return SectionCard(
+        padding: const EdgeInsets.symmetric(vertical: S.sm),
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: S.lg, vertical: S.md),
+              child: EmptyHint(
+                icon: 'tag',
+                text: '还没有设置分类预算',
+                hint: '点下方「为分类设置额度」开始',
+                padding: EdgeInsets.zero,
+              ),
+            ),
+            Divider(height: 1, thickness: hairlineOf(context), color: C.line),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: S.sm, top: S.xs),
+                child: TextButton.icon(
+                  onPressed: () => _addCategoryBudget(context),
+                  icon: LineIcon('plus', size: 16, color: C.ink2),
+                  label: Text('为分类设置额度', style: T.body2),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return SectionCard(
       padding: const EdgeInsets.symmetric(vertical: S.sm),
@@ -370,17 +403,6 @@ class _CategoryBudgets extends StatelessWidget {
         children: [
           for (final b in budgeted)
             _BudgetRow(stat: b, onTap: () => _editBudget(context, b)),
-          if (budgeted.isNotEmpty && unbudgeted.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: S.lg),
-              child: Divider(
-                height: 1,
-                thickness: hairlineOf(context),
-                color: C.line,
-              ),
-            ),
-          for (final b in unbudgeted)
-            _UnbudgetedRow(stat: b, onTap: () => _editBudget(context, b)),
           Divider(height: 1, thickness: hairlineOf(context), color: C.line),
           Align(
             alignment: Alignment.centerLeft,
@@ -507,43 +529,6 @@ class _BudgetRow extends StatelessWidget {
   }
 }
 
-/// 未设额度：一行，点一下就能设。
-///
-/// 不把这行做「灰」—— 待设额度的常常是花得最多的分类，
-/// 把最大的支出画成禁用态，方向正好反了。
-class _UnbudgetedRow extends StatelessWidget {
-  const _UnbudgetedRow({required this.stat, required this.onTap});
-
-  final BudgetStat stat;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: 11),
-        child: Row(
-          children: [
-            LineIcon(stat.icon, size: 18, color: C.ink2),
-            const SizedBox(width: S.md),
-            Expanded(
-              child: Text(
-                stat.name,
-                style: T.body,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Text(Fmt.money(stat.spentCents), style: T.amountSm),
-            const SizedBox(width: S.sm),
-            Text('设额度', style: T.caption),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ------------------------------------------------------------------- 储蓄目标
 

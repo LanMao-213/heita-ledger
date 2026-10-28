@@ -490,6 +490,9 @@ class _MonthlyTrendState extends State<_MonthlyTrend> {
       button: true,
       label: _line ? '趋势图：折线。点按切换为柱状' : '趋势图：柱状。点按切换为折线',
       child: GestureDetector(
+        // 1.6.0：可见的「点卡片切到柱状/折线」提示被去掉之后，测试与读屏
+        // 都需要一个稳定的抓手，这里给整卡一个 key。
+        key: const ValueKey('stats_trend_card'),
         // opaque：图里大片的空白（柱子上方、折线下方）也要能点
         behavior: HitTestBehavior.opaque,
         onTap: () => setState(() => _line = !_line),
@@ -549,26 +552,24 @@ class _MonthlyTrendState extends State<_MonthlyTrend> {
                     ),
                 ],
               ),
-            const SizedBox(height: S.sm),
-            // 左：折线模式才有的断月说明（柱状模式下空着，用 Expanded 撑住 ——
-            // 否则切换时右边那句话会被推着左右跳）。右：「能切换」的唯一提示。
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _line ? '0 收 0 支的月份断开 —— 多半是整月没记账' : '',
-                    style: T.caption.copyWith(color: C.ink4),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            // 1.6.0 按用户要求去掉「点卡片切到柱状/折线」这行常驻提示：
+            // 它每张图下面都挂一句，而且词还跟着状态来回变（柱状/折线），
+            // 喧宾夺主。可点性由上面 Semantics 的 label 兜住，读屏仍读得出来；
+            // 视觉上不再提示 —— 这张卡是「看数据」的，不是「教你用」的。
+            //
+            // 只有折线模式的断月说明留着：那是**数据本身的含义**，不是操作提示。
+            if (_line) ...[
+              const SizedBox(height: S.sm),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '0 收 0 支的月份断开 —— 多半是整月没记账',
+                  style: T.caption.copyWith(color: C.ink4),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: S.sm),
-                Text(
-                  '点卡片切到${_line ? '柱状' : '折线'}',
-                  style: T.caption.copyWith(color: C.ink3),
-                ),
-              ],
-            ),
+              ),
+            ],
           ],
         ),
       ),

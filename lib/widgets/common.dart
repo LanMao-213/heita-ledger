@@ -245,8 +245,11 @@ class CycleBar extends StatelessWidget {
       onNext: onNext,
       onTap: onTapLabel,
       onDoubleTap: onReset,
-      // Center + Row(min)：让「10月1日 – 10月31日」和日历图案作为一个整体居中，
-      // 而不是各自被 Row 的剩余空间拉开。
+      // Center + Row(min)：让「10月1日 – 10月31日」作为一个整体居中。
+      //
+      // 右边原先贴着一枚日历图案，用来提示「点这里能挑日期」。1.6.0 按用户
+      // 要求移除：日期行本身已经足够像可点区域（整条支持轻扫翻期、双击回本期），
+      // 多一枚图标反而把视线从日期上拽走。点击能力保留，只是不再画图标。
       child: Center(
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -262,12 +265,6 @@ class CycleBar extends StatelessWidget {
                 ),
               ),
             ),
-            // 日历图案贴在标签右边：表达「点这里能挑日期」，
-            // 而不是和标签并列的另一个入口。
-            if (onTapLabel != null) ...[
-              const SizedBox(width: S.xs),
-              LineIcon('calendar', size: 18, color: C.ink3),
-            ],
           ],
         ),
       ),
@@ -392,10 +389,7 @@ class MonthBar extends StatelessWidget {
                 ),
               ),
             ),
-            if (onTapLabel != null) ...[
-              const SizedBox(width: S.xs),
-              LineIcon('calendar', size: 18, color: C.ink3),
-            ],
+            // 同 CycleBar：1.6.0 起不再在日期右侧画日历图案，点击能力保留。
           ],
         ),
       ),

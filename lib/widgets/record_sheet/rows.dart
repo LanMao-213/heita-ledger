@@ -249,28 +249,76 @@ class _DebtFields extends StatelessWidget {
   }
 }
 
+/// 记账面板大字金额要显示成什么。
+///
+/// ## 两种输入，两套显示规则
+///
+/// - **纯字面量**（没按过运算符）：**原样显示用户敲的位数**。
+///   `4.3` 就显示 `4.3`，不补成 `4.30`；`4.30` 也照留两位，不替他截。
+///   理由：这一屏是「我正在输入」，不是「结果」。用户敲到第 2 位时屏幕替他
+///   补一个 0，会让他怀疑「是不是已经输入完成了」，进而多按一次退格。
+///   只在整数部分加千分位，方便核对位数。
+/// - **含运算符**：结果由计算得出，不存在「用户敲了几位」这回事，
+///   按分格式化并**去掉无意义的零**（`4.3+2` → `6.3`，不是 `6.30`）。
+///
+/// 抽成顶层函数而不是留在 `_AmountDisplay` 里，是因为它纯字符串进出、
+/// 没有 BuildContext —— 能直接单测，不用起 widget 树。
+String amountDraftText(String input) {
+  final d = Calc.display(input);
+  if (d == null) return '0';
+
+  final sign = d.cents < 0 ? '-' : '';
+
+  // 末尾还没敲完的运算符不算数（`12+` 这一屏仍然显示 12）
+  var expr = input;
+  while (expr.isNotEmpty && '+-*/'.contains(expr[expr.length - 1])) {
+    expr = expr.substring(0, expr.length - 1);
+  }
+
+  if (!Calc.hasOperator(expr)) {
+    var literal = expr.startsWith('-') ? expr.substring(1) : expr;
+    final parts = literal.split('.');
+    // 去掉前导零（`007` → `7`），但 `0.5` 里那个 0 要留
+    var intPart = parts[0].replaceFirst(RegExp(r'^0+(?=\d)'), '');
+    if (intPart.isEmpty) intPart = '0';
+    final hasDot = parts.length > 1;
+    final frac = hasDot ? parts[1] : '';
+    return '$sign${_groupDigits(intPart)}${hasDot ? '.$frac' : ''}';
+  }
+
+  return '$sign${_centsDraft(d.cents.abs())}';
+}
+
+/// 分 → 去掉无意义零的金额串（`630` → `6.3`，`600` → `6`，`655` → `6.55`）
+String _centsDraft(int absCents) {
+  final yuan = _groupDigits((absCents ~/ 100).toString());
+  final fen = absCents % 100;
+  if (fen == 0) return yuan;
+  if (fen % 10 == 0) return '$yuan.${fen ~/ 10}';
+  return '$yuan.${fen.toString().padLeft(2, '0')}';
+}
+
+/// 给整数部分加千分位
+String _groupDigits(String digits) {
+  final buf = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) buf.write(',');
+    buf.write(digits[i]);
+  }
+  return buf.toString();
+}
+
 class _AmountDisplay extends StatelessWidget {
   const _AmountDisplay({required this.input});
 
   final String input;
 
-  /// 金额区该显示什么。
+  /// 金额区该显示什么。规则见 [amountDraftText]。
   ///
   /// 用 [Calc.display]（「已经敲了什么」）而不是 [Calc.cents]（「能不能存」）：
   /// 后者对 `1.` / `12+` 一律返回 null，于是用户刚按完小数点、刚按完运算符，
   /// 屏幕上那个数就变回 0 —— 1.5.0 用户反馈的就是这一条。
-  static String textOf(String input) {
-    final d = Calc.display(input);
-    if (d == null) return '0';
-    // 收支由上方切换表示，这里不画固定的 ± 前缀，也不画 ¥。
-    // 只保留用户自己敲的负号 —— 那是「净额」信息，不能吞掉。
-    final sign = d.cents < 0 ? '-' : '';
-    final body = Fmt.money(d.cents.abs(), trimZero: true);
-    // 刚按完小数点：补一个「.」。值里已经带小数时（`1.5+2.`）不再补，
-    // 否则会出现 `3.5.` 这种画不出的东西。
-    final dot = d.trailingDot && !body.contains('.') ? '.' : '';
-    return '$sign$body$dot';
-  }
+  static String textOf(String input) => amountDraftText(input);
 
   @override
   Widget build(BuildContext context) {

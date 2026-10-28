@@ -112,7 +112,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final goal = _cardWidthOf(tester, '还没有储蓄目标');
-    final cat = _cardWidthOf(tester, '还没有分类预算或支出');
+    final cat = _cardWidthOf(tester, '还没有设置分类预算');
 
     // 两张卡都是 SectionCard 默认 margin（左右各 S.lg）
     expect(goal, closeTo(360 - S.lg * 2, 0.5), reason: '储蓄目标空态卡没有铺满');

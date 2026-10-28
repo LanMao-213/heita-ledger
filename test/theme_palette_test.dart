@@ -198,12 +198,13 @@ void main() {
 
   // ------------------------------------------------------------ 3 换肤生效
   group('换肤', () {
-    test('出厂默认是黑塔·永夜，且 ThemeData 是深色的', () {
-      // 需求本身：App 叫「黑塔消费日记」，默认给黑塔那一套。
-      expect(kDefaultTheme, HeitaThemeId.tower);
+    test('出厂默认是圣地 · 审判白，且 ThemeData 是亮色的', () {
+      // 1.6.0 起改为默认亮色：原生启动窗口是 #F3F4F7（浅），
+      // 默认深色会让冷启动出现一次「浅窗口 → 深界面」的跳变（1.5.0 实测）。
+      expect(kDefaultTheme, HeitaThemeId.holy);
       ThemeCtrl.i.loadSilently(kDefaultTheme);
-      expect(ThemeCtrl.i.dark, isTrue);
-      expect(buildAppTheme().brightness, Brightness.dark);
+      expect(ThemeCtrl.i.dark, isFalse);
+      expect(buildAppTheme().brightness, Brightness.light);
     });
 
     test('C.xxx 是运行时 getter：换 id 后取到的是新色板的色', () {
@@ -237,8 +238,8 @@ void main() {
       expect(themeIdFromString(null), kDefaultTheme);
       expect(themeIdFromString(''), kDefaultTheme);
       expect(themeIdFromString('nonsense'), kDefaultTheme);
-      // 老版本没有 ui.theme 这个键 → 也是出厂默认（黑塔·永夜），不是冷灰
-      expect(themeIdFromString(null), HeitaThemeId.tower);
+      // 老版本没有 ui.theme 这个键 → 也是出厂默认（圣地 · 审判白），不是冷灰
+      expect(themeIdFromString(null), HeitaThemeId.holy);
     });
 
     test('每套色板都有名字、副标题和完整十档（少一档就是运行时空色）', () {

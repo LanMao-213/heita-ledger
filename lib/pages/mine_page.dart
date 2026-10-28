@@ -226,7 +226,7 @@ class MinePage extends StatelessWidget {
           // 主题这一行为什么存在：配色是记账 App 里少有的「纯个人口味」项 ——
           // 有人夜里记账要深色，有人觉得深色刺眼，谁也说服不了谁。
           // 与其挑一套当唯一答案，不如六套都给，让用户自己挑。
-          // 出厂默认黑塔·永夜（见 kDefaultTheme），老版本升上来也是它。
+          // 出厂默认圣地 · 审判白（见 kDefaultTheme），老版本升上来也是它。
           const SectionTitle('偏好'),
           SectionCard(
             padding: const EdgeInsets.symmetric(vertical: S.sm),
