@@ -454,6 +454,12 @@ class _DailyTrend extends StatelessWidget {
 /// 「折线」是 P2 新增的第二副面孔：柱子天生把「没记账」画成 0 高，
 /// 看上去就是「这个月一分没花」。折线会把 0 收 0 支的月份**断开**，
 /// 让"没有数据"和"花了 0"在图上不是同一个东西。
+///
+/// ★ 切换方式（2026-10-28 用户要求）：右上角原来并排两枚「柱状 / 折线」胶囊，
+/// 现在**整张卡片就是开关**，点一下换一种。去掉胶囊不只是「碍眼」：两枚胶囊
+/// 各只有 44×24 的落点，还得先看清哪个是当前态；整卡点击面大了二十倍，手指
+/// 落在图上任何地方都算数。代价是「能切换」不再自解释，所以在图下面留一句
+/// 「点卡片切到 X」—— 这句话本身就是那个被删掉的按钮。
 class _MonthlyTrend extends StatefulWidget {
   const _MonthlyTrend({required this.rows});
 
@@ -478,107 +484,99 @@ class _MonthlyTrendState extends State<_MonthlyTrend> {
     }
     const barH = 86.0;
 
-    return Column(
-      children: [
-        Row(
+    return Semantics(
+      // 整卡可点，读屏要能说清「点一下会发生什么」，否则只剩一个没有名字的
+      // 按钮区域（原来两枚胶囊自带文字，删掉后必须补上这条语义）
+      button: true,
+      label: _line ? '趋势图：折线。点按切换为柱状' : '趋势图：柱状。点按切换为折线',
+      child: GestureDetector(
+        // opaque：图里大片的空白（柱子上方、折线下方）也要能点
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => _line = !_line),
+        child: Column(
           children: [
-            _legend('支出', C.ink),
-            if (!_line) ...[
-              const SizedBox(width: S.lg),
-              // ⚠️ 必须用 C.ink4 —— 柱子在下面画的就是这个色。图例是用户
-              // 「按色找柱」的唯一依据，图例色块和柱子不同色，等于给了错的
-              // 索引（1.4.21 之前这里写的是 C.ink3，比柱子深一档）。
-              _legend('收入', C.ink4),
-            ],
-            const Spacer(),
-            _modeToggle(),
-          ],
-        ),
-        const SizedBox(height: S.md),
-        if (_line) ...[
-          MonthTrendLine(
-            points: [
-              for (final r in rows)
-                (
-                  label: _labelOf(r.$1),
-                  // 收、支都是 0 = 这个月一条记录都没有 → 断开。
-                  // 账本里"整月一笔没记"和"整月花了 0 元"在数据上无法区分，
-                  // 但前者是常见事实，且把前者画成 0 会误导趋势判断。
-                  value: (r.$2 == 0 && r.$3 == 0) ? null : r.$2,
-                ),
-            ],
-          ),
-          const SizedBox(height: S.xs),
-          Text(
-            '0 收 0 支的月份断开 —— 多半是整月没记账',
-            style: T.caption.copyWith(color: C.ink4),
-          ),
-        ] else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (final r in rows)
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
+            Row(
+              children: [
+                _legend('支出', C.ink),
+                if (!_line) ...[
+                  const SizedBox(width: S.lg),
+                  // ⚠️ 必须用 C.ink4 —— 柱子在下面画的就是这个色。图例是用户
+                  // 「按色找柱」的唯一依据，图例色块和柱子不同色，等于给了错的
+                  // 索引（1.4.21 之前这里写的是 C.ink3，比柱子深一档）。
+                  _legend('收入', C.ink4),
+                ],
+              ],
+            ),
+            const SizedBox(height: S.md),
+            if (_line)
+              MonthTrendLine(
+                points: [
+                  for (final r in rows)
+                    (
+                      label: _labelOf(r.$1),
+                      // 收、支都是 0 = 这个月一条记录都没有 → 断开。
+                      // 账本里"整月一笔没记"和"整月花了 0 元"在数据上无法区分，
+                      // 但前者是常见事实，且把前者画成 0 会误导趋势判断。
+                      value: (r.$2 == 0 && r.$3 == 0) ? null : r.$2,
+                    ),
+                ],
+              )
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (final r in rows)
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          _bar(r.$2, maxV, barH, C.ink),
-                          const SizedBox(width: 3),
-                          _bar(r.$3, maxV, barH, C.ink4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              _bar(r.$2, maxV, barH, C.ink),
+                              const SizedBox(width: 3),
+                              _bar(r.$3, maxV, barH, C.ink4),
+                            ],
+                          ),
+                          const SizedBox(height: S.sm),
+                          Text(
+                            _labelOf(r.$1),
+                            style: T.overline.copyWith(letterSpacing: 0),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: S.sm),
-                      Text(_labelOf(r.$1), style: T.overline.copyWith(letterSpacing: 0)),
-                    ],
+                    ),
+                ],
+              ),
+            const SizedBox(height: S.sm),
+            // 左：折线模式才有的断月说明（柱状模式下空着，用 Expanded 撑住 ——
+            // 否则切换时右边那句话会被推着左右跳）。右：「能切换」的唯一提示。
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _line ? '0 收 0 支的月份断开 —— 多半是整月没记账' : '',
+                    style: T.caption.copyWith(color: C.ink4),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-            ],
-          ),
-      ],
+                const SizedBox(width: S.sm),
+                Text(
+                  '点卡片切到${_line ? '柱状' : '折线'}',
+                  style: T.caption.copyWith(color: C.ink3),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   String _labelOf(String key) =>
       key.length == 7 ? '${int.parse(key.substring(5))}月' : key.substring(5);
-
-  /// 柱 / 折 切换。做成胶囊而不是图标：两个中文词自解释，
-  /// 不需要用户猜哪个图标代表折线（图标语义在这里没有共识）。
-  Widget _modeToggle() {
-    Widget pill(String label, bool on, VoidCallback onTap) => GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: S.sm, vertical: 4),
-        decoration: BoxDecoration(
-          color: on ? C.ink : Colors.transparent,
-          borderRadius: BorderRadius.circular(R.pill),
-          border: Border.all(color: on ? C.ink : C.line2),
-        ),
-        child: Text(
-          label,
-          style: T.overline.copyWith(
-            letterSpacing: 0,
-            color: on ? C.bg : C.ink2,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        pill('柱状', !_line, () => setState(() => _line = false)),
-        const SizedBox(width: 4),
-        pill('折线', _line, () => setState(() => _line = true)),
-      ],
-    );
-  }
 
   Widget _legend(String label, Color color) => Row(
     mainAxisSize: MainAxisSize.min,

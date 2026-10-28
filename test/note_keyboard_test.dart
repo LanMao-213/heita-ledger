@@ -134,19 +134,48 @@ void main() {
     // 只点、只 pump 一帧：此时 viewInsets 还是 0（输入法还没起来）
     await tester.tap(find.byType(TextField));
     await tester.pump();
-
-    expect(
-      find.byType(CalcKeypad),
-      findsNothing,
-      reason: '数字键盘必须跟着焦点走，等输入法升起会让面板先挤扁再弹回来',
-    );
     expect(tester.takeException(), isNull);
 
-    // 输入法随后升起：面板让开，仍然不溢出
+    // ★ 1.5.0 起这条契约变了：数字键盘**不再自己收起**，而是「按输入法高度
+    // 1:1 被顶出去」——所以点下去那一帧它当然还在（输入法还没占地方）。
+    // 要钉的从「键盘没了」变成「键盘块的高度 = 自然高度 − 输入法高度」，
+    // 以及面板不给键盘留空（见 record_note_layout_test 的逐帧断言）。
+    //
+    // 为什么改：AnimatedSize 的 150ms 和输入法升起的 200~300ms 永远对不齐，
+    // 快了面板先塌、慢了可滚动区被压成 0，两种都是「面板跳了一下」（1.4.1 的
+    // 用户反馈）。跟着输入法走之后，面板顶边在整段动画里不动。
+    // 量「还剩多少露在外面」要量槽，不是量键盘：键盘自己的 rect 永远是自然
+    // 高度（它被自己的排版尺寸撑开，只是被外层剪掉）。
+    const slotKey = ValueKey('record_keypad_slot');
+    final padFull = tester.getSize(find.byKey(slotKey)).height;
+    expect(padFull, 324, reason: '56 键高 + 4 条缝 + 内边距 = 324');
+
+    // 输入法升到 100dp：键盘块应剩 224dp（324 − 100）
+    tester.view.viewInsets = const FakeViewPadding(bottom: 100 * 2);
+    await tester.pump();
+    expect(
+      tester.getSize(find.byKey(slotKey)).height,
+      closeTo(padFull - 100, 0.5),
+      reason: '键盘块没有按输入法高度 1:1 让位',
+    );
+
+    // 再升到 200dp：剩 124dp
+    tester.view.viewInsets = const FakeViewPadding(bottom: 200 * 2);
+    await tester.pump();
+    expect(
+      tester.getSize(find.byKey(slotKey)).height,
+      closeTo(padFull - 200, 0.5),
+    );
+
+    // 升满 300dp：324 − 300 = 24，只剩一排键都不到的碎边 → 整块收掉
     tester.view.viewInsets = const FakeViewPadding(bottom: _keyboardH * 2);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.byType(CalcKeypad), findsNothing);
+    expect(
+      find.byType(CalcKeypad),
+      findsNothing,
+      reason: '剩下的碎边不到一排键，应当整块让开而不是留半排键贴在输入法上',
+    );
 
     // 收起键盘（输入法「完成」）→ 数字键盘和确认键回来
     await tester.testTextInput.receiveAction(TextInputAction.done);

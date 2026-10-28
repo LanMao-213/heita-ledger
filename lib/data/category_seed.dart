@@ -240,32 +240,51 @@ final Map<String, List<TxnField>> kSubFieldSpecs = {
       if (s.hasFields) s.name: s.fields,
 };
 
-/// 某个分类名需要填哪些详情字段（自建 / 已改名的分类返回空）
-List<TxnField> fieldsOfSub(String? name) =>
-    (name == null ? null : kSubFieldSpecs[name]) ?? const [];
-
-/// 按分类过滤详情值：只保留 [fieldsOfSub] 认可的那几项，其余一律置空。
+/// 一级分类名 → **不细分时**仍然可填的字段。
 ///
-/// 字段是按**子分类名**绑定的，换分类之后控件里上一类残留的值必须丢掉 ——
+/// 为什么需要这张表：交易的 `category_id` 允许指向一级（= 这笔没细分），
+/// 而 [kSubFieldSpecs] 是按**子分类名**登记的 —— 于是「出行 / 不细分」查到的
+/// 是空表，详情区整块不出现，用户想记「从家到公司」时连入口都找不到
+/// （2026-10-28 用户反馈的第 2 条 bug）。
+///
+/// 只登记真正属于**一级语义**的字段：出行的地点两端（出发地 / 目的地）就是
+/// 这类支出的核心信息，不细分也得能记。人情 / 成长的「对象 / 名称」则绑在
+/// 具体子分类上（红包份子给谁 vs 送礼给谁，语义不同），不细分时不强加 ——
+/// 给每个一级都塞字段，等于把「登记过才有详情框」这条规则作废。
+const kParentFieldSpecs = <String, List<TxnField>>{
+  '出行': [TxnField.from, TxnField.to],
+};
+
+/// 某个分类名需要填哪些详情字段（子分类或一级都认；自建 / 已改名的返回空）
+List<TxnField> fieldsOfCat(String? name) =>
+    (name == null ? null : (kSubFieldSpecs[name] ?? kParentFieldSpecs[name])) ??
+    const [];
+
+/// 按分类过滤详情值：只保留 [fieldsOfCat] 认可的那几项，其余一律置空。
+///
+/// 字段是按**分类名**绑定的，换分类之后控件里上一类残留的值必须丢掉 ——
 /// 否则界面上看不见的「出发地」会跟着写进一笔买书。录入面板的「保存」和
 /// 「切换分类」共用这一个规则，避免两处各写一遍、日后只改了一处。
 ///
-/// 同一组字段的场景（公共交通 ⇄ 打车，都是出发地/目的地）不会被清掉，
+/// 同一组字段的场景（公共交通 ⇄ 打车 ⇄ 出行）不会被清掉，
 /// 用户切错再切回来不用重填。
 Map<TxnField, String> pruneDetails(
-  String? subName,
+  String? catName,
   Map<TxnField, String> values,
 ) {
-  final active = fieldsOfSub(subName);
+  final active = fieldsOfCat(catName);
   return {
     for (final f in TxnField.values)
       f: active.contains(f) ? (values[f] ?? '').trim() : '',
   };
 }
 
-/// 这些子分类的详情**默认折叠**在「＋ 详情」里。
+/// 这些分类的详情**默认折叠**在「＋ 添加详情」里。
 ///
 /// 分界线是信息量：地点两端多数人懒得填，常驻两行只是白占屏幕高度；
 /// 而人情/成长的「对象、名称」正是这几类支出的核心信息 —— 记了红包份子
 /// 却不知道给谁，这条记录基本没有价值，所以必须平铺、一眼可见。
-const kFoldedSubs = {'公共交通', '打车'};
+///
+/// 「出行」这一级也在里面：它就是公共交通 / 打车的父级，语义完全一样，
+/// 不该因为「没细分」就换一种呈现。
+const kFoldedSubs = {'公共交通', '打车', '出行'};

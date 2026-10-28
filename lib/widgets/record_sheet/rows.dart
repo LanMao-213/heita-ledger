@@ -254,14 +254,27 @@ class _AmountDisplay extends StatelessWidget {
 
   final String input;
 
+  /// 金额区该显示什么。
+  ///
+  /// 用 [Calc.display]（「已经敲了什么」）而不是 [Calc.cents]（「能不能存」）：
+  /// 后者对 `1.` / `12+` 一律返回 null，于是用户刚按完小数点、刚按完运算符，
+  /// 屏幕上那个数就变回 0 —— 1.5.0 用户反馈的就是这一条。
+  static String textOf(String input) {
+    final d = Calc.display(input);
+    if (d == null) return '0';
+    // 收支由上方切换表示，这里不画固定的 ± 前缀，也不画 ¥。
+    // 只保留用户自己敲的负号 —— 那是「净额」信息，不能吞掉。
+    final sign = d.cents < 0 ? '-' : '';
+    final body = Fmt.money(d.cents.abs(), trimZero: true);
+    // 刚按完小数点：补一个「.」。值里已经带小数时（`1.5+2.`）不再补，
+    // 否则会出现 `3.5.` 这种画不出的东西。
+    final dot = d.trailingDot && !body.contains('.') ? '.' : '';
+    return '$sign$body$dot';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cents = Calc.cents(input);
-    // 收支由上方切换表示，这里不再画固定的 ± 前缀，也不画 ¥。
-    // 只保留用户自己敲的负号 —— 那是「净额」信息，不能吞掉。
-    final amountText = cents == null
-        ? '0'
-        : '${cents < 0 ? '-' : ''}${Fmt.money(cents.abs(), trimZero: true)}';
+    final amountText = textOf(input);
 
     return Padding(
       // 顶部多了一排模板，这里收一点，保证键盘在首屏里露全
@@ -291,7 +304,14 @@ class _AmountDisplay extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 // 刻意比 hero(34) 大一档：这一屏只有「金额」一个主角，
                 // 键盘占了下半屏，数字不够大就会显得空。别收成 34。
-                child: Text(amountText, style: T.hero.copyWith(fontSize: 44)),
+                //
+                // key 是给测试用的：键盘上也有 0-9，`find.text('0')` 会撞上
+                // 「0」键，只有 key 能唯一定位这颗大数字。
+                child: Text(
+                  amountText,
+                  key: const ValueKey('record_amount_value'),
+                  style: T.hero.copyWith(fontSize: 44),
+                ),
               ),
             ),
           ),

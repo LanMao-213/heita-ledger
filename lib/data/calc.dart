@@ -143,6 +143,36 @@ abstract final class Calc {
 
   // ---------------------------------------------------------------- 展示
 
+  /// 展示口径：把「正在输入」的表达式翻译成金额区该显示的那个数。
+  ///
+  /// 与 [cents] 的分工是本类唯一容易搞混的地方，也是 1.5.0 那个
+  /// 「按了小数点，1 变成 0」的根因：
+  ///
+  /// - [cents] 回答「**能不能存**」：`1.`、`12+` 都还没输完 → null → 确认键置灰。
+  /// - [display] 回答「**已经敲了什么**」：`1.` 就是 1（小数点按过了），
+  ///   `12+` 就是 12。把「不能存」直接当成「没有值」，用户刚按的数字就会消失。
+  ///
+  /// 返回值：
+  /// - `null`：一个数字都没敲（空串、只有行首负号、只有运算符）。
+  /// - `cents`：此刻该显示的金额（分）。
+  /// - `trailingDot`：表达式停在「刚按完小数点」上（`1.`），调用方补一个点，
+  ///   让用户看得见自己按到了哪儿。**只有最后一位是小数点时**才为 true。
+  static ({int cents, bool trailingDot})? display(String expr) {
+    // 末尾的运算符不算数：`12+` 这一屏仍然显示 12。行首负号单独出现
+    // （`-`）剥完就空了，等于没输。
+    var s = expr;
+    while (s.isNotEmpty && _ops.contains(s[s.length - 1])) {
+      s = s.substring(0, s.length - 1);
+    }
+    if (s.isEmpty) return null;
+
+    final dot = s.endsWith('.');
+    // `1.` 按 1.0 求值：小数点是「下一个数字的入口」，不是非法字符。
+    final value = cents(dot ? '${s}0' : s);
+    if (value == null) return null;
+    return (cents: value, trailingDot: dot);
+  }
+
   /// 显示用：把键盘符号换成数学符号。
   /// 减号保持 ASCII —— U+2212 在部分中文字体里缺字形，会显示成空白。
   static String pretty(String expr) =>

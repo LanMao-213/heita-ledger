@@ -73,6 +73,18 @@ class CalcKeypad extends StatelessWidget {
 
   static const _gap = 6.0;
 
+  /// 键盘的**自然高度**：5 排键 + 4 条竖向缝 + 上下内边距。
+  ///
+  /// 为什么要有这个函数：键盘被输入法「顶出去」时，面板要按这个高度算出还剩
+  /// 多少可见（见 `record_sheet.dart` 的 `_keypadSlotHeight`）。算错了就会多剪
+  /// 或少剪一截 —— 多剪一截是「确认键被切掉」，少剪一截是「键盘底下露白」。
+  ///
+  /// 公式与 [build] 里的排布严格对应：`_upper` 3 行各留 1 条缝、
+  /// `_lower` 2 行里第 1 行留缝第 2 行不留（贴齐跨两行的确认键）。
+  /// **改行数或内边距时这里必须一起改**，否则两边会悄悄分叉。
+  static double heightOf(double keyHeight) =>
+      keyHeight * 5 + _gap * 4 + S.sm + S.md;
+
   static const _confirmSpec = CalcKeySpec('确认', CalcKeyKind.confirm);
 
   /// 上面三行，各 4 列

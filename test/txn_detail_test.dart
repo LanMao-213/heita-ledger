@@ -44,25 +44,31 @@ void main() {
     if (file.existsSync()) file.deleteSync();
   });
 
-  test('字段表只认登记过的子分类', () {
-    expect(fieldsOfSub('公共交通'), [TxnField.from, TxnField.to]);
-    expect(fieldsOfSub('打车'), [TxnField.from, TxnField.to]);
-    expect(fieldsOfSub('红包份子'), [TxnField.person]);
-    expect(fieldsOfSub('公益捐赠'), [TxnField.person]);
-    expect(fieldsOfSub('课程培训'), [TxnField.subject]);
-    expect(fieldsOfSub('书籍'), [TxnField.subject]);
+  test('字段表：登记过的子分类 + 出行这一级', () {
+    expect(fieldsOfCat('公共交通'), [TxnField.from, TxnField.to]);
+    expect(fieldsOfCat('打车'), [TxnField.from, TxnField.to]);
+    expect(fieldsOfCat('红包份子'), [TxnField.person]);
+    expect(fieldsOfCat('公益捐赠'), [TxnField.person]);
+    expect(fieldsOfCat('课程培训'), [TxnField.subject]);
+    expect(fieldsOfCat('书籍'), [TxnField.subject]);
 
-    // 没登记的（含用户自建、以及一级分类名）一律不要详情框
-    expect(fieldsOfSub('正餐'), isEmpty);
-    expect(fieldsOfSub('餐饮'), isEmpty);
-    expect(fieldsOfSub('我自己加的分类'), isEmpty);
-    expect(fieldsOfSub(null), isEmpty);
+    // 一级分类里只有「出行」登记了：这笔没细分，但地点两端仍然是核心信息。
+    // 旧实现只查子分类表，「出行 / 不细分」整块详情区都不出现（1.5.0 反馈）。
+    expect(fieldsOfCat('出行'), [TxnField.from, TxnField.to]);
+
+    // 没登记的（含用户自建、以及其它一级分类名）一律不要详情框
+    expect(fieldsOfCat('正餐'), isEmpty);
+    expect(fieldsOfCat('餐饮'), isEmpty);
+    expect(fieldsOfCat('人情'), isEmpty, reason: '对象绑在具体子分类上，不细分不强加');
+    expect(fieldsOfCat('成长'), isEmpty, reason: '名称绑在具体子分类上，不细分不强加');
+    expect(fieldsOfCat('我自己加的分类'), isEmpty);
+    expect(fieldsOfCat(null), isEmpty);
   });
 
-  test('折叠只作用于出行两类', () {
-    expect(kFoldedSubs, {'公共交通', '打车'});
+  test('折叠只作用于出行这一族（一级 + 两类子分类）', () {
+    expect(kFoldedSubs, {'公共交通', '打车', '出行'});
     for (final name in kFoldedSubs) {
-      expect(fieldsOfSub(name), isNotEmpty, reason: '$name 折叠了却没字段可填');
+      expect(fieldsOfCat(name), isNotEmpty, reason: '$name 折叠了却没字段可填');
     }
   });
 
@@ -138,6 +144,82 @@ void main() {
     expect(t.placeFrom, '家');
     expect(t.placeTo, '公司');
     expect(t.person, isNull, reason: '没用到的字段要存 NULL，不能存空串');
+    expect(t.detailSummary, '家 → 公司');
+  });
+
+  // 2026-10-28 用户反馈的第 2 条：记一笔 → 出行 → 不细分，界面上**没有**
+  // 任何地址入口。原因是详情区只查子分类字段表，而「出行」是一级分类名。
+  testWidgets('出行 / 不细分：也有地址入口，填完能落库', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.runAsync(() => Store.i.boot());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => Center(
+              child: ElevatedButton(
+                onPressed: () => showRecordSheet(ctx),
+                child: const Text('记一笔'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('记一笔'));
+    await tester.pumpAndSettle();
+
+    // 左轮滚一格（餐饮 → 出行），右轮**停在「不细分」**不动
+    await tester.tap(find.text('餐饮').first);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CupertinoPicker).at(0), const Offset(0, -52));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('出行'), findsWidgets);
+    // 入口必须存在（旧实现这里是 findsNothing，整块详情区都不出现）
+    expect(
+      find.text('＋ 添加详情'),
+      findsOneWidget,
+      reason: '出行不细分时没有地址入口 —— 用户找不到地方记「从哪到哪」',
+    );
+    expect(find.text('出发地'), findsNothing, reason: '地点两端默认折叠，不白占高度');
+
+    await tester.tap(find.text('＋ 添加详情'));
+    await tester.pumpAndSettle();
+    expect(find.text('出发地'), findsOneWidget);
+    expect(find.text('目的地'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, '从哪出发'), '家');
+    await tester.enterText(find.widgetWithText(TextField, '到哪去'), '公司');
+    await tester.pump();
+
+    await tester.tap(
+      find.descendant(of: find.byType(CalcKeypad), matching: find.text('5')),
+    );
+    await tester.pump();
+    await tester.tap(find.text('确认'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => Future.delayed(const Duration(milliseconds: 200)),
+    );
+    await settleWrites(tester);
+
+    final rows = await tester.runAsync(
+      () => Repo.listTxns(
+        ledgerId: Store.i.ledgerId,
+        month: Fmt.month(DateTime.now()),
+      ),
+    );
+    // 挂在一级分类上（没细分），但地点两端要存下来
+    final t = rows!.firstWhere((r) => r.placeFrom == '家');
+    expect(t.categoryId, Store.i.expenseCats.firstWhere((c) => c.name == '出行').id);
+    expect(t.placeTo, '公司');
     expect(t.detailSummary, '家 → 公司');
   });
 

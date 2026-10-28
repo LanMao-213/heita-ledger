@@ -98,4 +98,44 @@ void main() {
       expect(Calc.hasOperator('12*3'), isTrue);
     });
   });
+
+  // 展示口径与求值口径的分工。1.5.0 的「按小数点 1 变 0」就是两条口径
+  // 混用造成的：金额区拿了「能不能存」的答案当「已经敲了什么」。
+  group('展示（display）', () {
+    test('没输完的表达式：数字留着，小数点要标记出来', () {
+      expect(Calc.display('1.')?.cents, 100);
+      expect(Calc.display('1.')?.trailingDot, isTrue);
+      expect(Calc.display('0.')?.cents, 0);
+      expect(Calc.display('1234.')?.cents, 123400);
+    });
+
+    test('末尾是运算符：显示的是它左边那个数', () {
+      expect(Calc.display('12+')?.cents, 1200);
+      expect(Calc.display('12+')?.trailingDot, isFalse);
+      expect(Calc.display('12*')?.cents, 1200);
+      expect(Calc.display('12.')?.trailingDot, isTrue);
+      // 小数参与运算后再按运算符：值会保留下来
+      expect(Calc.display('1.5+')?.cents, 150);
+    });
+
+    test('一个数字都没有时返回 null（金额区据此显示 0）', () {
+      expect(Calc.display(''), isNull);
+      expect(Calc.display('-'), isNull);
+      expect(Calc.display('+'), isNull);
+    });
+
+    test('完整表达式照常求值', () {
+      expect(Calc.display('12')?.cents, 1200);
+      expect(Calc.display('12+8')?.cents, 2000);
+      expect(Calc.display('-20')?.cents, -2000);
+      expect(Calc.display('0.05')?.cents, 5);
+      expect(Calc.display('0.05')?.trailingDot, isFalse);
+    });
+
+    test('cents 的结论不受影响：能不能存仍按原规则', () {
+      // 这两条是确认键置灰的依据，不能因为展示变宽松而放松
+      expect(Calc.cents('1.'), isNull);
+      expect(Calc.cents('12+'), isNull);
+    });
+  });
 }

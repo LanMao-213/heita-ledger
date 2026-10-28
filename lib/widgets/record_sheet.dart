@@ -236,21 +236,17 @@ class _RecordSheetState extends State<RecordSheet> {
 
   /// 当前分类要填哪些详情字段。空表示不需要（绝大多数分类）。
   ///
-  /// 口径来自 [fieldsOfSub]：种子登记过的子分类才有，用户自建的分类不要 ——
-  /// 猜不出的字段宁可不显示，也别给每个分类都塞四个框。
+  /// 口径来自 [fieldsOfCat]：子分类按种子登记的字段来（公共交通/打车 → 地点两端，
+  /// 红包份子 → 对象…）；一级分类只有在 [kParentFieldSpecs] 里登记过才算 ——
+  /// 「出行 / 不细分」必须有出发地和目的地，否则用户想记「从家到公司」时
+  /// 连入口都没有（2026-10-28 反馈）。用户自建的分类不在任何一张表里 = 不要
+  /// 详情字段，猜不出的字段宁可不显示，也别给每个分类都塞四个框。
   List<TxnField> get _fields =>
-      fieldsOfSub(Store.i.categoryOf(_categoryId)?.name);
+      fieldsOfCat(Store.i.categoryOf(_categoryId)?.name);
 
-  /// 这个分类的详情要不要默认折叠（只看出行：地点两端）
+  /// 这个分类的详情要不要默认折叠（只看出行的地点两端）
   bool get _folded =>
       kFoldedSubs.contains(Store.i.categoryOf(_categoryId)?.name);
-
-  /// 任意一个文本输入框有焦点。有焦点才让数字键盘让位 ——
-  /// 只判备注框的话，点「出发地」时数字键盘还赖在下面占掉半屏。
-  bool get _hasTextFocus =>
-      _noteFocus.hasFocus ||
-      _counterpartyFocus.hasFocus ||
-      _detailFocus.values.any((f) => f.hasFocus);
 
   /// 当前有焦点的输入框位置，没焦点返回 null
   GlobalKey? get _focusedKey {
@@ -265,8 +261,7 @@ class _RecordSheetState extends State<RecordSheet> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    // 系统输入法占掉的高度。写备注时下半屏归它，面板必须整体让开，
-    // 否则备注框正好落在它底下。
+    // 系统输入法占掉的高度。面板底边要跟着它走。
     final keyboard = media.viewInsets.bottom;
     // 没有输入法时，屏幕底部还有手势条 / 三键导航栏。它不体现在 size 里，
     // 面板必须自己让出来 —— 之前漏了这一步，真机上键盘最后一排（0 / . / 确认）
@@ -274,24 +269,21 @@ class _RecordSheetState extends State<RecordSheet> {
     final bottomInset = keyboard > media.viewPadding.bottom
         ? keyboard
         : media.viewPadding.bottom;
-    // 备注框一拿到焦点，数字键盘立刻收起来 —— **不等输入法真的升起**。
+    // 面板底边始终贴着「键盘或手势条」的上沿，高度按内容算（封顶 maxH）。
     //
-    // 旧写法是 `keyboard > 0 && _hasTextFocus`，看着更"精确"，但真机上输入法
-    // 从 0 升到全高有 3~5 帧：这几帧里面板正被 bottomInset 顶着往上走，290dp 的
-    // 数字键盘还赖在下面，可滚动区被压成 0，备注框先被挤没再弹回来 ——
-    // 用户的原话是「点一下备注卡片，面板重新打开了一次」。改成跟焦点走之后，
-    // 顺序变成「数字键盘先收起 → 输入法再升起」，全程只有一个方向的位移。
+    // 这个高度策略被推翻重写过两次，两次的教训是同一条：**别让高度和底边各走各的**。
     //
-    // 只对**备注**用这个提前量：「借给谁」「出发地」这些填完还得接着按数字，
-    // 键盘早收一拍反而碍事，它们仍按「输入法真的占了下半屏」判断。
-    final typingNote = _noteFocus.hasFocus || (keyboard > 0 && _hasTextFocus);
-    // 写备注时把面板「钉住」。
+    // - 1.4.x 写备注时把面板钉在 0.9 屏高、且不让位给输入法（`reserved = 0`）。
+    //   面板一动不动，但内容顶对齐，多出来的高度全堆在备注框下面被键盘盖住 ——
+    //   2026-10-28 用户的原话：「输入备注时，下方与键盘之间留白过高」。
+    // - 那次还把「钉住」写成只在 `typingNote` 时生效：失焦那一帧 minHeight
+    //   从满高掉到 0，面板当场塌 380dp，紧接着数字键盘用 150ms 长回来又把内容
+    //   顶回去 —— 一帧下坠 + 一段回升，就是「返回输入金额时界面抽搐一下」。
     //
-    // 旧行为的三个动作叠在一起：数字键盘收起（-270）、面板跟着塌、
-    // 系统键盘升起再把它顶上去 —— 看着就是「点一下备注，面板缩回去了」。
-    // 现在让它一动不动：面板保持满高、不给系统键盘让位，由键盘直接盖住
-    // 原本属于数字键盘的那块。用户看到的是「键盘换了一个」，不是布局重排。
-    final reserved = typingNote ? 0.0 : bottomInset;
+    // 现在两条都归零：底边跟随 viewInsets，高度只由内容决定，数字键盘的让位
+    // 交给 [_keypadSlotHeight] 那条「1:1 被顶出去」的规则。三者一起，面板顶边
+    // 在键盘升起的整个过程里基本不动（见测试 `record_note_layout_test`）。
+    final reserved = bottomInset;
     // 0.90：顶部多了「最近模板」那排之后，0.88 会把备注框切掉一条。
     final maxH = (media.size.height - reserved) * 0.90;
 
@@ -314,8 +306,8 @@ class _RecordSheetState extends State<RecordSheet> {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: maxH,
-          // 钉住高度：数字键盘收起时若让面板跟着塌，就是那一下「缩回去」
-          minHeight: typingNote ? maxH : 0,
+          // 高度就按内容来。**不要**给 minHeight 钉一个「满高」：那正是
+          // 「备注下面空 100dp + 返回时抽搐」的来源，理由见上面那段。
         ),
         child: ClipRRect(
           // 背景由面板自己画（sheet 本身是透明的），这样让给键盘的那段
@@ -324,11 +316,7 @@ class _RecordSheetState extends State<RecordSheet> {
           // 面板面用卡面（纯白），不是页面底（纸白）：底与面同色会糊成一片
           child: Container(
             color: C.cardBg,
-            child: _sheetBody(
-              context,
-              keyboard: keyboard,
-              typingNote: typingNote,
-            ),
+            child: _sheetBody(context, keyboard: keyboard),
           ),
         ),
       ),
@@ -338,277 +326,299 @@ class _RecordSheetState extends State<RecordSheet> {
   /// 面板主体：头部 → 模板条 → 模式页签 → 金额 → 可滚动信息区 → 数字键盘。
   ///
   /// 单独抽出来，是为了让 [build] 只剩「让位计算 + 外壳」这十几行 —— 那部分每个
-  /// 数值（`reserved` / `maxH` / `typingNote`）背后都是一段真机上的踩坑记录，混在
-  /// 三百行的 widget 树里根本读不出来，改一行要靠猜。
+  /// 数值（`reserved` / `maxH`）背后都是一段真机上的踩坑记录，混在三百行的
+  /// widget 树里根本读不出来，改一行要靠猜。
   ///
-  /// 键高要等 layout 结果才知道，所以整块仍留在 `LayoutBuilder` 里。`keyboard` 与
-  /// `typingNote` 是上面算好的让位结论，往下传而不重算 —— 重算等于把「输入法升起
-  /// 的那 3~5 帧」那段判断写成两份，迟早走岔。
-  Widget _sheetBody(
-    BuildContext context, {
-    required double keyboard,
-    required bool typingNote,
-  }) {
-    return LayoutBuilder(
-      builder: (context, box) {
-        // 键高跟着可用高度走：先给头部 / 金额 / 信息区留 380，剩下 5 排均分。
-        // 56 是设计值（46 → 52 → 56，键偏矮不好按），只有矮屏才往下收 ——
-        // 宁可键矮一点，也不要裁掉「确认」。
-        //
-        // 有分类详情时上限压到 52：详情区要多吃 40~90 的高度，而信息区里
-        // 的「日期 / 账户」不能因为多填两个框就被挤出可视区。
-        //
-        // **不能再看 `_detailsOpen`**。之前这里写成
-        // `_fields.isEmpty ? 56 : (_detailsOpen ? 48 : 52)`，想着「展开后最挤，
-        // 再压 4dp 腾地方」。结果点一下「添加详情」，5 排键每排矮 4dp、整块
-        // 键盘瞬间少 20dp —— 用户的原话是「打开详情，小键盘抖了一下」。
-        //
-        // 键盘是这一屏最稳的东西：手指正在上面按，它的尺寸不该因为上面内容
-        // 多少而变。内容变高由滚动区吸收，不是压缩键盘。
-        // 只保留「有没有详情字段」这一层结构差异（56 / 52）。
-        final keyH = ((box.maxHeight - 380) / 5).clamp(
-          38.0,
-          _fields.isEmpty ? 56.0 : 52.0,
-        );
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SheetHeader(
-              title: _isEdit ? '编辑记录' : '记一笔',
-              action: _isEdit
-                  ? TextButton(
-                      // 取消：弹出 null，调用方按「没保存」处理
-                      onPressed: () => Navigator.pop(context),
-                      child: Text('取消', style: TextStyle(color: C.ink2)),
-                    )
-                  : TextButton(
-                      onPressed: _saveAsTemplate,
-                      child: Text(
-                        '存为模板',
-                        style: T.body2,
+  /// `keyboard` 是上面量到的输入法高度，往下传而不重算 —— 重算等于把同一件事
+  /// 写成两份。键高也在这里算，因为它要和键盘剩余高度对得上（见 [_keypadSlotHeight]）。
+  Widget _sheetBody(BuildContext context, {required double keyboard}) {
+    // 键高按**屏幕高度**算，不按面板的可用高度。
+    //
+    // 面板的可用高度会随输入法逐帧变化：键盘每升一帧，键高就变一次，整块键盘
+    // 跟着缩。而「键盘被输入法 1:1 顶出去」那条规则要求键盘的自然高度是**常量**
+    // —— 否则顶出去的量和长回来的量对不上，面板顶边就会在这场动画里上下跳
+    // （1.5.0 修 bug 3 时实测：顶边 141 → 221 → 165）。
+    //
+    // 屏幕高度对同一台机器是常量，所以键高在一次录入里不会变，正是想要的。
+    // 56 是设计值（46 → 52 → 56，键偏矮不好按）；只有矮屏才往下收 ——
+    // 宁可键矮一点，也不要裁掉「确认」。有分类详情时上限压到 52：详情区要
+    // 多吃 40~90 的高度，而信息区里的「日期 / 账户」不能被挤出可视区。
+    //
+    // **不能再看 `_detailsOpen`**：之前写成「展开详情就再压 4dp」，结果点一下
+    // 「添加详情」，整块键盘瞬间矮 20dp —— 用户的原话是「打开详情，小键盘抖了
+    // 一下」。键盘是这一屏最稳的东西：手指正在上面按，它的尺寸不该因为上面
+    // 内容多少而变；内容变高由滚动区吸收，不是压缩键盘。
+    final keyH = ((MediaQuery.sizeOf(context).height - 380) / 5).clamp(
+      38.0,
+      _fields.isEmpty ? 56.0 : 52.0,
+    );
+    // 数字键盘还剩多高（0 = 已经完全让给输入法）。见 [_keypadSlotHeight]。
+    final keypadSlot = _keypadSlotHeight(keyH, keyboard);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SheetHeader(
+          title: _isEdit ? '编辑记录' : '记一笔',
+          action: _isEdit
+              ? TextButton(
+                  // 取消：弹出 null，调用方按「没保存」处理
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('取消', style: TextStyle(color: C.ink2)),
+                )
+              : TextButton(
+                  onPressed: _saveAsTemplate,
+                  child: Text(
+                    '存为模板',
+                    style: T.body2,
+                  ),
+                ),
+        ),
+        // 顶部常驻「最近用过的模板」—— 记账高频场景下这就是快捷键
+        if (!_isEdit && Store.i.recentTemplates.isNotEmpty)
+          _TemplateStrip(
+            templates: Store.i.recentTemplates,
+            appliedId: _applied?.id,
+            onTap: _applyTemplate,
+          ),
+        _ModeTabs(
+          value: _mode,
+          onChanged: (m) {
+            setState(() {
+              _mode = m;
+              // 切换模式后原分类不再适用，重置到第一个；模板也随之失效
+              _categoryId = _firstCategoryId();
+              _applied = null;
+              // 支出侧的详情字段（出发地/对象）不该带到收入侧
+              _pruneDetails();
+              // 借贷不带分类与详情；「计入预算」只在借入时有意义
+              if (m.isLending) {
+                _detailsOpen = false;
+                _countInBudget = false;
+              }
+            });
+          },
+        ),
+        _AmountDisplay(input: _amountInput),
+        _hairline(context),
+        // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
+        // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
+        Flexible(
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                controller: _scroll,
+                // 底部只留一点呼吸位：面板自己已经让开键盘了（见 [build] 里
+                // 的 `reserved`），这里再补一份「键盘高度」的空白，屏幕上就是
+                // 「备注框下面空一大截」。1.4.x 写的是 `keyboard + S.sm`，
+                // 那是因为当时面板不给自己让位 —— 两处补偿不能都留着。
+                // 展开详情时多留一点：最后一个字段的边框才不会贴着键盘上沿。
+                padding: EdgeInsets.only(
+                  bottom: _detailsOpen ? S.md : S.sm,
+                ),
+                child: Column(
+                  children: [
+                    if (_isLending) ...[
+                      _DebtFields(
+                        direction: _mode.direction,
+                        counterparty: _counterparty,
+                        counterpartyFocus: _counterpartyFocus,
+                        dueDate: _dueDate,
+                        onPickDue: _pickDueDate,
+                        countInBudget: _countInBudget,
+                        onCountChanged: (v) =>
+                            setState(() => _countInBudget = v),
                       ),
-                    ),
-            ),
-            // 顶部常驻「最近用过的模板」—— 记账高频场景下这就是快捷键
-            if (!_isEdit && Store.i.recentTemplates.isNotEmpty)
-              _TemplateStrip(
-                templates: Store.i.recentTemplates,
-                appliedId: _applied?.id,
-                onTap: _applyTemplate,
-              ),
-            _ModeTabs(
-              value: _mode,
-              onChanged: (m) {
-                setState(() {
-                  _mode = m;
-                  // 切换模式后原分类不再适用，重置到第一个；模板也随之失效
-                  _categoryId = _firstCategoryId();
-                  _applied = null;
-                  // 支出侧的详情字段（出发地/对象）不该带到收入侧
-                  _pruneDetails();
-                  // 借贷不带分类与详情；「计入预算」只在借入时有意义
-                  if (m.isLending) {
-                    _detailsOpen = false;
-                    _countInBudget = false;
-                  }
-                });
-              },
-            ),
-            _AmountDisplay(input: _amountInput),
-            _hairline(context),
-            // 用 Flexible 而不是 Expanded：内容不满一屏时面板贴着内容收起来，
-            // 否则备注框和键盘之间会空出一大块（模板少的时候尤其明显）
-            Flexible(
-              child: Stack(
-                children: [
-                  SingleChildScrollView(
-                    controller: _scroll,
-                    // 写备注时面板不让位，被键盘盖住的那段要靠底部留白补，
-                    // 否则备注框「滚到底」也还在键盘底下
-                    padding: EdgeInsets.only(
-                      bottom: typingNote
-                          ? keyboard + S.sm
-                          // 展开详情时多留一点：键盘不再为内容让位，
-                          // 最后一个字段的边框才不会贴着键盘上沿
-                          : (_detailsOpen ? S.md : S.sm),
-                    ),
-                    child: Column(
-                      children: [
-                        if (_isLending) ...[
-                          _DebtFields(
-                            direction: _mode.direction,
-                            counterparty: _counterparty,
-                            counterpartyFocus: _counterpartyFocus,
-                            dueDate: _dueDate,
-                            onPickDue: _pickDueDate,
-                            countInBudget: _countInBudget,
-                            onCountChanged: (v) =>
-                                setState(() => _countInBudget = v),
-                          ),
-                          _hairline(context),
-                          _NoteField(
-                            key: _noteKey,
-                            controller: _note,
-                            focusNode: _noteFocus,
-                            onSubmitted: (_) => _noteFocus.unfocus(),
-                          ),
-                          _hairline(context),
-                        ] else ...[
-                          _CategoryNoteRow(
-                            category: Store.i.categoryOf(_categoryId),
-                            parent: Store.i.parentOf(
-                              Store.i.categoryOf(_categoryId),
-                            ),
-                            note: _note,
-                            onTap: _pickCategory,
-                          ),
-                          _hairline(context),
-                        ],
-                        // 有详情字段时，备注框提到分类下面（它不是必填项，
-                        // 藏起来用户就当它不存在了）。
-                        if (!_isLending && _fields.isNotEmpty) ...[
-                          _NoteField(
-                            key: _noteKey,
-                            controller: _note,
-                            focusNode: _noteFocus,
-                            onSubmitted: (_) => _noteFocus.unfocus(),
-                          ),
-                          _hairline(context),
-                        ],
-                        // 日期 / 账户**必须在详情区前面**。
-                        // 原来顺序是「备注 → 详情 → 日期账户」，一展开详情，
-                        // 这两行就被顶到可视区外面 —— 而它们比详情重要得多
-                        // （出行的「出发地」可以空着，日期和账户不能空）。
-                        _MetaRow(
-                          date: _date,
-                          onPickDate: _pickDate,
-                          accountName:
-                              Store.i.accountOf(_accountId)?.name ?? '未选账户',
-                          accountIcon:
-                              Store.i.accountOf(_accountId)?.icon ?? 'wallet',
-                          onPickAccount: _pickAccount,
+                      _hairline(context),
+                      _NoteField(
+                        key: _noteKey,
+                        controller: _note,
+                        focusNode: _noteFocus,
+                        onSubmitted: (_) => _noteFocus.unfocus(),
+                      ),
+                      _hairline(context),
+                    ] else ...[
+                      _CategoryNoteRow(
+                        category: Store.i.categoryOf(_categoryId),
+                        parent: Store.i.parentOf(
+                          Store.i.categoryOf(_categoryId),
                         ),
-                        if (_showLift)
-                          _LiftRow(
-                            on: _liftOn,
-                            periodLabel: shortYmd(
-                              periodStartOf(
-                                _date,
-                                Store.i.cycleStartDay,
-                                liftToNext: _liftOn,
-                              ),
-                            ),
-                            onChanged: (v) => setState(() => _liftOverride = v),
+                        note: _note,
+                        onTap: _pickCategory,
+                      ),
+                      _hairline(context),
+                    ],
+                    // 有详情字段时，备注框提到分类下面（它不是必填项，
+                    // 藏起来用户就当它不存在了）。
+                    if (!_isLending && _fields.isNotEmpty) ...[
+                      _NoteField(
+                        key: _noteKey,
+                        controller: _note,
+                        focusNode: _noteFocus,
+                        onSubmitted: (_) => _noteFocus.unfocus(),
+                      ),
+                      _hairline(context),
+                    ],
+                    // 日期 / 账户**必须在详情区前面**。
+                    // 原来顺序是「备注 → 详情 → 日期账户」，一展开详情，
+                    // 这两行就被顶到可视区外面 —— 而它们比详情重要得多
+                    // （出行的「出发地」可以空着，日期和账户不能空）。
+                    _MetaRow(
+                      date: _date,
+                      onPickDate: _pickDate,
+                      accountName:
+                          Store.i.accountOf(_accountId)?.name ?? '未选账户',
+                      accountIcon:
+                          Store.i.accountOf(_accountId)?.icon ?? 'wallet',
+                      onPickAccount: _pickAccount,
+                    ),
+                    if (_showLift)
+                      _LiftRow(
+                        on: _liftOn,
+                        periodLabel: shortYmd(
+                          periodStartOf(
+                            _date,
+                            Store.i.cycleStartDay,
+                            liftToNext: _liftOn,
                           ),
-                        // 详情区放最后：它展开时只会往下长，不会把上面任何
-                        // 一行挤走。
-                        if (!_isLending && _fields.isNotEmpty) ...[
-                          _hairline(context),
-                          _DetailBlock(
-                            fields: _fields,
-                            folded: _folded,
-                            open: _detailsOpen,
-                            controllers: _detailCtl,
-                            focusNodes: _detailFocus,
-                            keys: _detailKey,
-                            onToggle: () {
-                              setState(() => _detailsOpen = !_detailsOpen);
-                              if (_detailsOpen) {
-                                // 展开后滚到底：否则新出现的字段会落在可视区
-                                // 下沿之外，用户以为「点了没反应」。
-                                //
-                                // 套两层 postFrame：第一帧 detail 区的尺寸还没
-                                // 进 maxScrollExtent，这时 animateTo 拿到的是
-                                // 旧值（往往是 0），等于没滚。
-                                WidgetsBinding.instance.addPostFrameCallback(
-                                  (_) {
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                      if (!_scroll.hasClients) return;
-                                      _scroll.animateTo(
-                                        _scroll.position.maxScrollExtent,
-                                        duration: const Duration(
-                                          milliseconds: 220,
-                                        ),
-                                        curve: Curves.easeOutCubic,
-                                      );
-                                    });
-                                  },
-                                );
-                              }
-                            },
-                          ),
-                        ],
-                        // 借贷模式已经在上面单独放了备注框，这里不能再放一个 ——
-                        // 两处都用同一个 GlobalKey，会在切换模式时报重复 key
-                        if (!_isLending && _fields.isEmpty)
-                          _NoteField(
-                            key: _noteKey,
-                            controller: _note,
-                            focusNode: _noteFocus,
-                            // 输入法的「完成」= 备注写完：收起键盘，数字键盘和确认键回来
-                            onSubmitted: (_) => _noteFocus.unfocus(),
-                          ),
-                      ],
+                        ),
+                        onChanged: (v) => setState(() => _liftOverride = v),
+                      ),
+                    // 详情区放最后：它展开时只会往下长，不会把上面任何
+                    // 一行挤走。
+                    if (!_isLending && _fields.isNotEmpty) ...[
+                      _hairline(context),
+                      _DetailBlock(
+                        fields: _fields,
+                        folded: _folded,
+                        open: _detailsOpen,
+                        controllers: _detailCtl,
+                        focusNodes: _detailFocus,
+                        keys: _detailKey,
+                        onToggle: () {
+                          setState(() => _detailsOpen = !_detailsOpen);
+                          if (_detailsOpen) {
+                            // 展开后滚到底：否则新出现的字段会落在可视区
+                            // 下沿之外，用户以为「点了没反应」。
+                            //
+                            // 套两层 postFrame：第一帧 detail 区的尺寸还没
+                            // 进 maxScrollExtent，这时 animateTo 拿到的是
+                            // 旧值（往往是 0），等于没滚。
+                            WidgetsBinding.instance.addPostFrameCallback(
+                              (_) {
+                                WidgetsBinding.instance
+                                    .addPostFrameCallback((_) {
+                                  if (!_scroll.hasClients) return;
+                                  _scroll.animateTo(
+                                    _scroll.position.maxScrollExtent,
+                                    duration: const Duration(
+                                      milliseconds: 220,
+                                    ),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                });
+                              },
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                    // 借贷模式已经在上面单独放了备注框，这里不能再放一个 ——
+                    // 两处都用同一个 GlobalKey，会在切换模式时报重复 key
+                    if (!_isLending && _fields.isEmpty)
+                      _NoteField(
+                        key: _noteKey,
+                        controller: _note,
+                        focusNode: _noteFocus,
+                        // 输入法的「完成」= 备注写完：收起键盘，数字键盘和确认键回来
+                        onSubmitted: (_) => _noteFocus.unfocus(),
+                      ),
+                  ],
+                ),
+              ),
+              // 还能往下滚时，底部压一层渐隐 —— 不铺这层的话，被裁掉的
+              // 「日期 / 备注」看起来像界面画坏了一道横线。
+              if (_moreBelow)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: 22,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          // 渐隐的终点必须是面板自己的面（卡面），
+                          // 不是页面底 —— 否则暗一圈，像没画完
+                          colors: [C.cardBg.withValues(alpha: 0), C.cardBg],
+                        ),
+                      ),
                     ),
                   ),
-                  // 还能往下滚时，底部压一层渐隐 —— 不铺这层的话，被裁掉的
-                  // 「日期 / 备注」看起来像界面画坏了一道横线。
-                  if (_moreBelow)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: IgnorePointer(
-                        child: Container(
-                          height: 22,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              // 渐隐的终点必须是面板自己的面（卡面），
-                              // 不是页面底 —— 否则暗一圈，像没画完
-                              colors: [C.cardBg.withValues(alpha: 0), C.cardBg],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+                ),
+            ],
+          ),
+        ),
+        // 数字键盘给自己让位的方式：**被输入法 1:1 顶出去**，而不是自己「收起来」。
+        //
+        // 为什么不是 AnimatedSize 收起：那是一个 150ms 的独立动画，和输入法
+        // 升起（0.2~0.3s、逐帧变化）永远对不齐。动画快了，键盘先消失、面板
+        // 当场变矮；动画慢了，键盘赖着不走、可滚动区被压成 0。两边的观感
+        // 都是「面板跳了一下」——1.4.1 与 1.5.0 各踩过一次。
+        //
+        // 现在让位量直接取 `键盘高度`：输入法升多少，键盘就被剪掉多少。
+        // 面板高度 = 内容 + 剩下的那截键盘，底边 = 键盘上沿，于是
+        //
+        //     顶边 = (屏高 − 键盘) − (内容 + 键盘高 − 键盘) = 常数
+        //
+        // 键盘升起的整个过程里面板顶边一动不动，只有键盘块在缩短 ——
+        // 看起来就是「输入法从底下把键盘顶上去」，正是手指底下的物理事实。
+        // 输入法比键盘还高（少数机型）时它自然变成 0，不需要额外分支。
+        //
+        // 不给「完成」按钮：输入法自带的那颗 + 收起键盘，都是「写完了」。
+        //
+        // slot 归零时整块（含分隔线）都不出现，而不是留一个 0 高的空壳：
+        // 「键盘已经让开了」在测试与读代码时都该是一个能直接判断的事实。
+        if (keypadSlot > 0) ...[
+          _hairline(context),
+          SizedBox(
+            // key 给测试用：键盘本身的 rect 永远是「自然高度」（它被自己的
+            // 排版尺寸撑开、只是被外层剪掉），要量「还剩多少露在外面」只能量
+            // 这个槽。
+            key: const ValueKey('record_keypad_slot'),
+            height: keypadSlot,
+            child: ClipRect(
+              // 键盘按**自然高度**排一次版，再由外面这个 SizedBox 从下往上
+              // 剪掉：不这么做，键会为了挤进剩余空间而改高度（那就变成
+              // 又一次「小键盘抖了一下」）。
+              child: OverflowBox(
+                alignment: Alignment.topCenter,
+                minHeight: CalcKeypad.heightOf(keyH),
+                maxHeight: CalcKeypad.heightOf(keyH),
+                child: CalcKeypad(
+                  onKey: _pressKey,
+                  onConfirm: _save,
+                  canConfirm: _canSave && !_saving,
+                  keyHeight: keyH,
+                ),
               ),
             ),
-            // 写备注时数字键盘让位：它 270dp 高，和系统键盘叠在一起会把可滚动区
-            // 压成 0，备注框照样看不见；何况这时候本来也按不到数字。
-            // 不给「完成」按钮：输入法自带的那颗 + 收起键盘，都是「写完了」。
-            //
-            // 让位要**滑下去**，不能直接抽走：键盘升起时面板整体被顶高，如果
-            // 这 270dp 在同一帧里消失，画面就是「先缩一下、再跳一下」——
-            // 用户的原话是「点备注像重新打开了一次面板」。
-            // 只给这一块加动画，整个面板仍然逐帧跟随 viewInsets：键盘高度是
-            // 连续变化的，给面板加动画会让它永远追不上键盘（见下面的长注释）。
-            AnimatedSize(
-              duration: const Duration(milliseconds: 150),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: typingNote
-                  ? const SizedBox(width: double.infinity)
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _hairline(context),
-                        CalcKeypad(
-                          onKey: _pressKey,
-                          onConfirm: _save,
-                          canConfirm: _canSave && !_saving,
-                          keyHeight: keyH,
-                        ),
-                      ],
-                    ),
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ],
     );
+  }
+
+  /// 数字键盘还留下多高：键盘本体的高度减去被输入法顶掉的部分。
+  ///
+  /// 留一截碎边（不到 40dp，比一整排键矮得多）没有意义 —— 那只会是一排被切了
+  /// 一半的键贴在输入法上沿，看起来像画坏了。到这个程度就当它已经收起来了；
+  /// 代价是面板顶边会在这一下移动不到 40dp，比「一排半截的键」划算得多。
+  double _keypadSlotHeight(double keyH, double keyboard) {
+    final full = CalcKeypad.heightOf(keyH);
+    final left = (full - keyboard).clamp(0.0, full).toDouble();
+    return left < 40 ? 0 : left;
   }
 }
 
