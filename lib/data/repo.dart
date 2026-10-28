@@ -391,11 +391,19 @@ class Repo {
   /// [report] 可选：把「旧字段被忽略 / 换名 / 类型纠正」记进这份账本，
   /// 界面据此告诉用户「这份备份是哪一年的、有些字段没带过来」。
   /// 不传也能正常恢复 —— 兼容动作照样生效，只是没人记录。
+  /// [afterLoad] 见 `_repoReplaceTables` 的同名参数：在**同一事务内**、
+  /// 提交之前执行，用于旧备份恢复后补做的迁移（分类升级）。
   static Future<Map<String, int>> replaceTables(
     Map<String, List<Map<String, Object?>>> data, {
     Map<String, String> keepSettings = const {},
     ConformReport? report,
-  }) => _repoReplaceTables(data, keepSettings: keepSettings, report: report);
+    Future<void> Function(Transaction txn)? afterLoad,
+  }) => _repoReplaceTables(
+    data,
+    keepSettings: keepSettings,
+    report: report,
+    afterLoad: afterLoad,
+  );
 
   // 旧格式备份的行改写（`budget.month` → `period_start` 等）已统一收进
   // `backup_compat.dart` 的 `conformRow`：那里有完整的兼容表、类型对齐与

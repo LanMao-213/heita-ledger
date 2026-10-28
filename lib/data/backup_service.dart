@@ -244,24 +244,31 @@ abstract final class BackupService {
         if (!_restoredSettingKeys.contains(e.key)) e.key: e.value,
     };
 
+    // 旧备份里的分类是扁平的一套（交通 / 通讯 / 医疗…）。灌进新库之后，
+    // 走一遍升级迁移把它们并进两级体系 —— 否则恢复出来的账本在分类管理页里
+    // 是「9 个一级、0 个子分类」，而且再也不会被自动修正。
+    //
+    // ★ 必须和「灌行」在**同一个事务里**（1.5.0 修正）。以前是恢复函数返回
+    //   之后再单独调 `Db.upgradeRestoredData()`：那时灌行已经提交，迁移一旦
+    //   中途失败，就是「账目进来了、分类只升了一半」，而调用方拿到异常后会对
+    //   用户说「恢复失败，数据未改动」—— 那句话在当时是假的。现在交给
+    //   `afterLoad`，在提交之前跑完，抛异常则整次覆盖一起回滚。
+    final sv = payload['schemaVersion'];
+    final needsUpgrade = sv is int && sv < Db.schemaVersion;
+
     final Map<String, int> counts;
     try {
       counts = await Repo.replaceTables(
         tables,
         keepSettings: keep,
         report: report,
+        afterLoad: needsUpgrade
+            ? (txn) => Db.migrateTwoLevelCategories(txn)
+            : null,
       );
     } on BackupFieldException catch (e) {
       // 事务已回滚，数据未被改动 —— 把技术错误翻成用户能读懂的一句话
       throw BackupException(e.message);
-    }
-
-    // 旧备份里的分类是扁平的一套（交通 / 通讯 / 医疗…）。灌进新库之后，
-    // 走一遍升级迁移把它们并进两级体系 —— 否则恢复出来的账本在分类管理页里
-    // 是「9 个一级、0 个子分类」，而且再也不会被自动修正。
-    final sv = payload['schemaVersion'];
-    if (sv is int && sv < Db.schemaVersion) {
-      await Db.upgradeRestoredData();
     }
 
     // v7 及以前的备份里没有 `opening_cents`，灌进新库后全是默认值 0，

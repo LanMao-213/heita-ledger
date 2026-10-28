@@ -185,7 +185,10 @@ class MinePage extends StatelessWidget {
                 SettingRow(
                   icon: 'upload',
                   title: '备份全部数据',
-                  subtitle: 'JSON，含预算、目标、模板、账户余额',
+                  // 副标题必须写明「未加密」：这是一份能被任何文本编辑器打开的
+                  // 明文 JSON，里面是整本账（含备注、账户余额、「借给谁」）。
+                  // 以前只写「JSON」，读到的人默认会以为总要密码或者打不开。
+                  subtitle: '明文 JSON（未加密），含预算、目标、模板、余额',
                   onTap: () => _backup(context),
                 ),
                 Divider(
@@ -453,6 +456,24 @@ class MinePage extends StatelessWidget {
   // ------------------------------------------------------------------ 备份
 
   static Future<void> _backup(BuildContext context) async {
+    // 导出口子是**唯一**会把整本账变成「一个可以随手转发的文件」的地方，
+    // 所以在这里把「不加密」讲明白，而不是只写在设置页的副标题里 ——
+    // 副标题会被一划而过，系统分享面板一打开，文件就出去了。
+    //
+    // 不做加密是刻意的取舍：真加密要引入 crypto 依赖、给备份格式加版本、
+    // 再做一套「忘了密码就永久打不开」的流程，本轮不铺这么大。所以先把
+    // 风险讲清楚，代价是一句话的确认。
+    final ok = await showAppConfirm(
+      context,
+      title: '导出全部数据？',
+      message: '文件是明文 JSON，拿到它的人能读出全部账目、备注和账户余额。\n\n'
+          '请只发给自己（存本地、发自己邮箱）。要发给别人，先把账目里的'
+          '隐私内容删掉。',
+      cancelLabel: '取消',
+      confirmLabel: '导出',
+    );
+    if (!ok || !context.mounted) return;
+
     try {
       final path = await BackupService.writeToTempFile();
       if (!context.mounted) return;

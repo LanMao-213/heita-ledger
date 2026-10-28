@@ -148,10 +148,28 @@ class Db {
   /// 而界面上按两级渲染的分类管理页会显示成「一级分类 + 0 个子分类」。
   ///
   /// 迁移本身幂等（见 [_migrateTwoLevelCategories]），重复调用只会补缺。
+  ///
+  /// ⚠️ **恢复流程不再调这个方法**（1.5.0 起）。它自己 `open()` 一个新连接、
+  /// 跑在 `replaceTables` 的事务**外**：迁移一旦中途失败，灌进去的数据已经
+  /// 提交、分类却停在半路 —— 账本里一半子分类没有父级、另一半还挂在
+  /// 「交通 / 通讯」这些已经不用的名字上，而调用方拿到的是一次异常，
+  /// 只能告诉用户「恢复失败，数据未改动」，实际上已经改了一半。
+  ///
+  /// 现在恢复走 [migrateTwoLevelCategories]，由 `Repo.replaceTables` 的
+  /// `afterLoad` 钩子在**同一个事务里**执行完再提交。保留这个方法只为兼容
+  /// 历史调用点（当前仓库内已无调用），新代码别再用。
   static Future<void> upgradeRestoredData() async {
     final db = await open();
     await _migrateTwoLevelCategories(db);
   }
+
+  /// 把恢复回来的扁平分类升成两级 —— 可传事务，跟着调用方一起提交/回滚。
+  ///
+  /// [db] 用 [DatabaseExecutor] 而不是 [Database]：恢复流程传进来的是
+  /// `Transaction`，它只有 executor 那一层能力，没有 `transaction` 方法。
+  /// 这也顺带**堵住了**「迁移过程中自己再开一个事务」的可能 —— 类型上就没有。
+  static Future<void> migrateTwoLevelCategories(DatabaseExecutor db) =>
+      _migrateTwoLevelCategories(db);
 
   /// 清空时**子表在前、主表在后**：顺序错了会撞 `foreign_keys = ON`。
   ///
@@ -768,7 +786,7 @@ class Db {
   /// 2. **不猜**。不根据备注推断子分类、不合并重名分类。猜错比不猜更难发现。
   /// 3. **幂等**。全部按「账本 + 类型 + 父级 + 名字」查重，重复执行只会补充、
   ///    不会生成第二套分类。
-  static Future<void> _migrateTwoLevelCategories(Database db) async {
+  static Future<void> _migrateTwoLevelCategories(DatabaseExecutor db) async {
     final hasTxn = await db.rawQuery(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'txn'",
     );
@@ -809,7 +827,7 @@ class Db {
   /// [topOnly] 为 true 时只在一级里找（`parent_id IS NULL`——
   /// SQLite 里 `parent_id = NULL` 永远不成立，必须单独写）。
   static Future<int?> _findCategory(
-    Database db,
+    DatabaseExecutor db,
     int ledgerId,
     String type,
     String name, {
@@ -835,7 +853,7 @@ class Db {
   /// 「原地改名」是这次迁移能做到「不动交易」的关键：改的是 `category.name`，
   /// 交易的 `category_id` 指向没变，历史账目自动跟着新名字走。
   static Future<int> _ensureTopCategory(
-    Database db,
+    DatabaseExecutor db,
     int ledgerId,
     String type,
     SeedCat cat,
@@ -886,7 +904,7 @@ class Db {
 
   /// 老的一级分类原地降级成某个一级的子分类（改 `parent_id` + 改名）。
   static Future<void> _demoteCategory(
-    Database db,
+    DatabaseExecutor db,
     int ledgerId,
     DemotedCat d,
   ) async {
@@ -916,7 +934,7 @@ class Db {
 
   /// 把种子里的两级结构同步进某个账本：缺什么补什么，已有的只刷新图标。
   static Future<void> _syncGroup(
-    Database db,
+    DatabaseExecutor db,
     int ledgerId,
     String type,
     List<SeedCat> cats,
@@ -961,7 +979,7 @@ class Db {
   /// （彼此保持原来的相对顺序）。不这么做的话，改名保留下来的老分类
   /// 会带着旧编号，跟新补的分类编号撞在一起，顺序随 id 漂移。
   static Future<void> _normalizeTopOrder(
-    Database db,
+    DatabaseExecutor db,
     int ledgerId,
     String type,
     List<SeedCat> cats,

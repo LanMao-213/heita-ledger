@@ -32,10 +32,17 @@ Future<Map<String, List<Map<String, Object?>>>> _repoDumpTables() async {
   /// [report] 可选：把「旧字段被忽略 / 换名 / 类型纠正」记进这份账本，
   /// 界面据此告诉用户「这份备份是哪一年的、有些字段没带过来」。
   /// 不传也能正常恢复 —— 兼容动作照样生效，只是没人记录。
+  ///
+  /// [afterLoad] 可选：**灌完数据、提交之前**在同一事务里再跑一段（拿得到
+  /// `Transaction`）。给「旧备份恢复后要补做的迁移」用 —— 分类升级就是这种：
+  /// 它此前跑在事务外，失败时数据已提交、迁移只做了一半，调用方却以为
+  /// 整次恢复都没生效（见 `Db.upgradeRestoredData` 的注释）。
+  /// 传进来的函数**不要自己开事务**：参数就是 `Transaction`，类型上开不了。
 Future<Map<String, int>> _repoReplaceTables(
   Map<String, List<Map<String, Object?>>> data, {
   Map<String, String> keepSettings = const {},
   ConformReport? report,
+  Future<void> Function(Transaction txn)? afterLoad,
 }) async {
   final db = await Db.open();
   final counts = <String, int>{};
@@ -73,8 +80,15 @@ Future<Map<String, int>> _repoReplaceTables(
       }
       await batch.commit(noResult: true);
     }
+    // 放在循环之后、提交之前：迁移读到的是刚灌进去的行，写回去的也还在
+    // 同一个事务里 —— 它抛异常时整次覆盖一起回滚。
+    await afterLoad?.call(txn);
   });
-  // 旧备份（v3 及更早）里没有 period_start，回填一次即可；新备份自带，等于空跑
+  // 旧备份（v3 及更早）里没有 period_start，回填一次即可；新备份自带，等于空跑。
+  // ⚠️ 这一句仍在事务外：`_recomputePeriods` 自己会 `db.transaction(...)`，
+  // 在已开启的事务里再走一次会死锁。它只补「period_start 为空」的行，且可重复
+  // 执行（下次启动也会补），所以留在外面；要收进事务得先把 `_recomputePeriods`
+  // 改成接受 executor，那是另一件事。
   await _repoBackfillMissingPeriods();
   return counts;
 }
