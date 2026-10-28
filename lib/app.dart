@@ -85,9 +85,18 @@ class _BootGateState extends State<_BootGate> {
     //
     // seedDemoDataIfNeeded 只在带 `--dart-define=HEITA_SEED=1` 的构建里做事，
     // 正式包是空操作（见 lib/dev/seed.dart）。
-    _boot = Store.i.ready
+    final booting = Store.i.ready
         ? Future<void>.value()
         : Store.i.boot().then((_) => seedDemoDataIfNeeded());
+
+    // 启动页**不跟着 boot 的快慢走**：快设备上 boot 一两百毫秒就结束，动画
+    // 刚起步就会被 HomeShell 顶掉（用户看到的是一帧小图标，然后突然进主界面）；
+    // 慢设备上又反过来，动画早放完还干等。这里取「boot 完成」与「最短停留」
+    // 中较慢的一边，两种设备看到的过渡一致。
+    _boot = Future.wait<void>([
+      booting,
+      Future<void>.delayed(kSplashMinVisible),
+    ]).then((_) {});
   }
 
   @override
@@ -161,6 +170,26 @@ class _SplashScreen extends StatelessWidget {
   }
 }
 
+// 启动页的标志：从「桌面图标大小」平滑长到定稿尺寸。
+//
+// 时间轴上的三段，缺一帧都会露馅：
+//
+//   系统闪屏（纯色 #14161A）
+//     → Flutter 首帧：标志**已经**是图标大小（22%），不是透明的
+//     → 720ms 长到 100%，然后停 120ms
+//     → 主界面
+//
+// ⚠️ 两条不能碰的红线：
+//
+// 1. **首帧必须可见**。这里曾经包着 `Opacity(v)`、v 从 0 开始，于是第一帧整屏
+//    只有渐变。测试环境 900ms 就补上了所以一直是绿的；真机冷启动时帧推进慢，
+//    动画停在第 0 帧，等 boot 完成直接跳主界面 —— 标志一次都没出现过
+//    （2026-10-28 的真机截图：一块空的深色渐变）。
+// 2. **不能只靠 boot 决定时长**。快设备上 boot 一两百毫秒就结束，动画会被
+//    直接切走。「最短停留时长」在 `_BootGate` 里兜（见 kSplashMinVisible）。
+//
+// 用 `Transform.scale` 而不是改 `BrandMark.height`：前者是绘制期变换，
+// 整段动画只按终态分辨率绘制一次再缩放，既不会变形也不会每帧重排布局。
 class _SplashMark extends StatelessWidget {
   const _SplashMark({required this.height});
 
@@ -170,12 +199,17 @@ class _SplashMark extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 900),
+      duration: kSplashGrowDuration,
+      // 先快后慢：像被「甩」出去再稳稳停住，比匀速或 easeIn 更像系统的展开动画
       curve: Curves.easeOutCubic,
-      builder: (context, v, child) => Opacity(
-        opacity: v.clamp(0.0, 1.0),
-        // 从 0.94 放大到 1.0，配合淡入 —— 标志像从暗处浮出来
-        child: Transform.scale(scale: 0.94 + 0.06 * v, child: child),
+      builder: (context, v, child) => Transform.scale(
+        // 测试要读这个缩放值来判断「起点是图标大小」「终点是定稿尺寸」。
+        // 不挂 key 的话 `find.byType(Transform)` 会先抓到 MaterialApp 路由
+        // 过渡里的那个，读出来永远是 1.0。
+        key: const ValueKey<String>('splash.mark.grow'),
+        scale: kSplashMarkStartFraction +
+            (1 - kSplashMarkStartFraction) * v,
+        child: child,
       ),
       // 深色底：标志取白色，火焰取亮红（C.overD），与原型 dark 模式一致
       child: BrandMark(

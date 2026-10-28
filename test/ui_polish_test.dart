@@ -24,6 +24,7 @@ import 'package:ledger/pages/detail_page.dart';
 import 'package:ledger/pages/mine_page.dart';
 import 'package:ledger/store.dart';
 import 'package:path/path.dart' as p;
+import 'support/app_boot.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'test_ui_polish.db';
@@ -287,7 +288,8 @@ void main() {
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(const HeitaApp());
-    await settle(tester);
+    // 启动页有最短停留时长，这里要等它走完才看得到底部 tab。
+    await pumpUntilHome(tester);
     expect(Store.i.tabIndex, 0);
 
     // 点「图表」

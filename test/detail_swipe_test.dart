@@ -27,6 +27,7 @@ import 'package:ledger/pages/detail_page.dart';
 import 'package:ledger/store.dart';
 import 'package:ledger/widgets/detail/summary_card.dart';
 import 'package:path/path.dart' as p;
+import 'support/app_boot.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'test_detail_swipe.db';
@@ -99,8 +100,8 @@ void main() {
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(const HeitaApp());
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+    // 启动页有最短停留时长（kSplashMinVisible），必须等它走完才看得到主界面。
+    await pumpUntilHome(tester);
   }
 
   Future<void> pumpDetail(WidgetTester tester) async {

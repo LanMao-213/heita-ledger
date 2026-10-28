@@ -80,3 +80,31 @@ double splashMarkHeight(Size screen) => math.min(
 /// 撞上屏高上限时会小于 [kSplashMarkWidthRatio]；想看「有没有被钳制」用它。
 double splashMarkWidthFraction(Size screen) =>
     splashMarkHeight(screen) / kSplashMarkHeightPerWidth / screen.width;
+
+// ── 启动动画 ─────────────────────────────────────────────────────────────
+//
+// 为什么需要这三个常量：Android 12+ 的系统闪屏会先画一个小图标（带
+// iconBackgroundColor 时可见内容约 160dp），再把窗口交给 Flutter 首帧，而首帧
+// 的标志是 718dp —— 差 4.51 倍，冷启动时就是「小图标突然跳成大标志」。
+//
+// 把这段时间交给动画：Flutter 首帧从**图标大小**起画，再用 720ms 长到定稿尺寸。
+// 起点的 0.22 不是随手取的 —— 390×844 上终态 712dp × 0.22 ≈ 157dp，与真机
+// 测到的系统闪屏图标 159dp 基本重合，所以两段接得上。
+
+/// 动画起点：标志高度占终态高度的比例（≈ 桌面图标的视觉大小）。
+const double kSplashMarkStartFraction = 0.22;
+
+/// 从起点长到终态用的时长。取 720ms 而不是 Android 默认的 ~500ms：
+/// 这是在「感觉得到」和「不磨蹭」之间的取舍，真机上 500ms 会显得没展开完。
+const Duration kSplashGrowDuration = Duration(milliseconds: 720);
+
+/// 启动页最短停留时长。
+///
+/// **这一条才是「无论启动快慢都能完整呈现」的关键。** 之前启动页跟着
+/// `Store.boot()` 走：快设备上 boot 只要一两百毫秒，动画刚起步就被
+/// `HomeShell` 顶掉，用户看到的是一帧小图标然后突然进主界面；慢设备上又反过来，
+/// 动画早放完了还得干等。固定一个下限，快慢两种设备看到的过渡是一样的。
+///
+/// 比 [kSplashGrowDuration] 多 120ms，让定稿尺寸停一下再交棒 —— 否则
+/// 「长满」和「切走」在同一帧发生，看着像没长完就闪了。
+const Duration kSplashMinVisible = Duration(milliseconds: 840);

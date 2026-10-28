@@ -56,10 +56,14 @@ void main() {
     await tester.pumpWidget(const HeitaApp());
     // boot 在 `_BootGate.initState` 里跑真实数据库 I/O，假时钟下 pumpAndSettle
     // 等不到它 —— 真实时间与 pump 交替，直到首屏出来。
+    //
+    // 注意每次 pump 必须**推进假时钟**：启动页有最短停留时长
+    // （`kSplashMinVisible`，一个 `Future.delayed`），只 pump 零时长的话
+    // 定时器永远不响，循环跑满 120 次也到不了主界面。
     for (var i = 0; i < 120 && find.byType(HomeShell).evaluate().isEmpty; i++) {
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
       await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 30)),
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
       );
     }
     await tester.pumpAndSettle(const Duration(seconds: 1));
