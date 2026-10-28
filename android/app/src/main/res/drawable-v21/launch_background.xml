@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 启动窗口背景（API 21+）。
-     与 Flutter 端 _SplashScreen 的径向渐变保持同一套参数，避免冷启动时跳变：
-       中心 #2C323E / 边缘 #07080B，中心点 (50%, 44%)，半径 95% 短边。 -->
+<!-- 冷启动窗口背景（API 21+）。
+     ⚠️ 这里必须是**纯色**，而且必须引用 @color/splash_background。
+
+     2026-10-28 之前这里画的是径向渐变（#2C323E → #07080B）。问题在于它比
+     Flutter 那段启动页暗得多：用户点开图标后先看到一整块近黑的画面铺满，
+     然后 Flutter 首帧才把整屏提亮、标志再冒出来 —— 观感就是「先黑一下，
+     再从中间冒出 Logo」。现在整条链路只铺同一个底色 #14161A：
+       桌面图标背景 → 本窗口 → 系统闪屏 → Flutter 首帧的 Scaffold 底色
+     四屏同色，交接时看不出变化；渐变只作为 Flutter 那层的「浮现物」淡入。
+
+     Dart 侧同名常量：lib/design/splash_spec.dart 的 kSplashNativeBackground。
+     test/splash_spec_test.dart 会读本文件，比对色值并断言这里不含 gradient。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <gradient
-                android:type="radial"
-                android:centerX="50%"
-                android:centerY="44%"
-                android:gradientRadius="95%p"
-                android:startColor="#2C323E"
-                android:endColor="#07080B" />
+            <solid android:color="@color/splash_background" />
         </shape>
     </item>
 </layer-list>

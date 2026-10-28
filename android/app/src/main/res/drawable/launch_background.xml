@@ -1,16 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 旧版 API 兜底（gradientRadius 不支持百分比，改用固定 dp）。
-     实际构建 minSdk >= 24，会优先使用 drawable-v21 下的同名文件。 -->
+<!-- 冷启动窗口背景（API 21 以下兜底）。
+     实际构建 minSdk >= 24，会优先使用 drawable-v21 下的同名文件；这份保持内容
+     一致，免得哪天有人把 minSdk 调回去时又冒出一块近黑的渐变。
+
+     纯色的理由见 drawable-v21/launch_background.xml 的注释。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <gradient
-                android:type="radial"
-                android:centerX="50%"
-                android:centerY="44%"
-                android:gradientRadius="370dp"
-                android:startColor="#2C323E"
-                android:endColor="#07080B" />
+            <solid android:color="@color/splash_background" />
         </shape>
     </item>
 </layer-list>

@@ -131,6 +131,30 @@ void main() {
       );
     });
 
+    test('原生窗口只铺纯色：drawable 里不能再出现 gradient', () {
+      // 2026-10-28 的观感问题就出在这里：原生窗口画的是径向渐变，外圈 #07080B
+      // 比 Flutter 那屏暗得多，于是「点开图标 → 一整块近黑铺满 → 标志冒出来」。
+      // 现在两端都只铺 @color/splash_background，渐变留给 Flutter 淡入。
+      for (final rel in const [
+        'drawable/launch_background.xml',
+        'drawable-v21/launch_background.xml',
+      ]) {
+        final body = bodyOf(rel);
+        expect(
+          body.contains('<gradient'),
+          isFalse,
+          reason: '$rel 又画上渐变了：它比启动仪式的那屏更暗，'
+              '用户会先看到一整块近黑铺满，再从中间冒出标志',
+        );
+        expect(
+          body.contains('@color/splash_background'),
+          isTrue,
+          reason: '$rel 没有引用 @color/splash_background，色值会和系统闪屏各写一份、'
+              '慢慢漂开',
+        );
+      }
+    });
+
     test('splash_icon_none 确实是空的', () {
       final body = bodyOf('drawable/splash_icon_none.xml');
       expect(

@@ -1,14 +1,16 @@
-// 启动页的视觉规格 —— 渐变与标志尺寸的**唯一来源**。
+// 启动页的视觉规格 —— 渐变、底色与标志尺寸的**唯一来源**。
 //
 // 为什么值得单独一个文件：这套参数有三个消费者，而其中两个此前各写了一份：
 //
 //   · `lib/app.dart` 的 `_SplashScreen`（Flutter 首帧，真正生效的那个）
 //   · `test/splash_final_test.dart`（渲染出图；曾经抄了一遍 `markH` 公式，
 //     还漏掉了屏高钳制 —— 于是改实现它不会红，守卫等于摆设）
-//   · `android/.../drawable-v21/launch_background.xml`（原生冷启动窗口）
+//   · `android/.../values/colors.xml` + `drawable-v21/launch_background.xml`
+//     （原生冷启动窗口；只共享**底色**，渐变不出现在原生侧）
 //
-// 原生那份是 XML，跨语言共享不了，只能靠注释互相提醒；但 Dart 侧必须共用
-// 同一份常量，否则「改一处漏一处」的代价是冷启动时渐变位置跳一下。
+// 原生那几份是 XML，跨语言共享不了，只能靠注释互相提醒 + `splash_spec_test`
+// 读文件比对；Dart 侧则必须共用同一份常量，否则「改一处漏一处」的代价是
+// 冷启动时两屏之间闪一次色差。
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -38,10 +40,13 @@ const double kSplashMarkHeightCap = 0.92;
 
 /// 深色启动页的径向渐变。
 ///
-/// ⚠️ 这四个参数必须与
-/// `android/app/src/main/res/drawable-v21/launch_background.xml` 完全一致
-/// （中心 50%/44%、半径 95% 短边、#2C323E → #07080B）。原生窗口先出、Flutter
-/// 首帧后接，两边不一致就会在交接的那一帧看到渐变位置跳一下。
+/// 它只属于 Flutter 这一段：原生窗口与系统闪屏都用纯色 [kSplashNativeBackground]
+/// 打底（纯色才能和桌面图标背景、系统闪屏三方对齐），渐变是从那层底色上
+/// 淡入出来的。所以这里**不再**要求与 `launch_background.xml` 逐参数一致 ——
+/// 那份 drawable 现在是一个纯色 shape。
+///
+/// 中心 50%/44%、半径 95% 短边。#07080B 只作渐变最外圈，不再作为整屏底色：
+/// 它太暗，一整屏铺开就是用户说的「先黑一下」。
 const RadialGradient kSplashGradient = RadialGradient(
   center: Alignment(0, -0.12), // y = (44% - 50%) * 2
   radius: 0.95,
@@ -52,18 +57,22 @@ const RadialGradient kSplashGradient = RadialGradient(
 /// 渐变最外圈的颜色，用作无渐变时的兜底底色。
 const Color kSplashEdge = Color(0xFF07080B);
 
-/// Android 12+ 系统闪屏（SplashScreen API）的纯色背景。
+/// 启动页的**底色**：整条冷启动链路共用这一个值。
 ///
-/// ⚠️ 必须与 `android/app/src/main/res/values/colors.xml` 的
-/// `splash_background` 完全一致 —— `test/splash_spec_test.dart` 会读那个 XML
-/// 做逐字符比对，所以这条注释不会失效。
+/// 四个地方必须是它，缺一处就会看到接缝：
+///
+///   1. 桌面图标背景 `ic_launcher_background`
+///      （Android 12+ 的图标放大动画从这块色里长出来）
+///   2. Android 12+ 系统闪屏 `splash_background`（系统只接受纯色）
+///   3. Android 12 以下的启动窗口 `launch_background.xml`（纯色 shape）
+///   4. Flutter 首帧 `_SplashScreen` 的 `Scaffold.backgroundColor`
+///      —— 它**不参与淡入**，所以渐变 opacity=0 时露出的就是它
 ///
 /// 值取的是 [kSplashGradient] 的**整屏平均值** `#14161C`（亮度 22.1），不是
-/// 渐变中心色（中心 `#2C323E`，亮度 43.7）。平均值才对应「整屏看上去多亮」，
-/// 用它接 Flutter 首帧不会看到一次整体提亮；取中心色则会明显闪一下。
+/// 渐变中心色（中心 `#2C323E`，亮度 43.7）。平均值才对应「整屏看上去多亮」；
+/// 取中心色的话，渐变淡入到中途会比底色更暗，反而闪一下。
 ///
-/// 与 `ic_launcher_background` 同值是有意的：桌面图标放大成启动窗口的那段
-/// 动画里，两个色块要接得上。
+/// `test/splash_spec_test.dart` 会读上面那三个原生文件逐字符比对。
 const Color kSplashNativeBackground = Color(0xFF14161A);
 
 /// 给定屏幕尺寸，算出标志的绘制高度。
@@ -83,28 +92,40 @@ double splashMarkWidthFraction(Size screen) =>
 
 // ── 启动动画 ─────────────────────────────────────────────────────────────
 //
-// 为什么需要这三个常量：Android 12+ 的系统闪屏会先画一个小图标（带
-// iconBackgroundColor 时可见内容约 160dp），再把窗口交给 Flutter 首帧，而首帧
-// 的标志是 718dp —— 差 4.51 倍，冷启动时就是「小图标突然跳成大标志」。
+// 时间轴上只有三拍：**底色 → 淡入 → 停留**，没有「先铺开、再冒出」。
 //
-// 把这段时间交给动画：Flutter 首帧从**图标大小**起画，再用 720ms 长到定稿尺寸。
-// 起点的 0.22 不是随手取的 —— 390×844 上终态 712dp × 0.22 ≈ 157dp，与真机
-// 测到的系统闪屏图标 159dp 基本重合，所以两段接得上。
+// 第一拍由原生窗口负责：它的背景已改成纯色 `#14161A`（= 系统闪屏色 =
+// 桌面图标背景色），所以「点图标 → 原生窗口 → Flutter 首帧」三屏同色，
+// 交接时看不出任何变化，也不存在一块「比启动页更黑的画面」。
+//
+// 第二拍才是动画：渐变与标志包在**同一个** `Opacity` 里，用同一个 v 从 0 走到
+// 1 —— 两者严格同步，没有谁先谁后。v=0 时露出的正是第一拍那层同色底，
+// 所以「起点透明」不等于「黑屏」。
 
-/// 动画起点：标志高度占终态高度的比例（≈ 桌面图标的视觉大小）。
-const double kSplashMarkStartFraction = 0.22;
+/// 渐变与标志一起淡入的时长。
+///
+/// 取 360ms：短于这个数会觉得「啪」地亮起来，长于 500ms 又会磨蹭。曲线用
+/// [kSplashFadeCurve]，起步快、收尾稳，符合「显示出来」而不是「弹出来」。
+const Duration kSplashFadeIn = Duration(milliseconds: 360);
 
-/// 从起点长到终态用的时长。取 720ms 而不是 Android 默认的 ~500ms：
-/// 这是在「感觉得到」和「不磨蹭」之间的取舍，真机上 500ms 会显得没展开完。
-const Duration kSplashGrowDuration = Duration(milliseconds: 720);
+/// 淡入曲线。和旧的展开动画同一条 —— 先快后慢，收尾时几乎察觉不到速度。
+const Curve kSplashFadeCurve = Curves.easeOutCubic;
+
+/// 淡入过程中标志的起始缩放（0.96 → 1.0）。
+///
+/// 这一项是**辅助**，不是主角：只让标志在浮现的最后一点点「顶近」一下，
+/// 避免纯 opacity 显得像幻灯片翻页。幅度必须小 —— 曾经用过 0.22（从桌面图标
+/// 大小放大），真机观感就是「从中间冒出一个小标志」，正是这次要消掉的东西。
+const double kSplashMarkSettle = 0.96;
 
 /// 启动页最短停留时长。
 ///
-/// **这一条才是「无论启动快慢都能完整呈现」的关键。** 之前启动页跟着
+/// **这一条是「无论启动快慢都能完整呈现」的关键。** 之前启动页跟着
 /// `Store.boot()` 走：快设备上 boot 只要一两百毫秒，动画刚起步就被
-/// `HomeShell` 顶掉，用户看到的是一帧小图标然后突然进主界面；慢设备上又反过来，
-/// 动画早放完了还得干等。固定一个下限，快慢两种设备看到的过渡是一样的。
+/// `HomeShell` 顶掉，用户看到的是一帧淡入到一半的画面然后突然进主界面；
+/// 慢设备上又反过来，动画早放完了还得干等。固定一个下限，快慢两种设备看到的
+/// 过渡是一样的。
 ///
-/// 比 [kSplashGrowDuration] 多 120ms，让定稿尺寸停一下再交棒 —— 否则
-/// 「长满」和「切走」在同一帧发生，看着像没长完就闪了。
+/// 比 [kSplashFadeIn] 多 480ms，让画面在完全不透明的状态停一下再交棒 ——
+/// 否则「淡入完成」和「切走」挤在同一帧，看着像没显示完就闪了。
 const Duration kSplashMinVisible = Duration(milliseconds: 840);

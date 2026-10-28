@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 自适应图标背景层：与深色启动页同色，保证「桌面图标 → 启动页」视觉连贯 -->
+    <!-- 自适应图标背景层：与启动页底色同色，保证「桌面图标 → 启动页」视觉连贯 -->
     <color name="ic_launcher_background">#14161A</color>
 
-    <!-- Android 12+ 系统闪屏背景。必须是纯色（系统不支持渐变 drawable）。
-         这个值取的是**启动页渐变的整屏平均值**（#14161C，亮度 22.1），不是渐变
-         中心色（中心是 #2C323E，亮度 43.7）—— 平均值才对应「整屏看上去的亮度」，
-         用它接 Flutter 首帧不会看到一次整体提亮。
+    <!-- 冷启动的**统一底色**，四个地方都引用它（谁都不许再写死色值）：
+           1. 系统闪屏 windowSplashScreenBackground（Android 12+，只接受纯色）
+           2. 原生启动窗口 drawable/launch_background.xml（纯色 shape）
+           3. Flutter 首帧 Scaffold 的 backgroundColor（不参与淡入的那层）
+           4. 上面的 ic_launcher_background（桌面图标放大动画的起点色）
+
+         值取的是启动页渐变的**整屏平均值**（#14161C，亮度 22.1），不是渐变中心色
+         （#2C323E，亮度 43.7）—— 平均值才对应「整屏看上去多亮」。
+
+         这样整条链路同色，交接时看不出切换；渐变与标志再从这层底色上同步淡入，
+         不会出现「先铺开一整块近黑、再从中间冒出 Logo」。
+
          Dart 侧同名常量：lib/design/splash_spec.dart 的 kSplashNativeBackground，
          test/splash_spec_test.dart 会读本文件比对，改一处必须改另一处。 -->
     <color name="splash_background">#14161A</color>
