@@ -61,6 +61,16 @@ class Store extends ChangeNotifier {
   /// 被误判成「已经被告知过」。
   static const _kThemeNotice = 'ui.theme_notice';
 
+  /// 皮肤默认值的变更日（1.5.1 发布日）。
+  ///
+  /// 只服务 [_kThemeNotice] 这一条判据：这一版把出厂默认从「黑塔 · 永夜」改成
+  /// 「圣地 · 审判白」，需要被提醒的只有**升级上来的老用户**，而"谁升级过"
+  /// 无从查询 —— 能用的只有时间线，判据见 `_doBoot` 里那段注释。
+  ///
+  /// 将来默认值再变一次，除了改这个日期，还得把 `ui.theme_notice` 换个新键：
+  /// 旧标记已经躺在老用户的库里，沿用同一个键会让新提示永远不触发。
+  static const _defaultSkinChangedAt = '2026-10-28';
+
   /// 换肤：先让 ThemeCtrl 通知整树重建，再落库。
   ///
   /// 顺序不能反 —— `apply()` 会触发 `app.dart` 的 AnimatedBuilder，
@@ -310,10 +320,11 @@ class Store extends ChangeNotifier {
 
   static const _kCatsNotice = 'ui.cats_two_level_notice';
 
-  /// 是否要提示「默认皮肤已改成『圣地 · 审判白』了」。
+  /// 是否要提示「界面默认皮肤是『圣地 · 审判白』，可在「我的 → 主题」换回」。
   ///
-  /// 只在「从没手动选过皮肤 + 从没提示过 + 库里有账目」三条同时成立时为真 ——
-  /// 也就是「1.5.1 之前就一直在用、升级后才第一次看到新默认色」的那批人。
+  /// 只在三条同时成立时为真：从没手动选过皮肤（`ui.theme` 空）、从没提示过
+  /// （`ui.theme_notice` 空）、**发布日之前就记过账**（= 升级上来的老用户）。
+  /// 第三条为什么不是「库里有账目」：装完就记账的新用户也有账目，会误伤。
   bool _themeDefaultNotice = false;
 
   Ledger? get currentLedger {
@@ -421,16 +432,18 @@ class Store extends ChangeNotifier {
     }
 
     // 1.5.1 把出厂默认从「黑塔 · 永夜」（深色）换成了「圣地 · 审判白」（亮色）。
-    // 手动切过皮肤的人有 `ui.theme`，不受影响；从没切过的老用户升级后界面会
+    // 手动切过皮肤的人有 `ui.theme`，不受影响；从没切过的**老用户**升级后界面会
     // 毫无征兆地变浅 —— 他没做过任何操作，只能理解成 bug。所以补一句话。
     //
-    // 为什么不用「升级标记」那套（对比上面 `Db.upgradedToTwoLevel`）：那是数据迁移
-    // 打的标，而这次只换默认色、表结构一列没动，升级路径上没有任何可用的信号。
-    // 换成反向判据 —— 「库里有账目」就说明不是全新安装：空白库（新装 / 刚卸载重装）
-    // 用新默认色本来就是第一印象，不该被打扰。
+    // 难点是认出「老用户」，而不是「装完就记账的新用户」。1.5.1 只换了默认色、
+    // 表结构一列没动，升级路径上没有任何"我刚升级了"的信号（对比上面的
+    // `Db.upgradedToTwoLevel`，那是数据迁移时自己打的标，这次没有对应物）。
+    // 剩下能用的只有时间线：新装用户的第一笔账必然落在发布日**当天或之后**，
+    // 所以「发布日之前就记过账」才等于「这个人 1.5.1 之前就在用」。
+    // 反过来按「库里有账目」判，新用户记完一笔再启动就会被一条假提示打扰。
     if (await Repo.getSetting(_kTheme) == null &&
         await Repo.getSetting(_kThemeNotice) == null &&
-        await _hasAnyTxn()) {
+        await _hasTxnBefore(_defaultSkinChangedAt)) {
       _themeDefaultNotice = true;
       await Repo.setSetting(_kThemeNotice, '1');
     }
@@ -440,14 +453,23 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 库里有没有哪怕一笔账目。
+  /// [date]（`YYYY-MM-DD`）**之前**有没有记过账。
   ///
-  /// 只服务于「这是升级上来的老库，还是刚装上的空库」这一个判断，所以用
-  /// `EXISTS` 而不是 `COUNT(*)`：SQLite 命中第一行就停，不必把 txn 表扫完。
+  /// 只服务于「这是升级上来的老用户，还是刚装上的新用户」这一个判断，所以用
+  /// `EXISTS` 而不是 `COUNT(*)`：SQLite 命中第一行就停，不必把 txn 表扫完 ——
   /// boot 是冷启动的关键路径，这里多花的每一毫秒都是用户盯启动页的时间。
-  Future<bool> _hasAnyTxn() async {
+  ///
+  /// 严格小于而不是小于等于：日期正好等于发布日的那笔，既可能是老用户升级当天
+  /// 记的，也可能是新用户装完当天记的，两者分不清 —— 宁可少提示一次，
+  /// 也不要让新用户看到一条不属于他的"变更说明"。
+  ///
+  /// `txn.date` 是等宽定长的 `'YYYY-MM-DD'` TEXT，字符串比较即日期比较。
+  Future<bool> _hasTxnBefore(String date) async {
     final db = await Db.open();
-    final r = await db.rawQuery('SELECT EXISTS(SELECT 1 FROM txn) AS e');
+    final r = await db.rawQuery(
+      'SELECT EXISTS(SELECT 1 FROM txn WHERE date < ?) AS e',
+      [date],
+    );
     return ((r.first['e'] as int?) ?? 0) != 0;
   }
 

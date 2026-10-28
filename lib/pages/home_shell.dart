@@ -111,7 +111,12 @@ class _HomeShellState extends State<HomeShell> {
         '已补记 ${Store.i.recurringJustAdded} 笔周期账单',
       // 只对「升级上来的老用户」出现：他没点过任何东西，界面自己变浅了，
       // 不说一句就只会被当成 bug。同时给出换回去的路径，不逼他去翻设置。
-      if (Store.i.themeDefaultNotice) '默认皮肤已改为「圣地 · 审判白」，可在「我的 → 主题」换回',
+      //
+      // 措辞不写「已改为」：判据只能证明「他以前就在用」，证明不了「他的界面
+      // 确实变了」（他可能早就手动换过别的皮肤、只是没落这个标记）。说成陈述
+      // 当前默认值 + 一条换回的路径，两种情况都不会说错。
+      if (Store.i.themeDefaultNotice)
+        '界面默认皮肤是「圣地 · 审判白」；之前若是深色「黑塔 · 永夜」，可在「我的 → 主题」换回',
     ];
     if (parts.isEmpty || !mounted) return;
     showToast(context, parts.join('；'));

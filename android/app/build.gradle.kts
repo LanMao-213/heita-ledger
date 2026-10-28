@@ -116,23 +116,31 @@ flutter {
 // 包：它自己装得上，已经装了正式签名的老用户却装不上（签名不同必须卸载，
 // 卸载就把账目一起删了）。构建成功但产物是废的，比构建失败危险得多。
 //
-// 两个必须守住的边界：
+// 三个必须守住的边界：
 // 1) **只在执行期抛**。CI 的 release-permissions job 走
 //    `flutter build apk --release --config-only` + `:app:processReleaseManifest`
 //    来验证「发布包里没有 INTERNET 权限」，这两步不产出 APK、也没有密钥 ——
 //    若在配置阶段抛，那条门禁就再也跑不起来了。
-// 2) **保留签名回落**。逃生阀生效时还得有 debug 签名可签，否则守卫一放开就撞上
+// 2) **挂在打包任务上，不是 assemble 上**。`assembleRelease` 是聚合任务，它的
+//    `doFirst` 要等所有依赖跑完才轮到 —— 那时 `packageRelease` 早已把 debug 签名的
+//    APK 写进 `build/app/outputs/apk/release/` 了。构建虽然以失败收场，盘上却留着
+//    一个「看起来能用」的废包，随时可能被人拿去发。守在打包动作之前，磁盘上就不会
+//    出现它。AAB 那条（`packageReleaseBundle`）同理，一起守。
+// 3) **保留签名回落**。逃生阀生效时还得有 debug 签名可签，否则守卫一放开就撞上
 //    「signingConfig 为空」。
 // ---------------------------------------------------------------------------
 // 在配置阶段就把这两个值取出来存成局部量：doFirst 里再去读 project 会破坏
 // Gradle 的配置缓存（以后一旦开启就会报错）。
 val allowDebugSigning = (project.findProperty("allowDebugSigning") as String?) == "true"
 
-tasks.matching { it.name == "assembleRelease" }.configureEach {
+tasks.matching { it.name == "packageRelease" || it.name == "packageReleaseBundle" }.configureEach {
     doFirst {
         if (!hasReleaseKey && !allowDebugSigning) {
+            // 首行刻意用 ASCII：Windows 上 JVM 按系统代码页（GBK）输出，
+            // UTF-8 终端里整段中文会变成乱码，而这一行至少能让人读懂"缺什么文件"。
             throw GradleException(
                 """
+                |[heita] release build requires android/key.properties
                 |
                 |这是一次 **release** 构建，但 android/key.properties 不存在。
                 |缺它的后果不是"构建失败"，而是**悄悄签成 debug 签名**：包能编出来、

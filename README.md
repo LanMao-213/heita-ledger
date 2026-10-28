@@ -16,8 +16,8 @@
 | 默认分支 | **`main`**,版本 **`1.5.1+25`**(已发版,标签 `v1.5.1`) |
 | 开发分支 | `feat/*`,合进 `main` 后按版本打标签(旧的 `feat/v2-merge` 已并入 `main` 并删除) |
 | 已发版 | **`v1.5.1`**:[Release 页](https://github.com/LanMao-213/heita-ledger/releases/tag/v1.5.1) 带 arm64 APK(19.6 MB);上一版 `v1.5.0` 同样带包 |
-| 质量闸门 | `flutter analyze --fatal-infos` 0 issue、**582 条测试**全绿(含界面截图自检)、版本号三处一致性(CI 内)、出包七项校验、隐私扫描四处载体 |
-| 规模 | `lib/` 约 2.6 万行、`test/` 约 1.7 万行(83 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
+| 质量闸门 | `flutter analyze --fatal-infos` 0 issue、**584 条测试**全绿(含界面截图自检)、版本号三处一致性(CI 内)、出包七项校验、隐私扫描四处载体 |
+| 规模 | `lib/` 约 2.6 万行、`test/` 约 1.7 万行(84 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
 | 许可 | [MIT](LICENSE) |
 | 待办 | 1.5.0 四项真机验收**已通过**(2026-10-28);**1.5.1 的「分类预算过滤」「趋势卡取消提示」两项仍待有数据态复核**(当时设备离线)。全部待办已转成 [Issues](https://github.com/LanMao-213/heita-ledger/issues) |
 
@@ -148,8 +148,21 @@ python tools/privacy_scan.py --artifacts <apk路径>   # 应输出「干净」
 两者都被 `.gitignore` 挡住,**从未进入过提交历史**(签名文件泄露等于别人能以你的名义发版)。
 
 - 有这两个文件 → release 自动用正式密钥签,**可直接覆盖安装**。
-- 新克隆的机器没有 → 自动回落 **debug 签名**,构建照样成功,但签出来的包与手机上已有版本
-  签名不同,装不上、只能卸载(本地账目会跟着没)。
+- 没有这两个文件(新克隆的机器 / CI)→ `flutter build apk --release` **直接失败**。
+  构建在 `packageRelease` 之前就被拦下,磁盘上不会留下 APK。报错里写明了原因:
+  缺密钥时本来会悄悄签成 debug,产出的包与手机上已有的正式版签名不同 —— 装不上,
+  只能卸载,本地账目跟着没。**这里构建失败是安全行为,不是障碍**:一个"看起来是正式包、
+  老用户却装不上"的 APK 比没有包危险得多。
+- 本地联调 / 出并存测试包 → 显式放行(仍签成 debug):
+
+  ```bash
+  flutter build apk --release -PallowDebugSigning=true -PappIdSuffix=.dev
+  ```
+
+  这样出来的包与正式签名版本**不能互相覆盖**(签名不同),想两个包共存只能靠
+  `appIdSuffix` 换掉包名 —— 这也是 `.dev` 后缀存在的理由。
+- CI 不受影响:`.github/workflows/ci.yml` 的 `release-permissions` job 只跑
+  `--config-only` 与 `:app:processReleaseManifest`,两步都不打包、也不需要密钥,因此仍然绿。
 
 同理,`flutter build` 出来的包版本号取 `pubspec.yaml` 的 `version`;
 改版本要同时改 `lib/app.dart` 的 `kAppVersion`(「我的」页底部显示的就是它)。
@@ -191,7 +204,7 @@ docs/
 
 ## 开发约定
 
-1. **颜色只用 `design/tokens.dart` 里的 `C`**。每套皮肤只换色、不引入装饰色,唯一的彩色是超支砖红 `C.over`,它只表示超支。
+1. **颜色只用 `design/tokens.dart` 里的 `C`**。每套皮肤只换色、不引入装饰色;除超支砖红 `C.over`(只表示超支)之外,只允许各皮肤自己的 `accent`(如圣地 · 审判白的钢蓝 `#3A7BA1`,用于图表与日历「今天」)。
 2. **金额一律 `int` 存"分"**;日期 `TEXT 'YYYY-MM-DD'`;月份 `'YYYY-MM'`。
 3. **页面不写 SQL**,一律走 `Repo`;`Store` 只做内存缓存与刷新通知。
 4. **改表结构必须升 `Db._version` 并写 `onUpgrade`**,老用户数据不能丢。
