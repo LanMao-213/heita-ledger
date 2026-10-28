@@ -2,12 +2,18 @@
 <resources>
     <!-- 系统深色模式下的同一套主题 —— **和浅色模式完全一致，这不是漏改**。
 
-     App 本体只有浅色界面（两套皮肤都是浅底：冷灰 #F3F4F7 / 泽金 #F5F2EA）。
-     这里若跟着系统变黑，就会变成「黑窗口 → 浅色主界面」的一跳，正是本轮
-     要消掉的东西。所以底色一律取 @color/app_background。
+     为什么和浅色模式一模一样：原生窗口**读不到应用内的皮肤设置**（那存在 SQLite
+     里，引擎起来才读得到），只能取一个固定值。而 1.5.1 起默认皮肤是浅色
+     「圣地 · 审判白」，所以固定值取默认皮肤的底色。
 
-     哪天要做真·深色模式，改这一份 + NormalTheme，并同步
-     test/launch_native_test.dart 里的「两主题同色」守卫。 -->
+     六套皮肤里「黑塔 · 永夜」「血族 · 深红」是深色 —— 选这两套的用户冷启动会看到
+     一次「浅窗口 → 深界面」的跳变，这是已知取舍（要消掉得让 MainActivity 在
+     onCreate 里读 SharedPreferences 再 setBackgroundDrawable，多一条原生↔Dart
+     同步链路，未做）。
+
+     这里若跟着系统变黑反而更糟：默认浅色皮肤的用户在深色系统下会变成
+     「黑窗口 → 浅色主界面」的一跳。所以底色一律取 @color/app_background。
+     改这一份时同步 test/launch_native_test.dart 的「两主题同色」守卫。 -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">@color/app_background</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
