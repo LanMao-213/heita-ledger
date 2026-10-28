@@ -346,15 +346,9 @@ class _CategoryBudgets extends StatelessWidget {
     final rows = s.budgetStats;
 
     if (rows.isEmpty) {
-      // 空态卡：上下 24 由卡自己撑，EmptyHint 不再叠一层内边距
-      return const SectionCard(
-        padding: EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xxl),
-        child: EmptyHint(
-          icon: 'tag',
-          text: '还没有设置分类预算',
-          hint: '点下方「为分类设置额度」开始',
-          padding: EdgeInsets.zero,
-        ),
+      return _emptyBudgetCard(
+        context,
+        hint: '为常用分类设一个额度，就能看到进度与剩余',
       );
     }
 
@@ -367,34 +361,7 @@ class _CategoryBudgets extends StatelessWidget {
     final budgeted = rows.where((b) => b.budgetCents > 0).toList();
 
     if (budgeted.isEmpty) {
-      return SectionCard(
-        padding: const EdgeInsets.symmetric(vertical: S.sm),
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: S.lg, vertical: S.md),
-              child: EmptyHint(
-                icon: 'tag',
-                text: '还没有设置分类预算',
-                hint: '点下方「为分类设置额度」开始',
-                padding: EdgeInsets.zero,
-              ),
-            ),
-            Divider(height: 1, thickness: hairlineOf(context), color: C.line),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.only(left: S.sm, top: S.xs),
-                child: TextButton.icon(
-                  onPressed: () => _addCategoryBudget(context),
-                  icon: LineIcon('plus', size: 16, color: C.ink2),
-                  label: Text('为分类设置额度', style: T.body2),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+      return _emptyBudgetCard(context, hint: '点下方「为分类设置额度」开始');
     }
 
     return SectionCard(
@@ -438,6 +405,44 @@ class _CategoryBudgets extends StatelessWidget {
       amountCents: v,
     );
     if (context.mounted) showToast(context, v <= 0 ? '已清除' : '已更新');
+  }
+
+  /// 分类预算的空态卡：一句说明 + **真的那颗「为分类设置额度」按钮**。
+  ///
+  /// 1.5.1 修正：`rows.isEmpty` 那条分支原来只有一句「点下方「为分类设置额度」开始」，
+  /// 而**下方并没有这颗按钮** —— 按钮只画在「已有支出分类」的另一个分支里。
+  /// 全新安装（新库还没有流水）恰好走这一条，于是文案指着一个不存在的东西，
+  /// 用户根本没法建第一条分类预算。现在两个空态共用同一张卡：说得出口的入口，
+  /// 就要真的在那儿。
+  Widget _emptyBudgetCard(BuildContext context, {required String hint}) {
+    return SectionCard(
+      padding: const EdgeInsets.symmetric(vertical: S.sm),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: S.lg, vertical: S.md),
+            child: EmptyHint(
+              icon: 'tag',
+              text: '还没有设置分类预算',
+              hint: hint,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          Divider(height: 1, thickness: hairlineOf(context), color: C.line),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: S.sm, top: S.xs),
+              child: TextButton.icon(
+                onPressed: () => _addCategoryBudget(context),
+                icon: LineIcon('plus', size: 16, color: C.ink2),
+                label: Text('为分类设置额度', style: T.body2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _addCategoryBudget(BuildContext context) async {
