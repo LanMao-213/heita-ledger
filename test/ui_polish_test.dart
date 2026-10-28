@@ -288,7 +288,7 @@ void main() {
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(const HeitaApp());
-    // 启动页有最短停留时长，这里要等它走完才看得到底部 tab。
+    // 等 boot 走完才看得到底部 tab（启动页删除后已无最短停留）。
     await pumpUntilHome(tester);
     expect(Store.i.tabIndex, 0);
 

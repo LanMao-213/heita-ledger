@@ -1,21 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 自适应图标背景层：与启动页底色同色，保证「桌面图标 → 启动页」视觉连贯 -->
+    <!-- 自适应图标（桌面图标）的背景层。
+
+         **与窗口底色无关**，别再让两者互相对齐了：图标本身是深色的
+         （#14161A 底 + 白色标志），启动页删掉之后，窗口底色已经改成浅色，
+         两者本来就不该同色。图标放大动画是从这块色里长出来的，改它会改观感。 -->
     <color name="ic_launcher_background">#14161A</color>
 
-    <!-- 冷启动的**统一底色**，四个地方都引用它（谁都不许再写死色值）：
-           1. 系统闪屏 windowSplashScreenBackground（Android 12+，只接受纯色）
-           2. 原生启动窗口 drawable/launch_background.xml（纯色 shape）
-           3. Flutter 首帧 Scaffold 的 backgroundColor（不参与淡入的那层）
-           4. 上面的 ic_launcher_background（桌面图标放大动画的起点色）
+    <!-- 冷启动窗口底色 —— 整条启动链只认这一个值（谁都不许再写死色值）：
+           1. LaunchTheme.windowBackground（首帧之前的窗口）
+           2. NormalTheme.windowBackground（首帧之后、Flutter 画满之前）
+           3. Android 12+ windowSplashScreenBackground（系统闪屏只接受纯色）
 
-         值取的是启动页渐变的**整屏平均值**（#14161C，亮度 22.1），不是渐变中心色
-         （#2C323E，亮度 43.7）—— 平均值才对应「整屏看上去多亮」。
+         为什么是浅色：2026-10-28 删掉了品牌启动页（深色 #14161A + 标志 + 560ms）。
+         窗口若继续留深色，从点图标到 boot 结束（冷启动 200~800ms）就是一整块
+         近黑空屏 —— 比原来偶发的一帧白闪更显眼。改成应用底色后，原生窗口 →
+         Flutter 首帧 → 主界面 三层同色，没有跳变，也没有「黑一下」。
 
-         这样整条链路同色，交接时看不出切换；渐变与标志再从这层底色上同步淡入，
-         不会出现「先铺开一整块近黑、再从中间冒出 Logo」。
+         取值 = 默认皮肤 cold 的 bg（lib/design/palette.dart，0xFFF3F4F7）。
+         选了泽金（#F5F2EA）的用户，在引擎起来前那 100~300ms 会看到这一档冷灰，
+         约 2 个色阶的差 —— 原生窗口读不到应用内的皮肤设置，这是能取到的最优解。
 
-         Dart 侧同名常量：lib/design/splash_spec.dart 的 kSplashNativeBackground，
-         test/splash_spec_test.dart 会读本文件比对，改一处必须改另一处。 -->
-    <color name="splash_background">#14161A</color>
+         守卫：test/launch_native_test.dart 读本文件，比对三个引用点是否同值。 -->
+    <color name="app_background">#F3F4F7</color>
 </resources>

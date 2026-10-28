@@ -1,17 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 系统处于深色模式时同样使用深色渐变启动屏。
-         注意 NormalTheme 仍用 Light + 白底 —— App 本体只有浅色界面，
-         若这里跟着变黑，会出现「黑启动屏 → 白主界面」的突兀切换。 -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowBackground">@drawable/launch_background</item>
+    <!-- 系统深色模式下的同一套主题 —— **和浅色模式完全一致，这不是漏改**。
+
+     App 本体只有浅色界面（两套皮肤都是浅底：冷灰 #F3F4F7 / 泽金 #F5F2EA）。
+     这里若跟着系统变黑，就会变成「黑窗口 → 浅色主界面」的一跳，正是本轮
+     要消掉的东西。所以底色一律取 @color/app_background。
+
+     哪天要做真·深色模式，改这一份 + NormalTheme，并同步
+     test/launch_native_test.dart 里的「两主题同色」守卫。 -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@color/app_background</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:windowBackground">@color/app_background</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>

@@ -1,19 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 进程启动期间（冷启动第一帧之前）的窗口主题。
-         用 Black 系：状态栏图标自动取白色，配合深色渐变背景才看得见。 -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowBackground">@drawable/launch_background</item>
+
+         **没有启动页了。** 2026-10-28 删掉了品牌开屏（深色 #14161A + 标志 +
+         560ms 最短停留），所以这里唯一要保证的是「首帧之前那几百毫秒别露黑底」：
+         底色改成与应用同色（@color/app_background），冷启动看上去就是
+         「主界面还没画出来」，而不是一块黑屏。
+
+         父主题从 Theme.Black 换成 Theme.Light：底色变浅之后，状态栏/导航栏的
+         图标必须转成深色，否则时间和电量在浅底上基本看不见。
+         （原来用 Black 是为了配深色启动页的白色图标，那是启动页的遗产。） -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@color/app_background</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
     <!-- Flutter 首帧绘制后切到这个主题。
-         App 本体是浅色界面，所以无论系统是否深色模式，窗口底色都用白色，
-         避免出现「黑 → 白」的闪屏跳动。 -->
+
+         底色用 @color/app_background（**不是** #FFFFFF）：主界面自己是纸白偏灰，
+         窗口留纯白的话，两者之间会有一层很薄的色差带，横滑时最明显。
+         两个主题用同一个值，切换前后就完全看不出。 -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:windowBackground">@color/app_background</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>

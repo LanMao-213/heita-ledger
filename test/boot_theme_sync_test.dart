@@ -57,9 +57,9 @@ void main() {
     // boot 在 `_BootGate.initState` 里跑真实数据库 I/O，假时钟下 pumpAndSettle
     // 等不到它 —— 真实时间与 pump 交替，直到首屏出来。
     //
-    // 注意每次 pump 必须**推进假时钟**：启动页有最短停留时长
-    // （`kSplashMinVisible`，一个 `Future.delayed`），只 pump 零时长的话
-    // 定时器永远不响，循环跑满 120 次也到不了主界面。
+    // 注意每次 pump 都要**让出真实事件循环**：boot 是真实数据库 I/O，
+    // 只 pump 帧不会让它回包。（启动页删除后已无最短停留定时器，
+    // 但这一条仍然必要 —— else 数据库永远不会打开。）
     for (var i = 0; i < 120 && find.byType(HomeShell).evaluate().isEmpty; i++) {
       await tester.pump(const Duration(milliseconds: 20));
       await tester.runAsync(

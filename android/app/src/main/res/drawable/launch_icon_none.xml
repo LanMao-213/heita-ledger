@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ 系统闪屏的「空图标」—— 有意画不出任何东西。
+
+  为什么还要留着它：应用**没有启动页了**（2026-10-28 删除），但 Android 12+
+  仍然强制画一个系统 SplashScreen，而且关不掉。不指定
+  windowSplashScreenAnimatedIcon 的话，系统会拿应用图标来画：尺寸锁死在约
+  160dp，冷启动时会看到一枚小标志闪一下再消失。应用首帧现在没有任何标志，
+  凭空冒出这一枚反而更突兀。
+
+  系统闪屏的背景只接受纯色，所以「让闪屏和首帧看起来是同一屏」的唯一做法就是：
+  背景取 @color/app_background（与窗口、主界面同色），图标留空。
+
+  ⚠️ 不要把这个改回 @mipmap/ic_launcher_foreground，也不要删掉本文件 ——
+  test/launch_native_test.dart 有一条守卫会读这个 XML 比对。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="1dp"
+    android:height="1dp"
+    android:viewportWidth="1"
+    android:viewportHeight="1" />

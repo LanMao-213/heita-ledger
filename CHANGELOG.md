@@ -97,6 +97,52 @@
 
 ---
 
+## 未发布 · 删除品牌启动页 — 2026-10-28
+
+> `pubspec.yaml` 仍是 `1.5.0+24`（真机没过不升版本）。
+> 测试 **567 → 561**（删掉 5 份启动页用例共 16 条、新增 2 份新守卫共 10 条，净 −6），
+> `flutter analyze --fatal-infos` 0 issue。
+
+打开 App 不再有品牌开屏，直接进主界面。**这不是"删掉一个 widget"** —— 启动页原本靠
+「四层同色」把原生窗口、Android 12+ 系统闪屏、Flutter 首帧接成一片，删掉之后这条链
+必须重新对齐，否则冷启动会先黑/先白一下。
+
+### 改了什么
+
+| 层 | 原来 | 现在 |
+|---|---|---|
+| Flutter 首帧 | `_SplashScreen`：`#14161A` + 径向渐变 + 标志，最短停留 560ms | `_BootBlank`：只铺 `C.bg` 一层，无标志、无文字、无停留 |
+| 原生窗口 | `@drawable/launch_background`（深色 `#14161A`） | `@color/app_background`（`#F3F4F7`） |
+| 启动主题父级 | `Theme.Black.NoTitleBar`（配深底白图标） | `Theme.Light.NoTitleBar`（浅底要深色状态栏图标） |
+| Android 12+ 系统闪屏 | `#14161A` + 空图标 | `@color/app_background` + 空图标（**保留**，不指定会画出应用图标） |
+| 正常主题 `NormalTheme` | `#FFFFFF` | `@color/app_background`（与主界面同色，避免那层薄薄的色差带） |
+
+### 为什么底色取 `#F3F4F7`
+
+= 默认皮肤 cold 的 `bg`。原生窗口读不到应用内的皮肤设置，只能取默认档；选泽金的用户
+在引擎起来前那 100~300ms 会看到这档冷灰，约 2 个色阶，属可接受取舍（写进 colors.xml 注释了）。
+
+**没有采用「保留 120ms 纯色过渡」**：深色的时长由 boot 决定而不是常量决定 —— boot 要
+800ms 那就是 800ms 深色空屏，120ms 这个数根本不起作用。
+
+### 删了哪些东西
+
+- 代码：`_SplashScreen`、`kSplashMinVisible`、`lib/design/splash_spec.dart`（渐变/尺寸/节奏常量）
+- 资源：`drawable/launch_background.xml`、`drawable-v21/launch_background.xml`、`@color/splash_background`
+- 测试：`splash_final` / `splash_first_frame` / `splash_gradient` / `splash_spec` 四份 + 一份出图预览脚本
+- 保留：`BrandMark`（「我的」页仍在用）、`@drawable/launch_icon_none`（把系统闪屏图标按住的那张空图）
+
+### 新增的两条守卫（都做过反向验证）
+
+- `test/launch_native_test.dart`：三处底色必须同值、启动主题必须 Light、底色必须够浅、
+  启动页资源不得复活，外加**全量资源引用解析**（防死链）。
+- `test/boot_no_splash_test.dart`：等待期必须有 `C.bg` 底色；**假时钟一步不走**也能进主界面。
+
+反向验证：把 `app_background` 改回 `#14161A` → 浅色守卫红；把 `Future.delayed(560ms)` 塞回
+`_BootGate` → 无停留守卫红。两条都确认能拦住，再还原。
+
+---
+
 ## 未发布 · 四个交互 bug — 2026-10-28
 
 > `pubspec.yaml` 仍是 `1.5.0+24`（真机没过不升版本）。

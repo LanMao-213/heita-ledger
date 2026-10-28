@@ -84,3 +84,8 @@ apk/
 
 # Widget Preview related
 .widget_preview/
+
+# 本地 AI 助手的工作目录（会话中间产物、临时提交信息等）。
+# 仓库是 public，这里面的东西没有审查价值但有泄露风险 —— 一次 `git add -A`
+# 就会带进去。不需要删，忽略即可。
+.workbuddy/

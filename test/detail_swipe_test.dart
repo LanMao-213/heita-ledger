@@ -100,7 +100,7 @@ void main() {
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(const HeitaApp());
-    // 启动页有最短停留时长（kSplashMinVisible），必须等它走完才看得到主界面。
+    // 等 boot 走完（真实数据库 I/O）才看得到主界面；启动页删除后已无最短停留。
     await pumpUntilHome(tester);
   }
 

@@ -1,20 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Android 12+ 强制启用系统 SplashScreen API，它会忽略 windowBackground 里的
-         drawable（渐变取不到色值，可能回退白色）。必须显式给出纯色背景与图标。 -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowBackground">@drawable/launch_background</item>
-        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+    <!-- Android 12+ 由系统强制画一个 SplashScreen，**关不掉**，只能指定它长什么样。
+         它只接受纯色背景（给 drawable 会被忽略），所以这里显式指定与窗口同色的
+         @color/app_background —— 系统闪屏、原生窗口、Flutter 首帧、主界面
+         四层同色，冷启动看不出分界。 -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:windowSplashScreenBackground">@color/app_background</item>
 
-        <!-- 图标**故意留空**。系统闪屏的图标尺寸是锁死的：带 iconBackgroundColor
-             时可见内容约 240dp 的 2/3 ≈ 160dp，而 Flutter 首帧的标志是 718dp
-             （屏高 82%），差 4.51 倍 —— 真机上就是「小标志」突然放大成「大标志」。
-             闪屏背景又只接受纯色、不支持渐变，所以带图标时两屏不可能接上。
+        <!-- 图标**必须留空**（@drawable/launch_icon_none 是一个画不出东西的
+             vector）。不指定这一项的话，系统会拿应用图标来画：尺寸被锁死在约
+             160dp，居中一枚小标志闪一下再消失。
 
-             去掉图标后：闪屏只剩 #14161A 底色（启动页渐变整屏平均值是 #14161C，
-             差 1 个色阶），图案由 Flutter 首帧淡入，过渡是连续的。
-             详见 drawable/splash_icon_none.xml 与 test/splash_spec_test.dart 的守卫。 -->
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_none</item>
+             应用首帧现在**没有任何标志**（启动页已删除），所以那枚图标不只是
+             「小」，而是凭空多出来一个品牌元素 —— 比原来「小标志跳大标志」
+             更突兀。不要改回 @mipmap/…，也不要删这个占位文件。
+             test/launch_native_test.dart 有一条守卫读这里比对。 -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/launch_icon_none</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
