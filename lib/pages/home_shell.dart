@@ -98,9 +98,9 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   /// 周期账单补记只提示一次，不打扰
-  /// 启动后的一次性提示：分类升级 / 补记的周期账单。
+  /// 启动后的一次性提示：分类升级 / 补记的周期账单 / 默认皮肤变了。
   ///
-  /// 两条合并成一句：`showToast` 会先清掉上一条，连弹两次等于只有后一条
+  /// 几条合并成一句：`showToast` 会先清掉上一条，连弹两次等于只有后一条
   /// 被看见 —— 而「分类改名了」恰恰是最不能说丢的那一条。
   void _notifyStartup() {
     if (_startupNotified) return;
@@ -109,6 +109,9 @@ class _HomeShellState extends State<HomeShell> {
       if (Store.i.catsUpgradeJustDone) '分类已升级为「分类 + 子分类」两级，可在「我的 → 分类管理」里调整',
       if (Store.i.recurringJustAdded > 0)
         '已补记 ${Store.i.recurringJustAdded} 笔周期账单',
+      // 只对「升级上来的老用户」出现：他没点过任何东西，界面自己变浅了，
+      // 不说一句就只会被当成 bug。同时给出换回去的路径，不逼他去翻设置。
+      if (Store.i.themeDefaultNotice) '默认皮肤已改为「圣地 · 审判白」，可在「我的 → 主题」换回',
     ];
     if (parts.isEmpty || !mounted) return;
     showToast(context, parts.join('；'));

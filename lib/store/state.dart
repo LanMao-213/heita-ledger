@@ -137,4 +137,8 @@ extension StoreRead on Store {
 
   /// 是否要提示「分类升级成两级了」。只在真的从老库升上来、且没提示过时为真。
   bool get catsUpgradeJustDone => _catsUpgradeJustDone;
+
+  /// 是否要提示「默认皮肤已改成『圣地 · 审判白』」。
+  /// 只在「从没手动选过皮肤 + 从没提示过 + 库里有账目」三条同时成立时为真。
+  bool get themeDefaultNotice => _themeDefaultNotice;
 }

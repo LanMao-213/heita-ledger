@@ -54,6 +54,13 @@ class Store extends ChangeNotifier {
 
   static const _kTheme = 'ui.theme';
 
+  /// 「默认皮肤已改为『圣地 · 审判白』」这条一次性提示的落库标记。
+  ///
+  /// 与 [_kTheme] 分开一个键，是因为两者语义不同：`ui.theme` 记的是「用户选了哪套」，
+  /// 这里记的是「用户知不知道默认值变了」。共用一个键会导致「用户手动选了默认那套」
+  /// 被误判成「已经被告知过」。
+  static const _kThemeNotice = 'ui.theme_notice';
+
   /// 换肤：先让 ThemeCtrl 通知整树重建，再落库。
   ///
   /// 顺序不能反 —— `apply()` 会触发 `app.dart` 的 AnimatedBuilder，
@@ -303,6 +310,12 @@ class Store extends ChangeNotifier {
 
   static const _kCatsNotice = 'ui.cats_two_level_notice';
 
+  /// 是否要提示「默认皮肤已改成『圣地 · 审判白』了」。
+  ///
+  /// 只在「从没手动选过皮肤 + 从没提示过 + 库里有账目」三条同时成立时为真 ——
+  /// 也就是「1.5.1 之前就一直在用、升级后才第一次看到新默认色」的那批人。
+  bool _themeDefaultNotice = false;
+
   Ledger? get currentLedger {
     for (final l in _ledgers) {
       if (l.id == _ledgerId) return l;
@@ -370,6 +383,7 @@ class Store extends ChangeNotifier {
     // 不重置的话它只在「真从老库升上来」那一刻被置 true，之后永远为真 ——
     // 进程内重复 boot（测试、以及热重启后的首次导航）就会重复弹。
     _catsUpgradeJustDone = false;
+    _themeDefaultNotice = false;
     await Db.open();
     // v3 → v4 升级后 `period_start` 是空的，先补齐。账单日默认 1 时回填结果
     // 等于月初，与升级前完全一致 —— 这一步不改任何查询口径。
@@ -406,9 +420,35 @@ class Store extends ChangeNotifier {
       await Repo.setSetting(_kCatsNotice, '1');
     }
 
+    // 1.5.1 把出厂默认从「黑塔 · 永夜」（深色）换成了「圣地 · 审判白」（亮色）。
+    // 手动切过皮肤的人有 `ui.theme`，不受影响；从没切过的老用户升级后界面会
+    // 毫无征兆地变浅 —— 他没做过任何操作，只能理解成 bug。所以补一句话。
+    //
+    // 为什么不用「升级标记」那套（对比上面 `Db.upgradedToTwoLevel`）：那是数据迁移
+    // 打的标，而这次只换默认色、表结构一列没动，升级路径上没有任何可用的信号。
+    // 换成反向判据 —— 「库里有账目」就说明不是全新安装：空白库（新装 / 刚卸载重装）
+    // 用新默认色本来就是第一印象，不该被打扰。
+    if (await Repo.getSetting(_kTheme) == null &&
+        await Repo.getSetting(_kThemeNotice) == null &&
+        await _hasAnyTxn()) {
+      _themeDefaultNotice = true;
+      await Repo.setSetting(_kThemeNotice, '1');
+    }
+
     await loadAll();
     _ready = true;
     notifyListeners();
+  }
+
+  /// 库里有没有哪怕一笔账目。
+  ///
+  /// 只服务于「这是升级上来的老库，还是刚装上的空库」这一个判断，所以用
+  /// `EXISTS` 而不是 `COUNT(*)`：SQLite 命中第一行就停，不必把 txn 表扫完。
+  /// boot 是冷启动的关键路径，这里多花的每一毫秒都是用户盯启动页的时间。
+  Future<bool> _hasAnyTxn() async {
+    final db = await Db.open();
+    final r = await db.rawQuery('SELECT EXISTS(SELECT 1 FROM txn) AS e');
+    return ((r.first['e'] as int?) ?? 0) != 0;
   }
 
   /// 从后台回到前台：日期或账本变了，就重算游标并补记周期账单。

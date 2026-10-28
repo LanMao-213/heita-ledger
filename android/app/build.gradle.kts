@@ -10,6 +10,12 @@ plugins {
 // 正式签名。key.properties 与 release.jks 都不进仓库（见 .gitignore）；
 // 新克隆的机器上没有这两个文件，正式签名配置就不注册，release 自动退回 debug 签名，
 // 保证「能拉下来就能跑」，不会因为缺密钥直接构建失败。
+//
+// 但这条「能跑」的便利只该给**本地联调**。真打 release 包时静默退回 debug 签名会产出
+// 一个「看起来是正式包、老用户却装不上」的 APK —— 签名不同必须卸载重装，账目全没。
+// 所以 assembleRelease 挂了守卫（见文件末尾），配置阶段仍然不抛：
+// `flutter build apk --release --config-only` 与 `:app:processReleaseManifest`
+// 是 CI 的 release-permissions job 的必经之路，它在没有密钥的环境下跑，不能被拦。
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseKey = keystorePropertiesFile.exists()
@@ -100,4 +106,46 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// ---------------------------------------------------------------------------
+// release 缺密钥即失败。
+//
+// 上面 `signingConfig` 的回落逻辑是给**本地联调**用的逃生阀，不是给发版用的。
+// 没有这层守卫时，缺 key.properties 的机器照样能编出一个签成 debug 的「release」
+// 包：它自己装得上，已经装了正式签名的老用户却装不上（签名不同必须卸载，
+// 卸载就把账目一起删了）。构建成功但产物是废的，比构建失败危险得多。
+//
+// 两个必须守住的边界：
+// 1) **只在执行期抛**。CI 的 release-permissions job 走
+//    `flutter build apk --release --config-only` + `:app:processReleaseManifest`
+//    来验证「发布包里没有 INTERNET 权限」，这两步不产出 APK、也没有密钥 ——
+//    若在配置阶段抛，那条门禁就再也跑不起来了。
+// 2) **保留签名回落**。逃生阀生效时还得有 debug 签名可签，否则守卫一放开就撞上
+//    「signingConfig 为空」。
+// ---------------------------------------------------------------------------
+// 在配置阶段就把这两个值取出来存成局部量：doFirst 里再去读 project 会破坏
+// Gradle 的配置缓存（以后一旦开启就会报错）。
+val allowDebugSigning = (project.findProperty("allowDebugSigning") as String?) == "true"
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    doFirst {
+        if (!hasReleaseKey && !allowDebugSigning) {
+            throw GradleException(
+                """
+                |
+                |这是一次 **release** 构建，但 android/key.properties 不存在。
+                |缺它的后果不是"构建失败"，而是**悄悄签成 debug 签名**：包能编出来、
+                |也能装在这台机器上，但装了正式签名版本的手机会因为签名不同而装不上，
+                |必须先卸载 —— 卸载会把本机账目一起删掉。
+                |
+                |要发版：把 key.properties 与 release.jks 放好（格式见 .gitignore 里的条目）。
+                |只是本地联调 / 出并存测试包：加 -PallowDebugSigning=true 显式放行，例如
+                |  flutter build apk --release -PallowDebugSigning=true
+                |（配合 -PappIdSuffix=.dev 可与手机上已有的正式版共存。）
+                |
+                """.trimMargin(),
+            )
+        }
+    }
 }
