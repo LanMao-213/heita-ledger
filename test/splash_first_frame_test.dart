@@ -1,21 +1,19 @@
-// 启动页动画的守卫。
+// 启动页的守卫。
 //
-// 2026-10-28 真机反馈三连，一次比一次细：
+// 这块地方前后改了四版，每一版都被真机反馈打回一次，记下来免得再走回头路：
 //   1. 系统闪屏画着小图标（159dp），Flutter 首帧是 718dp —— 差 4.51 倍，跳一下；
 //   2. 把系统图标去掉后，首帧只剩渐变：标志当时包在 `Opacity(v)` 里，v 从 0 起，
 //      而快设备上 boot 结束得太快，动画还没走就被 HomeShell 顶掉，标志一次没出现；
 //   3. 改成「小标志放大到铺满」之后，观感变成「先铺开一整块近黑的画面，
-//      然后中间冒出一个小标志再长大」。
+//      然后中间冒出一个小标志再长大」；
+//   4. 改成「渐变与标志同步淡入 360ms」之后，又嫌「先看到一块纯色、等 0.36 秒
+//      图案才长出来」不必要 —— 最终定为**硬切**：图案在第 1 帧就完整。
 //
-// 现在这一版是「底色先满、渐变与标志同步淡入」：
-//
-//   · 首帧上屏的是**不透明的品牌底色** #14161A（与系统闪屏 / 原生窗口同值），
-//     不是黑屏，也不是全透明；
-//   · 渐变与标志由同一个 `Opacity` 驱动，从 0 一起走到 1，没有先后；
-//   · 标志只有 0.96 → 1.0 的轻微落定，不再从 22% 放大。
-//
-// 这个文件钉四件事：首帧有实底、二者同步淡入、淡入会真的走完、boot 很快时
-// 启动页仍留满足够久。
+// 现在钉四件事：
+//   · 首帧有**不透明的品牌底色**，不是黑屏也不是全透明；
+//   · 首帧的图案已经完整 —— 没有 Opacity、没有缩放，也没有正在跑的动画；
+//   · 图案不会随时间变化（硬切的另一种说法）；
+//   · boot 很快时，启动页仍留满 560ms，否则图案一闪而过。
 //
 // 和 `splash_final_test.dart` 的分工：那个自己拼一棵树出图，**测不到
 // `_SplashScreen`**；这里 pump 真实入口 `HeitaApp`，走用户真会看到的那条路。
@@ -29,31 +27,10 @@ import 'package:ledger/pages/home_shell.dart';
 import 'package:ledger/store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-/// 淡入进度（0 → 1）。渐变与标志共用这一个值。
-double _fade(WidgetTester tester) {
-  final o = tester.widget<Opacity>(
-    find.byKey(const ValueKey<String>('splash.fade')),
-  );
-  return o.opacity;
-}
-
-/// 取标志当前的落定缩放（0.96 → 1.0）。
+/// 启动页那层底色。
 ///
-/// 用 key 精确定位启动页自己的那个 `Transform`：直接 `find.byType(Transform)`
-/// 会先抓到 MaterialApp 路由过渡里的那个（缩放恒为 1.0），读出来的永远不是它。
-double _markScale(WidgetTester tester) {
-  final t = tester.widget<Transform>(
-    find.byKey(const ValueKey<String>('splash.mark.settle')),
-  );
-  // 读矩阵的 m00（x 轴缩放）。不能用 getMaxScaleOnAxis()：它取三个轴的最大值，
-  // 而 Transform.scale 的 z 轴恒为 1.0，于是永远返回 1 —— 这个坑踩过一次。
-  return t.transform.storage[0];
-}
-
-/// 启动页那层「不参与淡入」的底色。
-///
-/// 这是「不出现黑屏」的唯一依据：它必须在首帧就是**不透明**的实色，
-/// 且等于系统闪屏的纯色。任何把它改成透明 / 去掉的改动都要在这里变红。
+/// 这是「不出现黑屏」的依据：它必须在首帧就是不透明实色，且等于系统闪屏的纯色。
+/// 任何把它改成透明 / 去掉的改动都要在这里变红。
 Color? _backdrop(WidgetTester tester) {
   final scaffold = tester.widget<Scaffold>(
     find
@@ -101,7 +78,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
   }
 
-  testWidgets('首帧：整屏是不透明的品牌底色，渐变与标志都从 0 开始', (tester) async {
+  testWidgets('首帧：底色不透明、图案已完整显示，没有半透明也没有缩放', (tester) async {
     await pumpApp(tester);
     // 只 pump 一帧 —— 就是真机上「系统闪屏刚交棒」的那一帧。
 
@@ -109,24 +86,40 @@ void main() {
         reason: '首帧就进了主界面，说明这个用例没测到启动页');
     expect(find.byType(BrandMark), findsOneWidget, reason: '首帧的启动页里没有标志');
 
-    // ── 硬底线：首帧必须有一层不透明的实底 ──
-    // 上一版的缺陷是「整屏都塞进 Opacity(0)」，渲染出来全透明；这一版把底色
-    // 放在 Scaffold 上，所以哪怕淡入还停在 0，用户看到的也是品牌底色，不是黑屏。
+    // ── 底线一：首帧必须有一层不透明的实底 ──
+    // 曾经把整屏都塞进 Opacity(0)，渲染出来全透明；现在底色放在 Scaffold 上。
     final backdrop = _backdrop(tester);
     expect(backdrop, kSplashNativeBackground,
         reason: '启动页底色必须等于系统闪屏色（#14161A），否则交接那一帧会闪一次色差');
     expect(backdrop!.a, 1.0,
-        reason: '底色被做成半透明了：淡入起点会露出窗口后面的黑');
+        reason: '底色被做成半透明了：会露出窗口后面的黑');
 
-    // 淡入起点是 0（渐变与标志都还没浮上来），这是设计，不是缺陷 ——
-    // 前提就是上面那条：底下垫着实底。
-    expect(_fade(tester), 0.0, reason: '淡入没有从头开始，用户会觉得画面「已经在了」');
+    // ── 底线二：图案在首帧就已经是完整形态 ──
+    // 硬切的意思是「没有过渡」，所以标志身上不能有 Opacity 压着，
+    // 也不能有 Transform 缩放（曾经从 0.22 放大、后来 0.96 落定，都去掉了）。
+    final opacityAncestors = find
+        .ancestor(of: find.byType(BrandMark), matching: find.byType(Opacity))
+        .evaluate()
+        .map((e) => (e.widget as Opacity).opacity)
+        .toList();
+    expect(opacityAncestors, isEmpty,
+        reason: '标志身上还挂着 Opacity(${opacityAncestors.join(", ")})，'
+            '说明淡入没有拆干净，用户会看到「等一会儿图案才出来」');
 
-    // 落定缩放的起点：0.96。不再是 0.22 —— 那个值就是「从中间冒出」的来源。
-    expect(_markScale(tester), closeTo(kSplashMarkSettle, 0.001),
-        reason: '标志起点缩放应等于 kSplashMarkSettle（接近终态，只轻微落定）');
+    final transformAncestors = find
+        .ancestor(of: find.byType(BrandMark), matching: find.byType(Transform))
+        .evaluate()
+        .length;
+    expect(transformAncestors, 0,
+        reason: '标志身上还挂着 Transform，说明缩放/落定没删干净');
 
-    // 布局尺寸仍是方案①（D · 留白 88%）：Transform 只改绘制不改布局。
+    // ── 底线三：没有任何动画在跑 ──
+    // `transientCallbackCount` 就是当前登记的 ticker 数。启动页里只要还有
+    // 一个 AnimationController 在 forward，这个值就不为 0。
+    expect(tester.binding.transientCallbackCount, 0,
+        reason: '启动页还有动画在跑：硬切应当是零时长的');
+
+    // 布局尺寸仍是方案①（D · 留白 88%）。
     final size = tester.getSize(find.byType(BrandMark));
     expect(size.height, closeTo(splashMarkHeight(const Size(390, 844)), 0.5));
     expect(size.height / 844, closeTo(0.844, 0.01));
@@ -134,78 +127,34 @@ void main() {
     await drainToHome(tester);
   });
 
-  testWidgets('渐变与标志在同一个淡入组里：两者的 opacity 不可能不同步', (tester) async {
+  testWidgets('图案不随时间变化：第 1 帧和 400ms 之后画的是同一张', (tester) async {
     await pumpApp(tester);
 
-    // 结构守卫：淡入用的那一个 Opacity，其子树里同时有径向渐变和标志。
-    // 如果哪天有人把 Opacity 下放成「渐变常显 + 标志单独淡入」，
-    // 这里立刻变红 —— 那正是用户看到的「先铺开画面，再从中间冒出 Logo」。
-    final fade = find.byKey(const ValueKey<String>('splash.fade'));
-    expect(
-      find.descendant(of: fade, matching: find.byType(DecoratedBox)),
-      findsWidgets,
-      reason: '淡入组里没有背景层，说明渐变没跟着一起淡入',
-    );
-    expect(
-      find.descendant(of: fade, matching: find.byType(BrandMark)),
-      findsOneWidget,
-      reason: '标志不在淡入组里，说明它和背景不是同步淡入的',
-    );
+    final firstSize = tester.getSize(find.byType(BrandMark));
+    final firstFg = tester.widget<BrandMark>(find.byType(BrandMark)).fgOverride;
+    final firstOpacity = find.byType(Opacity).evaluate().length;
 
-    final decorated = tester.widgetList<DecoratedBox>(
-      find.descendant(of: fade, matching: find.byType(DecoratedBox)),
-    );
-    final hasGradient = decorated.any((d) {
-      final deco = d.decoration;
-      return deco is BoxDecoration && deco.gradient == kSplashGradient;
-    });
-    expect(hasGradient, isTrue,
-        reason: '淡入组里没有 kSplashGradient，说明背景渐变被挪到了别处');
+    await tester.pump(const Duration(milliseconds: 400));
 
-    // 标志的祖先里只有那一个 Opacity，没有第二个把关。
-    final ancestors = find
-        .ancestor(of: find.byType(BrandMark), matching: find.byType(Opacity))
-        .evaluate()
-        .map((e) => (e.widget as Opacity).opacity)
-        .toList();
-    expect(ancestors, isNotEmpty);
-    expect(ancestors, everyElement(closeTo(0.0, 1e-9)),
-        reason: '标志身上还有别的 Opacity 压着，同步性就不成立了');
+    expect(find.byType(BrandMark), findsOneWidget);
+    expect(tester.getSize(find.byType(BrandMark)), firstSize,
+        reason: '标志尺寸随时间变了，说明还有缩放在跑');
+    expect(tester.widget<BrandMark>(find.byType(BrandMark)).fgOverride, firstFg,
+        reason: '标志颜色随时间变了');
+    expect(find.byType(Opacity).evaluate().length, firstOpacity,
+        reason: '中途冒出了 Opacity，说明有淡入');
+    expect(tester.binding.transientCallbackCount, 0,
+        reason: '400ms 了还有动画在跑');
 
     await drainToHome(tester);
   });
 
-  testWidgets('淡入会走完：360ms 后完全浮现，标志停在 1.0', (tester) async {
-    await pumpApp(tester);
-
-    await tester.pump(kSplashFadeIn ~/ 2);
-    final mid = _fade(tester);
-    expect(mid, greaterThan(0.0), reason: '半程还在 0，说明淡入没在推进');
-    expect(mid, lessThan(1.0), reason: '半程就已经满不透明了，说明时长被压缩了');
-    final midScale = _markScale(tester);
-    expect(midScale, greaterThan(kSplashMarkSettle), reason: '缩放没跟着淡入走');
-    expect(midScale, lessThan(1.0), reason: '缩放半程就到终点了');
-
-    await tester.pump(kSplashFadeIn ~/ 2 + const Duration(milliseconds: 16));
-    expect(_fade(tester), closeTo(1.0, 0.001), reason: '淡入结束时应当完全不透明');
-    expect(_markScale(tester), closeTo(1.0, 0.001),
-        reason: '落定结束时应当正好是定稿尺寸');
-
-    await drainToHome(tester);
-  });
-
-  test('时序常量自洽：淡入要能被最短停留完整兜住，且缩放幅度足够小', () {
-    expect(kSplashMinVisible, greaterThanOrEqualTo(kSplashFadeIn),
-        reason: '最短停留比淡入还短，淡入一定播不完');
-
-    // 淡入太短会「啪」地亮起来，太长会磨蹭。
-    expect(kSplashFadeIn.inMilliseconds, greaterThanOrEqualTo(200));
-    expect(kSplashFadeIn.inMilliseconds, lessThanOrEqualTo(600));
-
-    // 幅度必须小到看不出「放大」，否则又回到「从中间冒出一个小标志」。
-    expect(kSplashMarkSettle, lessThan(1.0));
-    expect(kSplashMarkSettle, greaterThanOrEqualTo(0.9),
-        reason: '起点缩放小于 0.9 就重新变成「冒出来」，这轮改动就白做了');
+  test('停留时长要够看清，又不能拖：560ms 是定稿', () {
+    // 图案第 1 帧就完整，所以这个数只负责「让人认出是哪个 App」。
+    expect(kSplashMinVisible, const Duration(milliseconds: 560),
+        reason: '改这个数之前先想清楚：低于 400ms 像闪一下就过，高于 800ms 像卡住');
+    expect(kSplashMinVisible.inMilliseconds, greaterThanOrEqualTo(400));
+    expect(kSplashMinVisible.inMilliseconds, lessThanOrEqualTo(800));
   });
 
   testWidgets('boot 已完成后，启动页仍要停满最短时长才交棒', (tester) async {
@@ -222,16 +171,12 @@ void main() {
     }
     expect(Store.i.ready, isTrue, reason: 'boot 没跑完，这个用例的前提不成立');
 
-    // 这是「无论启动快慢都能完整呈现」的判据：boot 已经完成，再推进 700ms
-    // （淡入 360ms 早就结束、最短停留 840ms 还没到），启动页必须还在。
+    // 推进 400ms（离 560ms 还有 160ms），启动页必须还在。
     // 没有最短停留这一道闸的话，boot 一完成就会被切走 —— 这里立刻变红。
-    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(BrandMark), findsOneWidget,
-        reason: 'boot 一完成就把启动页切走了，快速启动的机器上看不到完整淡入');
+        reason: 'boot 一完成就把启动页切走了，快速启动的机器上图案一闪而过');
     expect(find.byType(HomeShell), findsNothing);
-    // 而且这时候应该是全亮的静止画面，不是半透明 —— 否则「停留」是假的。
-    expect(_fade(tester), closeTo(1.0, 0.001),
-        reason: '停留阶段还没浮现完，等于把静止的那口气也省了');
 
     // 过了最短停留时长才放行。
     await tester.pump(const Duration(milliseconds: 200));

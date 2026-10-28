@@ -89,10 +89,10 @@ class _BootGateState extends State<_BootGate> {
         ? Future<void>.value()
         : Store.i.boot().then((_) => seedDemoDataIfNeeded());
 
-    // 启动页**不跟着 boot 的快慢走**：快设备上 boot 一两百毫秒就结束，动画
-    // 刚起步就会被 HomeShell 顶掉（用户看到的是一帧小图标，然后突然进主界面）；
-    // 慢设备上又反过来，动画早放完还干等。这里取「boot 完成」与「最短停留」
-    // 中较慢的一边，两种设备看到的过渡一致。
+    // 启动页**不跟着 boot 的快慢走**：快设备上 boot 一两百毫秒就结束，图案
+    // 会一闪而过（用户只看到一次跳变，来不及认出是哪个 App）；慢设备上又反过来，
+    // boot 早就完了还要干等。这里取「boot 完成」与「最短停留」中较慢的一边，
+    // 两种设备看到的是一样的画面。
     _boot = Future.wait<void>([
       booting,
       Future<void>.delayed(kSplashMinVisible),
@@ -119,20 +119,19 @@ class _BootGateState extends State<_BootGate> {
 /// ⚠️ 启动页**不跟主题走**：不管用户选了哪套皮肤，开屏都是这一屏深色。
 ///
 /// 理由和原生窗口有关：启动页的底色必须与 `launch_background.xml`、
-/// `@color/splash_background` 逐值相同，冷启动时三屏才接得上。让启动页跟着
+/// `@color/splash_background` 逐值相同，冷启动时四屏才接得上。让启动页跟着
 /// 皮肤变，就要给每套皮肤出一份 drawable，收益不抵复杂度。
 ///
-/// 动画的形状：**底色先满、内容后淡入**。
+/// 时间轴上只有两拍，**没有动画**：
 ///
 /// ```
-///   0ms    Scaffold 底色 #14161A 铺满（不参与淡入）
-///   0–360ms 渐变 + 标志，同一个 Opacity 0 → 1，同一条 easeOutCubic
-///   360ms  全不透明，静止
-///   840ms  交棒 HomeShell（或 boot 更慢时取 boot）
+///   0ms    Scaffold 底色 #14161A + 渐变 + 标志，同一帧完整画出（opacity 恒为 1）
+///   560ms  交棒 HomeShell（或 boot 更慢时取 boot）
 /// ```
 ///
-/// 这样就没有「先铺开一整块黑、再从中间冒出标志」那一段：首帧看到的不是黑，
-/// 是上一屏（系统闪屏）那张同色底继续留着，然后渐变和标志一起浮上来。
+/// 2026-10-28 这里先后试过「小标志放大到铺满」和「渐变与标志同步淡入」两版，
+/// 都被真机反馈否掉了：前者是「从中间冒出一个小标志」，后者是「先看到一块纯色、
+/// 等 0.36 秒图案才长出来」。现在直接硬切 —— 图案在首帧就是完整的。
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
 
@@ -141,11 +140,12 @@ class _SplashScreen extends StatelessWidget {
   /// 它只在这一段出现 —— 原生窗口是纯色，不再和这里对齐渐变参数。
   static const gradient = kSplashGradient;
 
-  /// 首帧就铺满整屏的底色，**不参与淡入**。
+  /// 铺满整屏的底色，压在渐变下面。
   ///
-  /// 「不出现黑屏」全靠它：它和 Android 12+ 系统闪屏、Android 12 以下的原生
-  /// 窗口、桌面图标背景是同一个值 `#14161A`。渐变 opacity=0 时露出的就是这层，
-  /// 与上一屏逐像素相同，所以看起来只是「底色还在，图案正在浮现」。
+  /// 它和 Android 12+ 系统闪屏、Android 12 以下的原生窗口、桌面图标背景是
+  /// 同一个值 `#14161A`，所以「点图标 → 原生窗口 → 系统闪屏 → 这一帧」四屏同色，
+  /// 交接时看不出变化。渐变虽然覆盖了整屏，这层仍不能删：它是首帧万一没画出
+  /// 渐变时的兜底，也是「这个底色值改一处就全链路生效」的那个锚点。
   static const _backdrop = kSplashNativeBackground;
 
   @override
@@ -167,65 +167,41 @@ class _SplashScreen extends StatelessWidget {
       ),
       child: Scaffold(
         backgroundColor: _backdrop,
-        body: TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: 0, end: 1),
-          duration: kSplashFadeIn,
-          curve: kSplashFadeCurve,
-          // 渐变与标志由**同一个 v** 驱动，包在同一个 Opacity 里 ——
-          // 「同步」是结构保证的，不是两处时长恰好写成一样。
-          //
-          // 不把 Opacity 下放到标志上、让渐变常显：那样首帧就是「渐变铺满 +
-          // 标志透明」，正是用户说的「先铺开画面再从中间冒出 Logo」。
-          builder: (context, v, child) => Opacity(
-            // 测试读这个值判断淡入进度；不给 key 会先抓到路由过渡里的 Opacity。
-            key: const ValueKey<String>('splash.fade'),
-            opacity: v,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                const DecoratedBox(
-                  decoration: BoxDecoration(gradient: gradient),
-                ),
-                Center(
-                  child: Transform.scale(
-                    // 只包标志，不包整屏：包整屏会让渐变四周缩进 4%，
-                    // 露出一圈比渐变更暗的底色边。
-                    key: const ValueKey<String>('splash.mark.settle'),
-                    scale: kSplashMarkSettle + (1 - kSplashMarkSettle) * v,
-                    child: child,
-                  ),
-                ),
-              ],
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const DecoratedBox(
+              decoration: BoxDecoration(gradient: gradient),
             ),
-          ),
-          // 深色底：标志取白色，火焰取亮红（C.overD），与原型 dark 模式一致。
-          // 作为 child 传进去，v 每帧变化时只重建 Opacity 与 Transform，
-          // 标志本身不重建。
-          child: BrandMark(
-            height: markH,
-            fg: const Color(0xFFFFFFFF),
-            flameColor: C.overD,
-          ),
+            Center(
+              child: BrandMark(
+                height: markH,
+                // 深色底：标志取白色，火焰取亮红（C.overD），与原型 dark 模式一致。
+                //
+                // 这个白是**定稿值**：2026-10-28 比过三档（#FFFFFF / #E4E7EC /
+                // #D6DBE3 + 压光渐变），选了不调暗的那一版 —— 深底上降亮度会让
+                // 标志发灰，而「白得醒目」正是这个开屏唯一的表达。
+                fg: const Color(0xFFFFFFFF),
+                flameColor: C.overD,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// 为什么用 opacity 而不是「插值渐变色」：两者在数学上等价（底色恒定时
-// `v·渐变 + (1-v)·底色` 就是颜色插值），但 opacity 只有一处要改，而且标志
-// （白 + 红火焰）本来也只能走透明度。代价是 360ms 的全屏 saveLayer ——
-// 启动页只有一个矢量，这点开销可以接受；真要省，就得把标志的 fg/flameColor
-// 也拿去和底色做插值，可读性换那几帧不值得。
+// 为什么这里没有任何动画：
 //
-// 两条不能碰的红线（都是真机踩出来的）：
+// 首帧就必须是完整图案，所以既不能用 `Opacity(v)`、也不能用 `Transform.scale`。
+// 曾经的坑要记着：把整屏塞进 `Opacity(v)` 且 v 从 0 起，首帧渲染出来是全透明的
+// —— 真机冷启动帧推进慢，动画停在第 0 帧，等 boot 完成直接跳主界面，标志一次
+// 没出现（2026-10-28 的真机截图：一块空的深色）。
 //
-// 1. **底色必须在 Scaffold 上，不能靠 Opacity 里的那一层**。曾经把整屏都
-//    塞进 `Opacity(v)` 且 v 从 0 起，首帧渲染出来是全透明的 —— 真机冷启动
-//    帧推进慢，动画停在第 0 帧，等 boot 完成直接跳主界面，标志一次没出现
-//    （2026-10-28 的真机截图：一块空的深色）。
-// 2. **不能只靠 boot 决定时长**。快设备上 boot 一两百毫秒就结束，淡入会被
-//    直接切走。「最短停留」在 `_BootGate` 里兜（见 kSplashMinVisible）。
+// 现在图案在第 1 帧就画完，唯一的时序只剩「停多久」：由 `_BootGate` 里的
+// kSplashMinVisible（560ms）与 boot 取较慢的一边。少了这一道，快设备上 boot
+// 一两百毫秒就结束，图案会一闪而过。
 
 class _BootError extends StatelessWidget {
   const _BootError({required this.error});
