@@ -17,8 +17,15 @@
 
 ### 1) release 缺签名密钥时**构建失败**，不再静默签成 debug
 
-`android/app/build.gradle.kts` 给 `assembleRelease` 挂了一个执行期守卫：没有
-`key.properties` 且未显式传 `-PallowDebugSigning=true` 时抛 `GradleException`。
+`android/app/build.gradle.kts` 给 **`packageRelease` / `packageReleaseBundle`**（不是
+`assembleRelease`）挂了执行期守卫：没有 `key.properties` 且未显式传
+`-PallowDebugSigning=true` 时抛 `GradleException`。
+
+**为什么必须挂在打包任务上，而不是 `assembleRelease`**：`assembleRelease` 是聚合任务，
+它的 `doFirst` 要等依赖跑完才轮到 —— 那时 `packageRelease` 早已把 debug 签名的
+21 MB APK 写进 `build/app/outputs/apk/release/`。构建虽然以失败收场，盘上却留着一个
+「看起来能用」的废包，随时可能被人拿去发。守在打包动作之前，磁盘上就不会出现它。
+AAB 那条（`packageReleaseBundle`）同理，一并守。
 
 原来的回落逻辑是「没密钥就用 debug 签名，保证构建能过」。对本地联调这是便利，
 对发版是**放大器**：产物看起来是正式包，装了正式签名的老用户却装不上
@@ -35,7 +42,12 @@
   的 `kDefaultTheme = HeitaThemeId.holy`；1.5.1 起就是这套，README 一直没跟上）。
 - 开发约定第 1 条「整套『纸墨』不引入装饰色」→ 改成不绑定具体皮肤名的表述
   （「每套皮肤只换色、不引入装饰色」），否则加/换皮肤时这句话必然过期。
-- 规模行「78 个测试文件 / 577 条测试」→ **83 个 / 582 条**（实测值）。
+- 规模行「78 个测试文件 / 577 条测试」→ **84 个 / 584 条**（实测值）。
+- 「打包与签名」段与上面第 1 条对齐：原文「没有密钥 → 自动回落 debug 签名，**构建照样成功**」
+  已不成立，改成「**直接失败**，且在 `packageRelease` 之前拦下、磁盘不留 APK」，
+  同时补上本地联调/并存包的逃生阀 `-PallowDebugSigning=true -PappIdSuffix=.dev`。
+- 开发约定第 1 条「唯一的彩色是超支砖红 `C.over`」与色板不符：各皮肤还有自己的
+  `accent`（圣地是钢蓝 `#3A7BA1`，用于图表与日历「今天」），改成准确表述。
 
 ### 3) 默认皮肤变更：给老用户一次性告知
 
@@ -46,14 +58,27 @@
 与全新安装无法区分。改成一次性告知，判据三条同时成立才触发：
 
 1. `ui.theme` 为空（从没手动选过）；2. `ui.theme_notice` 为空（从没提示过）；
-3. 库里已有账目（`SELECT EXISTS(SELECT 1 FROM txn)`，不走全表扫）。
+3. **1.5.1 发布日（`2026-10-28`）之前就记过账**
+   （`SELECT EXISTS(SELECT 1 FROM txn WHERE date < ?)`，不走全表扫）。
+
+第 3 条最初写成「库里已有账目」，独立验收时被判为 P1 后改掉：装完就记账的新用户也有账目，
+他第二次启动会被告知「默认皮肤已改为……」，而他根本没经历过任何变化。换成时间线判据 ——
+新用户的第一笔账必然落在发布日当天或之后。用**严格小于**是因为日期正好等于发布日的那笔
+分不清是老用户升级当天记的还是新用户装的当天记的，宁可少提示一次。
+
+文案也随之下调成中性表述（「界面默认皮肤是……；之前若是深色……可在『我的 → 主题』换回」），
+不再用「已改为」这种预设用户经历过变化的说法 —— 判据只能证明「他以前在用」，
+证明不了「他的界面确实变了」。
 
 命中后落 `ui.theme_notice = '1'` 并置 `Store.themeDefaultNotice`，由
 `home_shell.dart` 的 `_notifyStartup()` 并入启动那句提示（那个方法里几条提示是
 拼成一句的 —— `showToast` 会清掉上一条，连弹只有最后一条可见）。
-空白库不打扰：全新安装看到的新默认色本来就是第一印象，没有"变化"可解释。
 
-新测试 `test/theme_notice_test.dart` 四个用例：该弹的弹、只弹一次、选过的不弹、空库不弹。
+已知残余：新用户「补记昨天的账」或「导入历史账单」仍会命中（那笔账早于发布日）。
+文案已中性化、且只弹一次，接受这个取舍；要彻底消掉得在首启写一个安装指纹。
+
+新测试 `test/theme_notice_test.dart` 六个用例：该弹的弹、只弹一次、选过的不弹、空库不弹、
+**新用户记今天的账不弹**（上面那条 P1 的回归锁）、**日期正好等于发布日不弹**（边界）。
 
 ---
 
