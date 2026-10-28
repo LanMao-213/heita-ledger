@@ -18,8 +18,15 @@
          Flutter 首帧 → 主界面 三层同色，没有跳变，也没有「黑一下」。
 
          取值 = 默认皮肤 cold 的 bg（lib/design/palette.dart，0xFFF3F4F7）。
-         选了泽金（#F5F2EA）的用户，在引擎起来前那 100~300ms 会看到这一档冷灰，
-         约 2 个色阶的差 —— 原生窗口读不到应用内的皮肤设置，这是能取到的最优解。
+         选了暖米/泽金/圣地（都是浅底）的用户，引擎起来前那 100~300ms 会看到
+         这一档冷灰，约 2 个色阶的差 —— 可接受。
+
+         **深色皮肤（永夜 / 深红）的用户会看到一次浅→深跳变**，这是已知取舍：
+         原生窗口读不到应用内的皮肤设置，只能挑一个默认值。真正要消掉它，
+         得让 MainActivity 在 onCreate 里读 SharedPreferences（换肤时写入）
+         再 setBackgroundDrawable —— 那是另一件事，别顺手加，会多一条
+         原生↔Dart 的同步链路。当前结论：先用默认浅底，真机上如果深色皮肤
+         的跳变刺眼，再做那条链路。
 
          守卫：test/launch_native_test.dart 读本文件，比对三个引用点是否同值。 -->
     <color name="app_background">#F3F4F7</color>
