@@ -5,8 +5,16 @@
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
         <item name="android:windowSplashScreenBackground">@color/splash_background</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/splash_background</item>
+
+        <!-- 图标**故意留空**。系统闪屏的图标尺寸是锁死的：带 iconBackgroundColor
+             时可见内容约 240dp 的 2/3 ≈ 160dp，而 Flutter 首帧的标志是 718dp
+             （屏高 82%），差 4.51 倍 —— 真机上就是「小标志」突然放大成「大标志」。
+             闪屏背景又只接受纯色、不支持渐变，所以带图标时两屏不可能接上。
+
+             去掉图标后：闪屏只剩 #14161A 底色（启动页渐变整屏平均值是 #14161C，
+             差 1 个色阶），图案由 Flutter 首帧淡入，过渡是连续的。
+             详见 drawable/splash_icon_none.xml 与 test/splash_spec_test.dart 的守卫。 -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_none</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>

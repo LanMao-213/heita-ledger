@@ -124,8 +124,12 @@ class _SplashScreen extends StatelessWidget {
   /// 否则冷启动时「原生窗口 → Flutter 首帧」会看到渐变位置跳动。
   static const gradient = kSplashGradient;
 
-  /// 渐变最外圈的颜色，用作无渐变时的兜底底色
-  static const edge = kSplashEdge;
+  /// 首帧还没画出渐变时露出的底色 —— 与 Android 系统闪屏的纯色背景同源。
+  ///
+  /// 冷启动时先出的是**系统闪屏**（Android 12+ 的 SplashScreen API，只支持纯色），
+  /// 这里若用渐变最外圈的黑 `#07080B`，中间会闪过一层比闪屏更暗的底；两者同值时
+  /// 这段过渡是隐形的。渐变最外圈色仍在 [kSplashEdge]，供渲染 / 对拍工具用。
+  static const _backdrop = kSplashNativeBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +149,7 @@ class _SplashScreen extends StatelessWidget {
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: edge,
+        backgroundColor: _backdrop,
         body: SizedBox.expand(
           child: DecoratedBox(
             decoration: const BoxDecoration(gradient: gradient),

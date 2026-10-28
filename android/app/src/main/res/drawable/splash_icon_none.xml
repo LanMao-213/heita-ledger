@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ 系统闪屏的「空图标」—— 有意画不出任何东西。
+
+  为什么要有这个文件：系统闪屏（SplashScreen API）的图标尺寸是锁死的。带
+  windowSplashScreenIconBackgroundColor 时，图标可见内容约等于 240dp 的
+  2/3 ≈ 160dp，给多大的图都会被缩到那个尺寸。而 Flutter 首帧的标志是
+  718dp（屏高 82%），两者差 4.51 倍 —— 冷启动时会看到「小标志」突然放大成
+  「大标志」，这是真机截图里最刺眼的一跳。
+
+  系统闪屏的背景又只接受纯色、不支持渐变，所以「让两屏长得一样」在带图标
+  的前提下无解。唯一能让它们真正接上的做法是：闪屏只留底色，图案交给
+  Flutter 首帧去淡入（_SplashMark 本来就有 900ms 的淡入 + 0.94→1.0 缩放）。
+
+  底色这一半其实早就对上了：splash_background = #14161A，而启动页渐变
+  （#2C323E → #07080B）的整屏平均值是 #14161C，亮度 21.9 对 22.1，差 1 个
+  色阶，肉眼不可辨。
+
+  ⚠️ 不要把这个改回 @mipmap/ic_launcher_foreground，也不要删掉本文件 ——
+  test/splash_spec_test.dart 里有一条守卫会读这个 XML 比对。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="1dp"
+    android:height="1dp"
+    android:viewportWidth="1"
+    android:viewportHeight="1" />

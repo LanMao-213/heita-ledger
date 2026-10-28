@@ -7,6 +7,8 @@
 // 钉住的东西只有一件：**「D · 留白 88%」这个选择本身**。它不会因为任何
 // 一次重构而变红，只会在有人改了比例时变红 —— 那正是需要有人停下来问
 // 「设计定了吗」的时刻。
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ledger/design/splash_spec.dart';
@@ -73,6 +75,74 @@ void main() {
         final w = h / kSplashMarkHeightPerWidth;
         expect(w / h, closeTo(455 / 944, 1e-9));
       }
+    });
+  });
+
+  // 冷启动的第一屏不是 Flutter 画的 —— Android 12+ 由系统 SplashScreen API
+  // 接管：只有纯色背景 + 一个尺寸被系统锁死的图标。2026-10-27 的真机截图里，
+  // 那个图标只有 159dp（屏高 18%），而 Flutter 首帧的标志是 718dp（屏高 82%），
+  // 差 4.51 倍 —— 肉眼看到的是「一个小标志突然放大成一个大标志」。
+  //
+  // 这两条守卫钉住的是「两屏接得上」这个约束。它们读的是 android/ 下的真实
+  // 文件，所以改原生资源也会被拦；这类跨语言漂移没有任何 Dart 类型能约束，
+  // 只能靠测试盯着。
+  group('原生闪屏与 Flutter 首帧必须接得上', () {
+    // 读资源时统一剥掉 XML 注释：几个文件头都写了「不要改回 xxx」之类的警示，
+    // 不剥会把警示文字当成真实配置，守卫自己先误报。
+    String bodyOf(String rel) => File('android/app/src/main/res/$rel')
+        .readAsStringSync()
+        .replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
+
+    test('colors.xml 的 splash_background 与 kSplashNativeBackground 同值', () {
+      final xml = bodyOf('values/colors.xml');
+      final m = RegExp(
+        r'<color\s+name="splash_background"\s*>\s*#([0-9A-Fa-f]{6,8})\s*</color>',
+      ).firstMatch(xml);
+      expect(m, isNotNull, reason: 'colors.xml 里找不到 splash_background');
+
+      var hex = m!.group(1)!.toUpperCase();
+      if (hex.length == 6) hex = 'FF$hex'; // 省略 alpha 时补 FF
+      final dart = kSplashNativeBackground
+          .toARGB32()
+          .toRadixString(16)
+          .toUpperCase()
+          .padLeft(8, '0');
+
+      expect(
+        dart,
+        hex,
+        reason: '原生闪屏底色与 Dart 常量不一致：闪屏是 #$hex，'
+            'kSplashNativeBackground 是 #$dart。冷启动会在两屏之间闪一次色差',
+      );
+    });
+
+    test('Android 12+ 启动主题不画图标（画了就会出现「小标志跳大标志」）', () {
+      final xml = bodyOf('values-v31/styles.xml');
+      final m = RegExp(
+        r'windowSplashScreenAnimatedIcon"\s*>\s*([^<]+?)\s*<',
+      ).firstMatch(xml);
+
+      expect(m, isNotNull, reason: 'v31 启动主题里没有 windowSplashScreenAnimatedIcon');
+      expect(
+        m!.group(1),
+        '@drawable/splash_icon_none',
+        reason: '系统闪屏的图标只能画到约 160dp，而 Flutter 首帧是 718dp（差 4.5 倍），'
+            '所以这里必须是空图标。改回 @mipmap/… 会把那一跳重新带回来',
+      );
+    });
+
+    test('splash_icon_none 确实是空的', () {
+      final body = bodyOf('drawable/splash_icon_none.xml');
+      expect(
+        body.contains('<path'),
+        isFalse,
+        reason: '「空图标」里出现 path 就会真的画出东西，等于把图标加回来了',
+      );
+      expect(
+        body.contains('@mipmap') || body.contains('@drawable/'),
+        isFalse,
+        reason: '空图标不该引用任何位图 / 其它 drawable',
+      );
     });
   });
 }

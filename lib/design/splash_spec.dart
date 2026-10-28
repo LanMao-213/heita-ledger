@@ -52,6 +52,20 @@ const RadialGradient kSplashGradient = RadialGradient(
 /// 渐变最外圈的颜色，用作无渐变时的兜底底色。
 const Color kSplashEdge = Color(0xFF07080B);
 
+/// Android 12+ 系统闪屏（SplashScreen API）的纯色背景。
+///
+/// ⚠️ 必须与 `android/app/src/main/res/values/colors.xml` 的
+/// `splash_background` 完全一致 —— `test/splash_spec_test.dart` 会读那个 XML
+/// 做逐字符比对，所以这条注释不会失效。
+///
+/// 值取的是 [kSplashGradient] 的**整屏平均值** `#14161C`（亮度 22.1），不是
+/// 渐变中心色（中心 `#2C323E`，亮度 43.7）。平均值才对应「整屏看上去多亮」，
+/// 用它接 Flutter 首帧不会看到一次整体提亮；取中心色则会明显闪一下。
+///
+/// 与 `ic_launcher_background` 同值是有意的：桌面图标放大成启动窗口的那段
+/// 动画里，两个色块要接得上。
+const Color kSplashNativeBackground = Color(0xFF14161A);
+
 /// 给定屏幕尺寸，算出标志的绘制高度。
 ///
 /// 逻辑就两行：先按宽度定高，再用屏高封顶。抽成函数是为了让实现与测试

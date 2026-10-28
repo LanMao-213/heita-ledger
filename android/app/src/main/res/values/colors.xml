@@ -3,7 +3,11 @@
     <!-- 自适应图标背景层：与深色启动页同色，保证「桌面图标 → 启动页」视觉连贯 -->
     <color name="ic_launcher_background">#14161A</color>
 
-    <!-- Android 12+ 系统闪屏背景。必须是纯色（系统不支持渐变 drawable），
-         取渐变中心色，与 Flutter 启动页的渐变过渡自然。 -->
+    <!-- Android 12+ 系统闪屏背景。必须是纯色（系统不支持渐变 drawable）。
+         这个值取的是**启动页渐变的整屏平均值**（#14161C，亮度 22.1），不是渐变
+         中心色（中心是 #2C323E，亮度 43.7）—— 平均值才对应「整屏看上去的亮度」，
+         用它接 Flutter 首帧不会看到一次整体提亮。
+         Dart 侧同名常量：lib/design/splash_spec.dart 的 kSplashNativeBackground，
+         test/splash_spec_test.dart 会读本文件比对，改一处必须改另一处。 -->
     <color name="splash_background">#14161A</color>
 </resources>
