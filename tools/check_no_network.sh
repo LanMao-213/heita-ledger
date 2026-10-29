@@ -8,6 +8,18 @@
 #
 # 所以把这条从「注释里的约定」变成「构建时必须通过的检查」。
 #
+# 这道闸分三层（1.6.1 起）：
+#   1) pubspec.yaml 的直接依赖 —— 人审白名单，加一个就要登记一个；
+#   2) pubspec.lock 里出现的**网络客户端** —— 绝对红，无豁免；
+#   3) pubspec.lock 里**疑似有网络能力但不是客户端**的包（如 url_launcher*）——
+#      必须显式登记并写明为什么不进 release 主路径。
+# 第 2、3 层是后补的：此前只审第 1 层，等于只审「我主动要的」，而网络客户端
+# 绝大多数是被别的包带进来的。
+#
+# 另注意：这道闸是**构建期**的（看源码与依赖）；`verify_apk.py` 与下面第 4 步
+# 查的是**产物期**的（正式包零权限）。两者不能互相替代 —— 没有 INTERNET 权限
+# 是系统层面的硬保证，比任何静态扫描都强，不要因为有了 lock 检查就把它删掉。
+#
 # 用法：
 #   tools/check_no_network.sh                  # 检查依赖、源码、清单
 #   tools/check_no_network.sh path/to/app.apk  # 额外检查打出来的 APK
@@ -39,6 +51,7 @@ ALLOWED_DEPS=(
   share_plus
   file_picker
   excel
+  cryptography
 )
 
 in_deps=0
@@ -61,6 +74,71 @@ while IFS= read -r line; do
   fi
 done < pubspec.yaml
 [ "$FAIL" -eq 0 ] && ok "运行时依赖都在白名单内（${#ALLOWED_DEPS[@]} 个）"
+
+# ---- 传递依赖：pubspec.lock 全量 ----
+#
+# 这一层**不做**「每个包都登记」：lock 里有 90 多个包（Flutter 自身、各平台
+# 实现、传递工具库），全量白名单半年后必然退化成「报错了就加一行」，与没有
+# 门禁等价。它只守一条性质 —— **新出现的网络能力必须被人看见一次**。
+#
+# 注意：lock **不记录反向依赖**（谁依赖了谁），所以这里只能报出包名与
+# dependency 类型；要查上游用 `flutter pub deps --style=compact`。
+#
+# 下面两类命中分别对应上面的第 2、3 层。第 2 类无豁免：真的要引入一个 http
+# 客户端，那就不是改脚本的事，是这个产品不能再叫单机应用。
+
+FORBIDDEN_PKGS='^(http|http2|dio|chopper|retrofit|web_socket_channel|socket_io_client|grpc|firebase_.*|sentry.*|amplitude.*|umeng.*|bugly.*|jpush.*|alipay.*)$'
+
+# 疑似具备网络能力、但本身不是 http 客户端的包：必须逐条登记。
+# 每一条都要能回答两个问题：它为什么在 lock 里、为什么不进 release 主路径。
+KNOWN_NETCAP=(
+  # share_plus 的桌面分享回退（Linux / Windows / Web 用 mailto 或打开浏览器实现）。
+  # Android 走 share_plus 自己的 android 实现，这些平台实现不进 release 主路径。
+  url_launcher_linux
+  url_launcher_web
+  url_launcher_windows
+  url_launcher_platform_interface
+  # dart:html 的接口包，本身不发请求；被 url_launcher_web 依赖。
+  web
+)
+SUSPECT_PKGS='^(url_launcher.*|web|web_socket.*|socket_io_client|connectivity.*)$'
+
+lock_pkg_count=0
+netcap_hits=0
+if [ ! -f pubspec.lock ]; then
+  fail "找不到 pubspec.lock —— 传递依赖无从检查（先跑 flutter pub get）"
+else
+  lock_rows="$(awk '
+    /^packages:/ { inp=1; next }
+    /^sdks:/    { inp=0 }
+    inp && /^  [A-Za-z0-9_]+:$/ { gsub(/^  /,""); gsub(/:$/,""); name=$0; next }
+    inp && /^    dependency:/ {
+      v=$0; gsub(/^    dependency: /,"",v); gsub(/"/,"",v); print name" "v
+    }
+  ' pubspec.lock)"
+
+  while read -r pkg dep; do
+    [ -n "${pkg:-}" ] || continue
+    lock_pkg_count=$((lock_pkg_count + 1))
+    if printf '%s' "$pkg" | grep -qE "$FORBIDDEN_PKGS"; then
+      fail "lock 里有网络客户端：$pkg（dependency=${dep}）—— 它会直接毁掉「断网全功能可用」的资格。查上游：flutter pub deps --style=compact | grep -B5 $pkg"
+      continue
+    fi
+    if printf '%s' "$pkg" | grep -qE "$SUSPECT_PKGS"; then
+      known=0
+      for k in "${KNOWN_NETCAP[@]}"; do
+        [ "$pkg" = "$k" ] && known=1 && break
+      done
+      if [ "$known" -eq 1 ]; then
+        netcap_hits=$((netcap_hits + 1))
+      else
+        fail "疑似具备网络能力但未登记：$pkg（dependency=${dep}）—— 先确认它不进 release 主路径，再登记进 KNOWN_NETCAP 并写明理由。查上游：flutter pub deps --style=compact | grep -B5 $pkg"
+      fi
+    fi
+  done <<< "$lock_rows"
+
+  [ "$FAIL" -eq 0 ] && ok "传递依赖里没有网络客户端（lock ${lock_pkg_count} 个包，已登记的疑似网络能力 ${netcap_hits} 个）"
+fi
 
 echo "== 2/4 源码里的网络调用 =="
 
