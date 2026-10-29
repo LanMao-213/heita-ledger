@@ -74,8 +74,41 @@ Future<void> _repoUpdateLedger(Ledger l) async {
   await db.update('ledger', l.toMap(), where: 'id = ?', whereArgs: [l.id]);
 }
 
-  /// 删除账本会级联删掉它的分类与交易（外键 ON DELETE CASCADE）
+  /// 删除账本：**单事务级联**删掉它名下的一切。
+  ///
+  /// ★ 1.5.2 修正。原实现只有一句 `DELETE FROM ledger`，靠外键级联兜底；
+  ///   但 `budget` / `recurring` / `txn_template` 三张表的 DDL 里**没有**指向
+  ///   `ledger` 的外键（见 `db.dart`），于是删完账本会留下一堆指向死账本的
+  ///   孤儿行：预算查不到归属、周期账单还留在库里等下一次补记扫到。
+  ///   所以这里显式按「子表在前、主表在后」删一遍 —— 顺序错了会撞
+  ///   `PRAGMA foreign_keys = ON`（与 `Db._wipeOrder` 同一条规矩）。
+  ///
+  /// ★ `saving_goal` / `goal_flow` **刻意不删**：`saving_goal` 的 schema 里
+  ///   没有 `ledger_id`（储蓄目标是全局的，不按账本分），它不是账本的子表。
+  ///   按账本去删它等于「删一个账本顺手清掉所有储蓄目标」。
 Future<void> _repoDeleteLedger(int id) async {
   final db = await Db.open();
-  await db.delete('ledger', where: 'id = ?', whereArgs: [id]);
+  await db.transaction((txn) async {
+    await txn.delete('txn', where: 'ledger_id = ?', whereArgs: [id]);
+    await txn.delete('debt', where: 'ledger_id = ?', whereArgs: [id]);
+    await txn.delete('budget', where: 'ledger_id = ?', whereArgs: [id]);
+    await txn.delete('recurring', where: 'ledger_id = ?', whereArgs: [id]);
+    await txn.delete('txn_template', where: 'ledger_id = ?', whereArgs: [id]);
+    // 分类：子分类的 parent_id 是同一张表里的软关联，一起删掉才不留孤儿
+    await txn.delete('category', where: 'ledger_id = ?', whereArgs: [id]);
+    await txn.delete('ledger', where: 'id = ?', whereArgs: [id]);
+  });
+}
+
+/// 某账本名下的记账笔数（含转账、含借贷流水）—— 删除前的二次确认要说出这个数。
+///
+/// 用 `COUNT(*)` 而不是查列表再取长度：确认弹窗只要一个数字，
+/// 把几万行读进内存只为数一遍没有意义。
+Future<int> _repoLedgerTxnCount(int ledgerId) async {
+  final db = await Db.open();
+  final rows = await db.rawQuery(
+    'SELECT COUNT(*) AS n FROM txn WHERE ledger_id = ?',
+    [ledgerId],
+  );
+  return (rows.first['n'] as int?) ?? 0;
 }

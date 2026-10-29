@@ -213,6 +213,36 @@ extension StoreActions on Store {
     return switchLedger(id);
   }
 
+  /// 删除账本（连同账内的流水 / 往来 / 预算 / 周期账单 / 模板 / 分类）。
+  ///
+  /// 删的若是**当前账本**，必须切走：所有查询都按 `_ledgerId` 过滤，留在一个
+  /// 已删除的 id 上会让明细、分类、预算全部查空 —— 用户看到的是「数据没了」。
+  /// 切走复用 [switchLedger] 那条路径（清筛选 → 重载 → 补记），不另开一套。
+  ///
+  /// 「只剩一个账本不许删」的规则放在界面层（`mine_page.dart`）：那是产品约束，
+  /// 不是数据层约束 —— 测试或恢复流程直接调数据层时不该被它挡住。
+  Future<void> deleteLedger(int id) async {
+    final wasCurrent = id == _ledgerId;
+    await Repo.deleteLedger(id);
+
+    if (!wasCurrent) {
+      // 删的是别的账本：只有账本列表变了，其它投影不受影响
+      _ledgers = await Repo.listLedgers();
+      notifyListeners();
+      return;
+    }
+
+    final remaining = await Repo.listLedgers();
+    if (remaining.isEmpty) {
+      // 界面拦住了这种操作，真走到这里说明库里本来就只剩这一本：
+      // 让 `currentLedgerId()` 自己建一本，别让界面停在一个已删的 id 上
+      _ledgerId = await Repo.currentLedgerId();
+      await loadAll();
+      return;
+    }
+    await switchLedger(remaining.first.id);
+  }
+
   /// 重算所有账户余额（体检页的修复动作）→ 刷新。
   ///
   /// 这里写的是 `balance_cents` 而不是 `opening_cents`：修的是「增量维护漏加

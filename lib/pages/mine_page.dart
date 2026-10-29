@@ -16,6 +16,7 @@ import '../widgets/menu.dart';
 import '../widgets/restore_flow.dart';
 import '../widgets/storage_note.dart';
 import '../widgets/theme_sheet.dart';
+import '../widgets/transfer_sheet.dart';
 import 'cats_page.dart';
 import 'import_bill_page.dart';
 import 'recurring_page.dart';
@@ -912,8 +913,59 @@ class MinePage extends StatelessWidget {
             ),
           ],
         ),
+        // 删除单独一组、且每本各占一行：它和上面那组「切过去」是两种意图，
+        // 混在同一组里最容易被误点 —— 而这一步不可恢复。
+        MenuGroup(
+          actions: [
+            for (final l in s.ledgers)
+              MenuAction(
+                icon: 'trash',
+                title: '删除「${l.name}」',
+                danger: true,
+                onTap: () => _confirmDeleteLedger(context, l),
+              ),
+          ],
+        ),
       ],
     );
+  }
+
+  /// 删除账本：先说清会删掉多少笔，再动手。
+  ///
+  /// 两条硬规则：
+  /// 1. **至少保留一个账本** —— 没有账本时所有查询都按一个不存在的 ledger_id
+  ///    去查，界面空白，用户会以为数据全没了；
+  /// 2. 二次确认里必须写出**笔数**。「删除账本」听起来像删一个文件夹，
+  ///    实际上里面的账目一起没 —— 不写数字，用户不会意识到这是一次清空。
+  static Future<void> _confirmDeleteLedger(
+    BuildContext context,
+    Ledger l,
+  ) async {
+    final s = Store.i;
+    if (s.ledgers.length <= 1) {
+      showToast(context, '至少保留一个账本');
+      return;
+    }
+    final count = await Repo.ledgerTxnCount(l.id);
+    if (!context.mounted) return;
+
+    final ok = await showAppDialog<bool>(
+      context: context,
+      title: '删除「${l.name}」？',
+      content: Text(
+        '该账本内的 $count 笔账目会一起删除，不可恢复。',
+        style: T.body2,
+      ),
+      actions: const [
+        DialogAction(label: '取消', value: false),
+        DialogAction(label: '删除', value: true, danger: true),
+      ],
+    );
+    if (ok != true || !context.mounted) return;
+
+    // 删的是当前账本时，Store.deleteLedger 会切到剩余的第一本并重载
+    await s.deleteLedger(l.id);
+    if (context.mounted) showToast(context, '已删除「${l.name}」');
   }
 
   /// 新建账本：问名字 → 建 → 切过去。

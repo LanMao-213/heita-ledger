@@ -85,8 +85,14 @@ class Repo {
 
   static Future<void> updateLedger(Ledger l) => _repoUpdateLedger(l);
 
-  /// 删除账本会级联删掉它的分类与交易（外键 ON DELETE CASCADE）
+  /// 删除账本：单事务级联删掉它的流水、往来、预算、周期账单、模板与分类。
+  ///
+  /// ★ `saving_goal` 不跟着删 —— 它的 schema 里没有 `ledger_id`，
+  ///   储蓄目标是全局的，不属于任何账本。
   static Future<void> deleteLedger(int id) => _repoDeleteLedger(id);
+
+  /// 某账本名下的记账笔数。删除前的二次确认靠它说清「会删掉几笔」。
+  static Future<int> ledgerTxnCount(int id) => _repoLedgerTxnCount(id);
 
   // ------------------------------------------------------------------- 账户
   static Future<List<Account>> listAccounts({
