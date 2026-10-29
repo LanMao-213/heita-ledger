@@ -132,9 +132,25 @@ _LOOPBACK = re.compile(r'^(?:127\.|0\.0\.0\.0|255\.255\.255\.255|localhost)')
 # SVG / 图标路径数据：一堆数字挤在一起，会被 IP / 银行卡 / 身份证 的正则误吃
 _SVG_DATA = re.compile(r'(?:\sd="|r\'<|d=r\'|<path|<rect|<circle)', re.IGNORECASE)
 
+# 测试目录：夹具里**必须**写假口令，否则「错口令」这条路径无从验证。
+# 真凭据的载体是 `android/key.properties`（被 .gitignore 挡住）与 CI secret，
+# 两者都不在 test/ 下 —— 所以按路径豁免不构成漏检。
+_TEST_PATH = re.compile(r'(?:^|/)(?:test|integration_test)/')
+# 但构建签名键例外：test/ 里不该出现 `storePassword=...`，出现就是真配置被抄进来了
+_BUILD_SECRET_KEYS = re.compile(r'(?:storePassword|keyPassword|signingPassword)', re.IGNORECASE)
 
-def false_positive(name: str, matched: str, line: str) -> bool:
-    """逐条写明放行理由 —— 加规则时必须同时写理由，否则这函数会变成垃圾桶。"""
+# 2^53-1（JSON / JS 的安全整数上限）。备份往返测试拿它验证「大数额不丢精度」，
+# 16 位纯数字正好撞上银行卡号正则 —— 它是常量，不是谁卡里的钱。
+_MAX_SAFE_INT = '9007199254740991'
+
+
+def false_positive(name: str, matched: str, line: str,
+                   path: str | None = None) -> bool:
+    """逐条写明放行理由 —— 加规则时必须同时写理由，否则这函数会变成垃圾桶。
+
+    `path` 是命中所在的文件路径（历史扫描里由 `git grep` 给出；提交信息与自测
+    传 None）。按路径做的放行一律要说明「这个路径下为什么不可能有真凭据」。
+    """
     if name == '内网/公网 IP':
         # 文档里讲「跑测试要剥代理」必然写 127.0.0.1，环回地址不是敏感信息
         if _LOOPBACK.match(matched):
@@ -150,6 +166,15 @@ def false_positive(name: str, matched: str, line: str) -> bool:
         return True
     if name in ('银行卡号', '身份证号', '手机号') and _SVG_DATA.search(line):
         return True
+    if name == '银行卡号' and matched.replace(' ', '').replace('-', '') == _MAX_SAFE_INT:
+        # 见 _MAX_SAFE_INT：精度边界测试里的常量
+        return True
+    if name == '密码被写成字面量' and path and _TEST_PATH.search(path):
+        # 测试夹具：`password: '错的口令'`、`const _password = '正确的马电池订书钉'`。
+        # 这些口令的唯一用途是被代码拒绝，写进测试正是它们存在的意义。
+        # 构建签名键仍然照报 —— 那三个键不该出现在 test/ 里。
+        if not _BUILD_SECRET_KEYS.search(line):
+            return True
     if name == '邮箱' and matched.startswith('git@'):
         return True          # git@github.com:owner/repo 是 SSH 远程地址
     return False
@@ -175,7 +200,7 @@ def scan_text(rel: str, text: str, keep: set[str] | None = None) -> list[str]:
             m = pat.search(line)
             if not m:
                 continue
-            if false_positive(name, m.group(0), line):
+            if false_positive(name, m.group(0), line, rel):
                 continue
             hits.append(f'  {rel}:{i}  [{name}]  {line.strip()[:140]}')
             break
@@ -294,13 +319,17 @@ def scan_messages(cwd: Path, limit: int = 40) -> list[str]:
     return hits
 
 
-def _judge(content: str) -> tuple[str, str] | None:
-    """用 Python 正则精判一行内容，返回 (规则名, 命中串)。"""
+def _judge(content: str, path: str | None = None) -> tuple[str, str] | None:
+    """用 Python 正则精判一行内容，返回 (规则名, 命中串)。
+
+    `path` 一并传进 `false_positive`：历史扫描能给出命中所在的文件，
+    于是「test/ 下的假口令」才放得过去（提交信息与自测没有路径，传 None）。
+    """
     for name, pat in PATTERNS:
         m = pat.search(content)
         if not m:
             continue
-        if false_positive(name, m.group(0), content):
+        if false_positive(name, m.group(0), content, path):
             continue
         return name, m.group(0)
     return None
@@ -340,7 +369,7 @@ def _grep_commits(cwd: Path, revs: list[str], tag: str) -> list[str]:
             commit, path, _no, content = parts
             if path in SKIP_FILES:         # 扫描器自身在历史里同样是误报
                 continue
-            judged = _judge(content)
+            judged = _judge(content, path)
             if judged is None:
                 continue
             name, _m = judged
