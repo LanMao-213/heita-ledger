@@ -159,8 +159,10 @@ void main() {
       findsOneWidget,
       reason: '最大一笔要带分类名，只有数字的话想不起是哪笔',
     );
-    // 笔数只在上面那行出现一次，底栏不再重复
-    expect(find.text('1 笔'), findsOneWidget);
+    // 笔数只在上面那行出现一次，底栏不再重复。
+    // 文案是「共 N 条」而不是「N 笔」：转账也占一条记录，但既不算收入也不算支出，
+    // 写成「笔」会和左边两格的金额口径打架（见 summary_card 里那段注释）。
+    expect(find.text('共 1 条'), findsOneWidget);
     expect(find.textContaining('已过'), findsOneWidget);
   });
 

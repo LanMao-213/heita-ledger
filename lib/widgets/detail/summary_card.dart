@@ -200,11 +200,17 @@ class SummaryCard extends StatelessWidget {
               ),
               const SizedBox(width: S.sm),
               Padding(
-                // 下 2 是光学补偿：让「N 笔」的基线和左边两格的数字底部对齐，
+                // 下 2 是光学补偿：让「N 条」的基线和左边两格的数字底部对齐，
                 // 不是节奏值，不要收进 S 令牌
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
-                  '$count 笔',
+                  // ⚠️ 这里数的是**记录条数**，不是「几笔收支」：转账也占一条
+                  // （它改变余额，明细里必须看得见），但既不进支出也不进收入。
+                  // 写「N 笔」会和左边两格的口径打架 —— 转 500 块之后金额一分
+                  // 没变、笔数却 +1，用户会以为统计坏了（QA 实测 2→3）。
+                  // 「条」在本应用里就是指记录（「仅显示最近 N 条」），
+                  // 与两侧的「支出 / 收入 / 结余」明确分开。
+                  '共 $count 条',
                   style: T.caption,
                 ),
               ),
