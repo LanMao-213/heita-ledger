@@ -411,11 +411,16 @@ void main() {
       final ms = sw.elapsedMilliseconds;
       // ignore: avoid_print
       print('BENCH 默认迭代($kDefaultKdfIterations) 一次 seal = ${ms}ms');
+      // 门限 3s，不是 2s：这条要抓的是「有人把默认迭代数改回 600000」这类
+      // 数量级回归（600k 单次派生 3.7s，必然超），不是基准测试。
+      // 本机空载实测 1.24s，但两个 `flutter test` 同时跑时实测过 2.03s ——
+      // 卡在 2s 上只会得到一条随机器负载变红的测试。
+      // 「默认值到底是哪个数」由上面那条常量断言钉着，那一条才是硬的。
       expect(
         ms,
-        lessThan(2000),
-        reason: '导出要等 $ms ms —— 超过 2 秒用户会以为卡死。'
-            '（实测 600000 迭代单次派生 3.7s，所以降到了 210000）',
+        lessThan(3000),
+        reason: '一次派生 $ms ms —— 数量级不对了。'
+            '（600000 迭代单次派生 3.7s，所以默认降到了 210000）',
       );
     }, timeout: const Timeout(Duration(minutes: 2)));
   });

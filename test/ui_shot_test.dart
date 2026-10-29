@@ -533,6 +533,87 @@ void main() {
     await _shot(tester, 'build/visual/shot_24_safety.png');
     expect(tester.takeException(), isNull, reason: '数据安全页有布局溢出');
   });
+
+  // ---- 记一笔 · 键盘让位三档截图（#6）----
+  //
+  // ## 为什么必须是「图」而不是断言
+  //
+  // 自动化能证明的只有一件事：**面板顶边在输入法升降全程不跳**（
+  // `record_note_layout_test` 60 帧 × 5dp、容差 2dp）。它证明不了「好看」——
+  // 去掉 40dp 门槛之后，输入法完全升起时槽里会留 24dp 的碎边（第一排键的顶边
+  // 被剪下来的一条），靠槽下沿一条 24dp 渐隐溶进卡面。溶得干不干净、会不会
+  // 看起来像「画坏了的一道横线」，只能看图。这是 #6 唯一可能被真机否掉的地方。
+  //
+  // ## 三档取在门槛附近
+  //
+  // 键盘自然高度 324（56 键高）；旧行为在 `槽高 < 40` 时整块收掉，所以：
+  //
+  // | viewInsets | 槽高 | 这一档要看什么 |
+  // |---|---|---|
+  // | 0          | 324  | 满键盘：**绝不能有任何渐隐**（会把「0 / . / 确认」溶掉） |
+  // | 280        | 44   | 刚过旧门槛一点：旧代码在 44 还是完整、39 就整块没了 |
+  // | 300        | 24   | 典型碎边：一排键被剪掉一条，靠渐隐溶掉 |
+  //
+  // 三张都要 `takeException()` 为 null —— 图再好看，溢出也是错的。
+  testWidgets('记一笔 · 键盘让位三档截图（#6）', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await tester.runAsync(() => Store.i.boot());
+
+    await tester.pumpWidget(
+      RepaintBoundary(key: _shotKey, child: const HeitaApp()),
+    );
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+
+    // 打开「记一笔」（底栏 60 高，圆的「＋」圆心在 802 附近）
+    await tester.tapAt(const Offset(195, 802));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+    // 三档都要**有备注内容**：键盘收起时那一屏如果空空如也，就看不出
+    // 「被输入法压住的是什么」。写一句真实的备注。
+    await tester.tap(find.byType(TextField).first);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField).first,
+      '楼下那家面馆，加了两个卤蛋',
+    );
+    await tester.pumpAndSettle();
+
+    /// 摆一个输入法高度并截图。[imeDp] 是逻辑像素。
+    Future<void> shotAt(String name, double imeDp) async {
+      tester.view.viewInsets = FakeViewPadding(bottom: imeDp * 2);
+      await tester.pumpAndSettle();
+      // 槽高是这个用例的核心变量：断言一次，免得以后别人改了公式、
+      // 截图还在、却不是当初那三档了。
+      final slotFinder = find.byKey(const ValueKey('record_keypad_slot'));
+      final slotH = slotFinder.evaluate().isEmpty
+          ? 0.0
+          : tester.getSize(slotFinder).height;
+      expect(
+        slotH,
+        closeTo((324 - imeDp).clamp(0.0, 324.0), 0.5),
+        reason: '输入法 ${imeDp}dp 时槽高应当是 ${324 - imeDp}dp，实际 $slotH',
+      );
+      await _shot(tester, 'build/visual/$name');
+      expect(tester.takeException(), isNull, reason: '$name 有布局溢出');
+    }
+
+    await shotAt('shot_kb_000.png', 0);
+    await shotAt('shot_kb_280.png', 280);
+    await shotAt('shot_kb_300.png', 300);
+
+    // 满键盘那一张必须**没有**渐隐层：`shatterFade == 0` 时这一层根本不出现。
+    // 反过来断言一次，免得将来把渐隐写成「永远画」—— 那会把真键溶掉。
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('record_keypad_shatter_fade')),
+      findsNothing,
+      reason: '满键盘不该有碎边渐隐 —— 它会把「0 / . / 确认」这排真键溶掉',
+    );
+  });
 }
 
 /// 造一批贴近真实的演示数据：整月零散支出 + 两笔收入 + 一个超支分类
