@@ -16,8 +16,8 @@
 | 默认分支 | **`main`**,版本 **`1.5.1+25`**(已发版,标签 `v1.5.1`) |
 | 开发分支 | `feat/*`,合进 `main` 后按版本打标签(旧的 `feat/v2-merge` 已并入 `main` 并删除) |
 | 已发版 | **`v1.5.1`**:[Release 页](https://github.com/LanMao-213/heita-ledger/releases/tag/v1.5.1) 带 arm64 APK(19.6 MB);上一版 `v1.5.0` 同样带包 |
-| 质量闸门 | `flutter analyze --fatal-infos` 0 issue、**584 条测试**全绿(含界面截图自检)、版本号三处一致性(CI 内)、出包七项校验、隐私扫描四处载体 |
-| 规模 | `lib/` 约 2.6 万行、`test/` 约 1.7 万行(84 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
+| 质量闸门 | `flutter analyze --fatal-infos` 0 issue、**612 条测试**全绿(含界面截图自检)、版本号三处一致性(CI 内)、出包七项校验、隐私扫描四处载体 |
+| 规模 | `lib/` 约 2.8 万行、`test/` 约 1.9 万行(91 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
 | 许可 | [MIT](LICENSE) |
 | 待办 | 1.5.0 四项真机验收**已通过**(2026-10-28);**1.5.1 的「分类预算过滤」「趋势卡取消提示」两项仍待有数据态复核**(当时设备离线)。全部待办已转成 [Issues](https://github.com/LanMao-213/heita-ledger/issues) |
 
