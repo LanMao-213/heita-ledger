@@ -24,7 +24,7 @@ class PlanPage extends StatelessWidget {
       builder: (context, _) => ListView(
         padding: const EdgeInsets.only(bottom: S.xxl),
         children: [
-          const PageHeader(title: '计划'),
+          const PageHeader(title: '计划', leading: MenuButton()),
           Padding(
             padding: const EdgeInsets.only(top: S.xs),
             child: CycleBar(

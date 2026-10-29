@@ -6,15 +6,18 @@ import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/common.dart';
 import '../widgets/record_sheet.dart';
+import 'app_drawer.dart';
 import 'detail_page.dart';
 import 'mine_page.dart';
+import 'onboarding_page.dart';
 import 'plan_page.dart';
 import 'stats_page.dart';
 
-/// 主界面：底部四页 + 中间「记一笔」。
+/// 主界面：底部四页 + 中间「记一笔」+ 左侧侧拉栏。
 ///
 /// 导航布局与原型一致：明细 · 图表 · ＋ · 计划 · 我的。
-/// 「分类管理」按用户要求移到了「我的 → 设置」里。
+/// 「分类管理」按用户要求移到了「我的 → 设置」里；1.7.0 起它同时也在侧拉栏的
+/// 「管理」组 —— 侧拉栏是跨页面的快捷入口，不是第二套设置页（两处指向同一批动作）。
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -105,6 +108,15 @@ class _HomeShellState extends State<HomeShell> {
   void _notifyStartup() {
     if (_startupNotified) return;
     _startupNotified = true;
+    if (!mounted) return;
+
+    // 首次使用引导优先于启动提示：两者都会盖住这一屏，引导是一整页，
+    // 先弹提示等于让它被立刻挡住、用户根本没读到。
+    if (Onboarding.autoShow && Store.i.onboardingPending) {
+      showOnboarding(context);
+      return;
+    }
+
     final parts = <String>[
       if (Store.i.catsUpgradeJustDone) '分类已升级为「分类 + 子分类」两级，可在「我的 → 分类管理」里调整',
       if (Store.i.recurringJustAdded > 0)
@@ -138,6 +150,13 @@ class _HomeShellState extends State<HomeShell> {
     // 套在最外层会让整棵 PageView 跟着每次记账重建一遍
     return Scaffold(
       backgroundColor: C.bg,
+      // 侧拉栏。`hostContext` 传的是 HomeShell 自己的 context —— 抽屉收起后
+      // 它那棵子树就被销毁了，动作必须在宿主上执行（见 AppDrawer 的类注释）。
+      drawer: AppDrawer(hostContext: context, onRecord: _openRecord),
+      // 遮罩比默认的 54% 浅：抽屉后面那页是账目，压太黑会让人以为页面变了
+      drawerScrimColor: Colors.black.withValues(alpha: 0.3),
+      // 默认 20dp 的边缘热区偏窄（贴膜、手机壳会吃掉一部分），放到 32
+      drawerEdgeDragWidth: 32,
       body: SafeArea(
         bottom: false,
         // 四页用 PageView 铺开，左右滑就能换页。

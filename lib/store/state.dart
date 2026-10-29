@@ -50,6 +50,13 @@ extension StoreRead on Store {
   /// 底部 Tab 下标
   int get tabIndex => _tabIndex;
 
+  /// 首次使用引导是否还该自动出现（全新安装且没走完过）。
+  ///
+  /// 只在 [Store.boot] 里算一次，之后由 [Store.finishOnboarding] 关掉。
+  /// 注意它**不是**「引导还能不能打开」—— 侧拉栏里的「使用引导」任何时候都能
+  /// 打开，那个入口不看这个值。
+  bool get onboardingPending => _onboardingPending;
+
   // ---- 账本
 
   List<Ledger> get ledgers => _ledgers;

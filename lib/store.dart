@@ -69,6 +69,38 @@ class Store extends ChangeNotifier {
 
   static const _kTheme = 'ui.theme';
 
+  // ------------------------------------------------------------- 首次使用引导
+  //
+  // 「该不该自动弹」由两个条件**同时**成立决定：库是这次新建的（全新安装，见
+  // `Db.createdNow`）+ 没有 `onboarding.done` 标记。两个条件缺一不可：
+  // 只看标记 → 老用户升级上来也会被塞一份引导；只看新建 → 每次清空数据重建
+  // 库（`_wipe` 不重建库，这条其实不会发生，但语义上仍要守住）都会弹。
+  //
+  // 标记只在**走完或主动跳过**时写。中途杀进程不写 → 下次启动还会出现，
+  // 因为那说明他还没看完。
+
+  bool _onboardingPending = false;
+
+  static const _kOnboardingDone = 'onboarding.done';
+
+  /// 引导结束（走完或跳过）：立刻关掉「待弹出」，再落库。
+  ///
+  /// 先内存后落库，理由和 [setTheme] 一样 —— 落库是异步的，等它回来再改标志，
+  /// 中间那几帧界面已经可以再触发一次弹出了。
+  ///
+  /// 落库失败（磁盘满之类）时**不抛**：引导已经看过了，因为一次写失败让它下次
+  /// 再弹一遍，是把技术问题变成骚扰。
+  Future<void> finishOnboarding() async {
+    if (!_onboardingPending) return;
+    _onboardingPending = false;
+    notifyListeners();
+    try {
+      await Repo.setSetting(_kOnboardingDone, '1');
+    } catch (_) {
+      // 见上：不因为一次写失败打扰用户
+    }
+  }
+
   /// 「界面默认皮肤是『圣地 · 审判白』，可在『我的 → 主题』换回」这条一次性提示的落库标记。
   ///
   /// 与 [_kTheme] 分开一个键，是因为两者语义不同：`ui.theme` 记的是「用户选了哪套」，
@@ -418,6 +450,10 @@ class Store extends ChangeNotifier {
     _catsUpgradeJustDone = false;
     _themeDefaultNotice = false;
     await Db.open();
+    // 首次使用引导：判据见 [_onboardingPending] 的注释。必须在 `Db.open()` 之后读
+    // —— `createdNow` 正是在那次 open 的 `onCreate` 里被置位的。
+    _onboardingPending =
+        Db.createdNow && await Repo.getSetting(_kOnboardingDone) == null;
     // v3 → v4 升级后 `period_start` 是空的，先补齐。账单日默认 1 时回填结果
     // 等于月初，与升级前完全一致 —— 这一步不改任何查询口径。
     await Repo.backfillMissingPeriods();

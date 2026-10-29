@@ -397,6 +397,8 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.only(top: S.sm),
       child: PageHeader(
         title: s.currentLedger?.name ?? '账本',
+        // 侧拉栏的把手固定在最左，四页一致
+        leading: const MenuButton(),
         // 账本名右侧的切换箭头：它不是「更多动作」，是标题的一部分
         titleSuffix: s.ledgers.length > 1
             ? GestureDetector(

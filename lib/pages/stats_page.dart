@@ -132,7 +132,11 @@ class _StatsPageState extends State<StatsPage> {
             // 「本期 / 本月」原来独占内容区第一行（约 44dp），
             // 而页头右侧一直空着。它是**口径切换**，属于这一页的标题层，
             // 提到页头右侧之后，省掉一整行，区间条也上升了一层。
-            PageHeader(title: '图表', actions: _BasisSwitch()),
+            PageHeader(
+              title: '图表',
+              leading: const MenuButton(),
+              actions: _BasisSwitch(),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: S.lg),
               child: s.stats.byPeriod

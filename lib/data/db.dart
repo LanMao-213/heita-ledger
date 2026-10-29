@@ -78,6 +78,18 @@ class Db {
   /// 老用户打开会以为数据被改乱了。提示只出一次，见 [Store.boot]。
   static bool upgradedToTwoLevel = false;
 
+  /// 这次 `open()` 是不是**新建**了一份空库（= 全新安装）。
+  ///
+  /// 只服务一件事：首次使用引导该不该自动出现（见 `Store.onboardingPending`）。
+  ///
+  /// 为什么不用「setting 表里有没有 `onboarding.done`」单独判断：老用户升级上来
+  /// 也没有这个键，那样会把一份 5 步的引导糊在用了半年的账本上 —— 他要的是记账，
+  /// 不是重新认识这个 App。而「库是这一秒新建的」是**安装新鲜度**唯一可靠的信号，
+  /// 它由 sqlite 自己在 `onCreate` 里给，不依赖任何时间戳推断。
+  ///
+  /// 每次 [close] 归零：同一个进程里换库（测试）时不能残留上一次的判断。
+  static bool createdNow = false;
+
   /// 已经打开的连接，没有则为 null。
   ///
   /// 给 [WriteGateway] 用：库已经开着的时候不必再经过一次 `await`。
@@ -95,6 +107,7 @@ class Db {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: (db, version) async {
+        createdNow = true;
         await _createSchema(db);
         await _seed(db);
       },
@@ -148,6 +161,7 @@ class Db {
   static Future<void> close() async {
     await _db?.close();
     _db = null;
+    createdNow = false;
   }
 
   /// 从**旧版本备份**恢复之后调用，把恢复回来的扁平分类升成两级。

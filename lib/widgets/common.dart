@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/cycle.dart';
 import '../data/models.dart';
 import '../data/ui_flags.dart';
+import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 
@@ -564,6 +565,60 @@ void showToast(BuildContext context, String message) {
     );
 }
 
+/// 页头左侧那颗「打开侧拉栏」按钮。
+///
+/// 四个主页面的页头都挂它，位置固定在**最左**：侧拉栏是一个全局面，
+/// 它的把手在每一页都得在同一个地方，否则用户要重新找。
+///
+/// 点击区 36×36 而图形 22：视口（视觉边界）和热区（手指落点）从来不是一件事，
+/// 图标本身按 22 画才和标题的文字高度配得上。
+class MenuButton extends StatelessWidget {
+  const MenuButton({super.key, this.onTap});
+
+  /// 不传就打开当前 Scaffold 的抽屉（所有调用点都在 `HomeShell` 的 body 里）
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '菜单',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap ?? () => Scaffold.of(context).openDrawer(),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Center(child: LineIcon('menu', size: 22, color: C.ink)),
+        ),
+      ),
+    );
+  }
+}
+
+/// 设置列表里两行之间的分隔线。
+///
+/// 收掉的是 12 处逐字相同的 `Divider(height: 1, thickness: hairlineOf(context),
+/// color: C.line, indent: 52)` ——「我的」页一张卡里就抄了 11 遍。抄写的代价不是
+/// 打字，是**下一次有 9 处改成 56、3 处忘了**：线头参差不会有人报 bug，
+/// 只会让整页看起来「不太对」。
+///
+/// [indent] 默认 52 = 行左内边距 16 + 图标 20 + 图标与文字间距 12，
+/// 也就是线从**文字**左边缘起，不从图标起 —— 图标是行的一部分，不该被线切断。
+class SettingDivider extends StatelessWidget {
+  const SettingDivider({super.key, this.indent = 52});
+
+  final double indent;
+
+  @override
+  Widget build(BuildContext context) => Divider(
+    height: 1,
+    thickness: hairlineOf(context),
+    color: C.line,
+    indent: indent,
+  );
+}
+
 /// 四个主 tab 共用的页头。
 ///
 /// 改这一版之前，四页顶部是四种形态：明细是「账本名 + 筛选/搜索」、
@@ -572,6 +627,9 @@ void showToast(BuildContext context, String message) {
 ///
 /// 高度取 48 而不是 44：明细页右侧并排两个 `IconButton`，Material 的
 /// 最小点击区就是 48，压到 44 会裁掉触控范围。
+///
+/// 2026-10-29 起四页统一挂 [MenuButton] 当 `leading`：侧拉栏是全局入口，
+/// 把手位置固定在最左，用户不必每换一页重新找一次。
 class PageHeader extends StatelessWidget {
   const PageHeader({
     super.key,
