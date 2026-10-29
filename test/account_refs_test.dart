@@ -95,7 +95,7 @@ void main() {
             '${missing.join('、')}\n'
             '请加进 lib/data/repo/account.dart 的 kAccountRefPlan：'
             '历史流水 → repoint；「默认记到哪 / 从哪个账户挪的钱」→ detach；'
-            '账户自身的数据 → cascade；核对过不是账户引用 → unrelated。',
+            '核对过不是账户引用 → unrelated（账户没了也不用动它）。',
       );
     });
 
@@ -109,15 +109,18 @@ void main() {
       );
     });
 
-    test('四类处置都有名字，且当前生效的只有 repoint 与 detach', () {
-      // 四类是「登记时能选的全部答案」。今天用到两类，另两类是给将来加表的人
-      // 准备的位置 —— 没有名字，他只能把列顺手塞进 detach，那就又变成猜。
-      expect(AccountRefAction.values, hasLength(4));
+    test('三类处置：两种会发生的动作 + 一个诚实的出口', () {
+      // repoint / detach 各有实现；unrelated 是「核过了、不用动」的结论。
+      //
+      // **没有 `cascade`**：本库没有任何指向 account 的外键，那一类永远空着，
+      // 而它一旦被登记、`_detachAccountRefs` 里没有对应实现，清理会静默不发生
+      // —— 那比没有这个类别更危险。将来真需要，加类别时连实现和测试一起加。
+      expect(AccountRefAction.values, hasLength(3));
       expect(
         kAccountRefPlan.values.toSet(),
         {AccountRefAction.repoint, AccountRefAction.detach},
-        reason: '出现了 cascade / unrelated 的登记 —— 请确认这两类真的有对应的'
-            '清理代码（cascade 要有人删数据，unrelated 不用清）',
+        reason: '出现了 unrelated 的登记 —— 那是允许的（核过不用动），'
+            '但请顺手把这条测试的期望值改成实际生效的集合，让它继续有意义',
       );
     });
   });
