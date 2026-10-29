@@ -127,7 +127,34 @@ Future<int> _recomputePeriods({
   //   createDebt / repayDebt）全部走 `WriteGateway.run`：事务边界只有那一处，
   //   业务层拿不到 `Database`，所以「忘记开事务」在结构上不成立。
   //   其余写方法都是**单条 SQL**，本身就原子，不进网关。
+// ---------------------------------------------------------------------------
+// 转账的**数据层**校验
+//
+// 为什么不能只靠面板：`transfer_sheet.dart` 确实会拦「金额 ≤ 0」与「两端相同」，
+// 但那只是众多写入口中的一个。Excel 导入、恢复备份、以后可能加的「自动转账」
+// 都直接走 `Repo.insertTxn` —— 绕过面板就绕过了全部校验。而一笔坏转账的代价
+// 是双向的：它同时改两个账户的余额，事后体检只会说「余额与流水不一致」，
+// 没人能从这句话倒推出起因是「转出转入填成了同一个账户」。
+//
+// 只校验转账，不动支出/收入：后两类允许 0 与负数（退款冲正、导入的历史账单里
+// 都真实存在，见 `side_total_test`），把规则扩过去等于改掉既有口径。
+// ---------------------------------------------------------------------------
+
+void _validateTransfer(Txn t) {
+  if (t.type != TxnType.transfer) return;
+  if (t.accountId == null || t.toAccountId == null) {
+    throw const TxnValidationException('转账必须同时指定转出账户和转入账户');
+  }
+  if (t.accountId == t.toAccountId) {
+    throw const TxnValidationException('转出和转入不能是同一个账户');
+  }
+  if (t.amountCents <= 0) {
+    throw const TxnValidationException('转账金额必须大于 0');
+  }
+}
+
 Future<int> _repoInsertTxn(Txn t, {bool? liftToNext}) async {
+  _validateTransfer(t);
   final startDay = await _repoCycleStartDay();
   final liftable = await _liftableCategoryIds(await Db.open(), t.ledgerId);
   return WriteGateway.run(
@@ -168,6 +195,7 @@ Future<int> _repoImportBillRows({required List<Txn> txns}) async {
 }
 
 Future<void> _repoUpdateTxn(Txn old, Txn now, {bool? liftToNext}) async {
+  _validateTransfer(now);
   final startDay = await _repoCycleStartDay();
   final liftable = await _liftableCategoryIds(await Db.open(), now.ledgerId);
   return WriteGateway.run(

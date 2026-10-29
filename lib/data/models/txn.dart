@@ -210,6 +210,25 @@ class Txn {
   );
 }
 
+/// 写入前的字段校验失败。
+///
+/// 为什么要有独立的类型，而不是抛 `ArgumentError`：面板里「保存失败」是直接把
+/// 异常文本显示给用户的（`transfer_sheet.dart` 的 `catch` 会 `'$e'`），
+/// 而 `ArgumentError` 的 `toString()` 会长成
+/// 「Invalid argument(s): 转账必须同时指定…」—— 前面那一截是给开发者看的，
+/// 不该出现在用户眼前。所以这里让 `toString()` **只返回消息本身**。
+///
+/// 与之配套的约定：消息取「用户能据此行动」的说法（「两端不能相同」而不是
+/// 「accountId == toAccountId」）。
+class TxnValidationException implements Exception {
+  const TxnValidationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// 某一侧（支出 / 收入）的合计，口径是**交叉归集**：
 /// 支出里记的负数算进收入，收入里记的负数算进支出。
 ///

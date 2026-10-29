@@ -181,4 +181,120 @@ void main() {
       reason: '金额为 0 不该落库',
     );
   });
+
+  // ---------------------------------------------------------------------
+  // 数据层校验：面板是**入口之一**，不是唯一入口
+  //
+  // 上面两条测的是面板拦得住。但 `Repo.insertTxn` 还有别的调用者
+  // （导入、恢复、将来的自动转账），而一笔「转出=转入」的流水会同时改坏
+  // 两个账户的余额，事后体检只会说「余额与流水不一致」。
+  // 所以规则必须落在写入路径上，这一组用例就是钉它。
+  // ---------------------------------------------------------------------
+  group('数据层拒绝坏转账（绕过面板）', () {
+    Future<(int, int)> twoIds() async {
+      final (a, b) = await _twoAccounts();
+      return (a.id, b.id);
+    }
+
+    Txn bad({
+      required int ledger,
+      int? from,
+      int? to,
+      int cents = 100,
+    }) => Txn(
+      id: 0,
+      ledgerId: ledger,
+      type: TxnType.transfer,
+      amountCents: cents,
+      date: Fmt.today(),
+      accountId: from,
+      toAccountId: to,
+    );
+
+    test('两端相同 → 抛 TxnValidationException，且没有落库', () async {
+      await Store.i.boot();
+      final (a, _) = await twoIds();
+      await expectLater(
+        Repo.insertTxn(bad(ledger: Store.i.ledgerId, from: a, to: a)),
+        throwsA(isA<TxnValidationException>()),
+      );
+      final all = await Repo.rangeListTxns(
+        ledgerId: Store.i.ledgerId,
+        from: '2000-01-01',
+        to: '2099-12-31',
+      );
+      expect(
+        all.where((t) => t.type == TxnType.transfer),
+        isEmpty,
+        reason: '校验没过就不能留下半笔转账',
+      );
+    });
+
+    test('缺转入账户 / 缺转出账户 → 抛', () async {
+      await Store.i.boot();
+      final (a, _) = await twoIds();
+      await expectLater(
+        Repo.insertTxn(bad(ledger: Store.i.ledgerId, from: a)),
+        throwsA(isA<TxnValidationException>()),
+      );
+      await expectLater(
+        Repo.insertTxn(bad(ledger: Store.i.ledgerId, to: a)),
+        throwsA(isA<TxnValidationException>()),
+      );
+    });
+
+    test('金额为 0 或负数 → 抛', () async {
+      await Store.i.boot();
+      final (a, b) = await twoIds();
+      for (final cents in <int>[0, -1]) {
+        await expectLater(
+          Repo.insertTxn(
+            bad(ledger: Store.i.ledgerId, from: a, to: b, cents: cents),
+          ),
+          throwsA(isA<TxnValidationException>()),
+        );
+      }
+    });
+
+    test('异常消息是用户能照着做的一句话（不带 ArgumentError 前缀）', () async {
+      await Store.i.boot();
+      final (a, _) = await twoIds();
+      try {
+        await Repo.insertTxn(bad(ledger: Store.i.ledgerId, from: a, to: a));
+        fail('应当抛异常');
+      } on TxnValidationException catch (e) {
+        final text = '$e';
+        expect(text, '转出和转入不能是同一个账户');
+        expect(
+          text,
+          isNot(contains('Invalid argument')),
+          reason: '面板会把异常文本直接显示给用户，不能带开发者前缀',
+        );
+      }
+    });
+
+    test('规则没有扩散：支出金额 0 仍可写入', () async {
+      await Store.i.boot();
+      final s = Store.i;
+      final (a, _) = await twoIds();
+      // 退款冲正、导入的历史账单里 0 元和负数都真实存在，
+      // 把转账的规则扩到支出上等于改掉既有口径。
+      await Repo.insertTxn(
+        Txn(
+          id: 0,
+          ledgerId: s.ledgerId,
+          type: TxnType.expense,
+          amountCents: 0,
+          date: Fmt.today(),
+          accountId: a,
+        ),
+      );
+      final all = await Repo.rangeListTxns(
+        ledgerId: s.ledgerId,
+        from: '2000-01-01',
+        to: '2099-12-31',
+      );
+      expect(all.length, 1, reason: '0 元支出不该被转账规则误伤');
+    });
+  });
 }
