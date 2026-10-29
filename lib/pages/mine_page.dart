@@ -625,6 +625,22 @@ class MinePage extends StatelessWidget {
                         ),
                       MenuTile(
                         action: MenuAction(
+                          // 转账是账户之间的动作，入口就放在账户管理里。
+                          // 记一笔面板的四档（支出/收入/借出/借入）刻意不加
+                          // 第五档：那四档都在回答「这笔算收入还是支出」，
+                          // 而转账两者都不是，统计里不该出现。
+                          //
+                          // popFirst 用默认的 true：转完账 `Store.addTxn` 会把
+                          // 视角搬到明细页，账户弹层留在上面就成了「盖在另一页
+                          // 上的旧弹层」。
+                          icon: 'coin',
+                          title: '转账',
+                          subtitle: '账户之间挪钱，不计入收支',
+                          onTap: () => showTransferSheet(context),
+                        ),
+                      ),
+                      MenuTile(
+                        action: MenuAction(
                           icon: 'plus',
                           title: '新增账户',
                           popFirst: false,
