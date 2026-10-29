@@ -269,8 +269,25 @@ extension StoreActions on Store {
     await afterGoalChange();
   }
 
-  Future<void> addFunds(int goalId, int deltaCents) async {
-    await Repo.addFunds(goalId, deltaCents);
+  /// 存钱 / 取钱（金额可为负）→ 刷新目标投影与流水。
+  ///
+  /// [date] 默认今天、[accountId] 可空（用户只想记一句「我存了 500」时不必
+  /// 牵扯账户余额）、[note] 一句话备注。三者都会落到 `goal_flow` 那一行上 ——
+  /// 「预计何时达成」全靠这张表算速率，漏传日期就等于把速率算错。
+  Future<void> addFunds(
+    int goalId,
+    int deltaCents, {
+    String? date,
+    int? accountId,
+    String note = '',
+  }) async {
+    await Repo.addFunds(
+      goalId,
+      deltaCents,
+      date: date,
+      accountId: accountId,
+      note: note,
+    );
     await afterGoalChange();
   }
 

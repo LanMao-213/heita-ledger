@@ -552,6 +552,11 @@ class _Goals extends StatelessWidget {
       // （分类预算那张卡没这个问题，因为它是直接挂在 ListView 下的。）
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 「本月还没存」放在第一张目标卡**之前**：它是这一屏最该被看到的
+        // 一句话（提醒只在这个月还没存过时出现），但刻意不做成卡片 ——
+        // 见 [_MonthlyDepositHint]。
+        if (s.goalsNeedMonthlyDeposit.isNotEmpty)
+          _MonthlyDepositHint(goals: s.goalsNeedMonthlyDeposit),
         if (s.goals.isEmpty)
           const SectionCard(
             padding: EdgeInsets.symmetric(horizontal: S.lg, vertical: S.xxl),
@@ -590,6 +595,14 @@ class _Goals extends StatelessWidget {
     final targetCtl = TextEditingController(
       text: goal == null ? '' : Fmt.plain(goal.targetCents, decimals: 0),
     );
+    // 定投额是「用户声明的计划」，不是已发生的事实 —— 它只决定卡片上那句
+    // 「预计何时达成」的参考值，真正的存入记录在 `goal_flow` 里。
+    // 没设过就留空（而不是显示 `0`）：空框才读得懂「这一项可以不填」。
+    final monthlyCtl = TextEditingController(
+      text: goal == null || goal.monthlyCents == 0
+          ? ''
+          : Fmt.plain(goal.monthlyCents, decimals: 0),
+    );
     var icon = goal?.icon ?? 'flag';
 
     const iconChoices = [
@@ -620,6 +633,15 @@ class _Goals extends StatelessWidget {
               controller: targetCtl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(hintText: '目标金额（元）'),
+            ),
+            const SizedBox(height: S.md),
+            TextField(
+              controller: monthlyCtl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                hintText: '每月定投（元，可空）',
+                helperText: '存过一笔之后，卡片上会显示预计达成月份',
+              ),
             ),
             const SizedBox(height: S.lg),
             Wrap(
@@ -659,6 +681,8 @@ class _Goals extends StatelessWidget {
     if (ok != true) return;
     final name = nameCtl.text.trim();
     final target = Fmt.parseCents(targetCtl.text);
+    // 空串 → 0（= 不设定投），不是「非法输入」：这一项本来就是可空的
+    final monthly = Fmt.parseCents(monthlyCtl.text);
     if (name.isEmpty || target <= 0) {
       if (context.mounted) showToast(context, '名称和金额都要填');
       return;
@@ -671,11 +695,72 @@ class _Goals extends StatelessWidget {
               name: name,
               icon: icon,
               targetCents: target,
+              monthlyCents: monthly,
               savedCents: 0,
             )
-          : goal.copyWith(name: name, icon: icon, targetCents: target),
+          : goal.copyWith(
+              name: name,
+              icon: icon,
+              targetCents: target,
+              monthlyCents: monthly,
+            ),
     );
     if (context.mounted) showToast(context, '已保存');
+  }
+}
+
+/// 「本月还没存：A、B」的一行轻提示。
+///
+/// 刻意**不做成一张卡**：它是一句提醒，不是一份数据。做成卡片会和下面那几张
+/// 目标卡抢视觉层级，而用户真正要看的是卡的进度条。样式全部复用本页已有的
+/// caption + 文本按钮，不引入新组件。
+///
+/// 「还没存」的口径在 `Store.goalsNeedMonthlyDeposit` 里（只算存入流水，
+/// 取出不抵消），这里只负责把它说成人话。
+class _MonthlyDepositHint extends StatelessWidget {
+  const _MonthlyDepositHint({required this.goals});
+
+  /// 设了定投、但这个自然月还没存过的目标（至少一个，否则不显示这一行）
+  final List<SavingGoal> goals;
+
+  @override
+  Widget build(BuildContext context) {
+    final names = [for (final g in goals) g.name];
+    // 超过两个就收成「等 N 个」：一行只放得下两句短名，再多就会把右边的
+    // 「去存」按钮挤掉 —— 而这颗按钮是这一行存在的理由。
+    final label = names.length <= 2
+        ? names.join('、')
+        : '${names.take(2).join('、')} 等 ${names.length} 个';
+
+    return Padding(
+      // 右边内距比左边小：按钮自己带一圈内距，都按 S.lg 会让它离屏边太远
+      padding: const EdgeInsets.fromLTRB(S.lg, S.xs, S.sm, S.xs),
+      child: Row(
+        children: [
+          LineIcon('info', size: 15, color: C.ink3),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '本月还没存：$label',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: T.caption.copyWith(color: C.ink2),
+            ),
+          ),
+          TextButton(
+            // 存的是**第一个**目标的钱：多个目标都欠着时，用户下一步总要从
+            // 某一个开始；给一串按钮反而让他先做一次选择。
+            onPressed: () => _addFunds(context, goals.first),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: S.sm),
+              minimumSize: const Size(0, 30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text('去存', style: T.body2),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -788,9 +873,7 @@ class _GoalCard extends StatelessWidget {
                 // Expanded + 右对齐，短文本时跟原来的 Spacer 视觉一致。
                 Expanded(
                   child: Text(
-                    goal.dueMonth != null
-                        ? '目标 ${Fmt.monthLabel(goal.dueMonth!)}'
-                        : '还差 ${Fmt.money(goal.remainCents)}',
+                    _goalSummary(goal),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
@@ -803,14 +886,6 @@ class _GoalCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _addFunds(BuildContext context, SavingGoal g) async {
-    final s = Store.i;
-    final v = await _askAmount(context, title: '存入「${g.name}」', initial: 0);
-    if (v == null || v == 0) return;
-    await s.addFunds(g.id, v);
-    if (context.mounted) showToast(context, '已存入 ${Fmt.money(v)}');
   }
 
   Future<void> _menu(BuildContext context) async {
@@ -850,6 +925,44 @@ class _GoalCard extends StatelessWidget {
 }
 
 // --------------------------------------------------------------------- 工具
+
+/// 目标卡右下角那句「目标 / 预计 / 还差」的组合式文案。
+///
+/// 三段都是**可选信息**，谁有就显示谁，用「 · 」连起来：
+/// - `goal.dueMonth`：用户自己定的目标月份，是承诺；
+/// - 预计达成：由真实流水外推出来的（`Store.i.goalEta`），是事实；
+/// - 还差多少：两者都没有时的兜底，也是唯一永远成立的数字。
+///
+/// ★ `noFlow` / `noRate` / `unreachable` 一律**不加任何文案**。
+///   说「预计 2150 年达成」或者「算不出来」都不如直接给金额 —— 宁可少一句，
+///   也不要给一句像玩笑或像 bug 的话。
+///
+/// 返回值必须能塞进一行（调用方是 `maxLines: 1` + ellipsis）：这句话出现过
+/// 溢出，`plan_page.dart` 里 `Expanded` 那一段注释解释了原因。
+String _goalSummary(SavingGoal goal) {
+  if (goal.done) return '已达成';
+  final parts = <String>[];
+  final due = goal.dueMonth;
+  if (due != null && due.isNotEmpty) parts.add('目标 ${Fmt.monthLabel(due)}');
+  final eta = Store.i.goalEta(goal);
+  // 只有 estimated 才说「预计 X」：noFlow / noRate / unreachable 的 etaMonth
+  // 本来就是 null，这里再挡一次是为了让「什么时候该沉默」写在一个地方。
+  if (eta.hasEta && eta.etaMonth != null) {
+    parts.add('预计 ${Fmt.monthLabel(eta.etaMonth!)}');
+  }
+  if (parts.isEmpty) parts.add('还差 ${Fmt.money(goal.remainCents)}');
+  return parts.join(' · ');
+}
+
+/// 给某个目标存一笔钱。目标卡上的「存一笔」和本月提醒的「去存」共用这一条
+/// 路径 —— 两处各写一份金额弹窗，迟早出现「从这里存能填负数、从那里不能」。
+Future<void> _addFunds(BuildContext context, SavingGoal g) async {
+  final s = Store.i;
+  final v = await _askAmount(context, title: '存入「${g.name}」', initial: 0);
+  if (v == null || v == 0) return;
+  await s.addFunds(g.id, v);
+  if (context.mounted) showToast(context, '已存入 ${Fmt.money(v)}');
+}
 
 /// 金额输入弹窗。返回分；返回 null 表示取消。
 Future<int?> _askAmount(
