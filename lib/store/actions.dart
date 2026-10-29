@@ -189,6 +189,24 @@ extension StoreActions on Store {
     await afterAccountChange();
   }
 
+  /// 设置 / 取消「默认支出账户」。
+  ///
+  /// 取消（[id] 为 null）写的是**空串**而不是删掉这一行：`setting` 表只有
+  /// k/v 两列，读侧本来就会把「键不存在」和「值为空」折成同一个 null，
+  /// 多写一条 DELETE 只是多一条会出错的语句。
+  ///
+  /// ★ 这里**不校验**传进来的 id 还在不在：校验放在读取处（记账面板初始化时
+  /// 回落到第一个账户）而不是写入处，是因为账户可能在设置之后才被删 ——
+  /// 写入时校验得再严，也拦不住「先设默认、再删账户」这条正常操作。
+  Future<void> setDefaultExpenseAccount(int? id) async {
+    await Repo.setSetting(
+      Store._kDefaultExpenseAccount,
+      id == null ? '' : '$id',
+    );
+    _defaultExpenseAccountId = id;
+    notifyListeners();
+  }
+
   /// 新建账本并切过去；返回补记的周期账单条数（0 = 没有补记）
   Future<int> addLedger(String name) async {
     final id = await Repo.insertLedger(Ledger(id: 0, name: name));

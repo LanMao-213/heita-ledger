@@ -598,18 +598,27 @@ class MinePage extends StatelessWidget {
                             // 行本身也能点开菜单：目标小、又在底部弹层里，
                             // 只靠右边那颗 ⋯ 容易点空
                             onTap: () => _accountMenu(context, a),
-                            trailing: IconButton(
-                              onPressed: () => _accountMenu(context, a),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints.tightFor(
-                                width: 32,
-                                height: 32,
-                              ),
-                              icon: LineIcon(
-                                'more', semanticLabel: '更多',
-                                size: 20,
-                                color: C.ink3,
-                              ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // 「默认」徽章：记账面板会预选它，这件事在账户
+                                // 列表上得看得见，否则用户设完就再也找不到证据。
+                                if (a.id == Store.i.defaultExpenseAccountId)
+                                  const _DefaultBadge(),
+                                IconButton(
+                                  onPressed: () => _accountMenu(context, a),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 32,
+                                    height: 32,
+                                  ),
+                                  icon: LineIcon(
+                                    'more', semanticLabel: '更多',
+                                    size: 20,
+                                    color: C.ink3,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -637,6 +646,8 @@ class MinePage extends StatelessWidget {
   /// 原来那颗 ⋯ 点下去直接跳「编辑账户」，名字叫「更多」、行为却是编辑 ——
   /// 想删账户的人在弹层里翻不到入口，只能以为它不能删。
   static Future<void> _accountMenu(BuildContext context, Account a) async {
+    final s = Store.i;
+    final isDefault = s.defaultExpenseAccountId == a.id;
     await showMenuSheet<void>(
       context: context,
       title: a.name,
@@ -648,6 +659,18 @@ class MinePage extends StatelessWidget {
               title: '编辑资料',
               subtitle: '名称 · 类型 · 余额校准',
               onTap: () => _accountSheet(context, a),
+            ),
+            // 默认支出账户：设 / 取消都在这一个位置上，靠标题区分 ——
+            // 分成两条（一条「设为默认」一条「取消默认」）会让禁用中的那条
+            // 也留在菜单里，用户得先判断哪条才有效。
+            MenuAction(
+              icon: 'check',
+              title: isDefault ? '取消默认支出账户' : '设为默认支出账户',
+              subtitle: isDefault
+                  ? '记账面板当前预选这个账户'
+                  : '记账面板新建一笔时预选它',
+              checked: isDefault,
+              onTap: () => s.setDefaultExpenseAccount(isDefault ? null : a.id),
             ),
             MenuAction(
               icon: 'trash',
@@ -923,6 +946,28 @@ class MinePage extends StatelessWidget {
     if (added > 0 && context.mounted) {
       showToast(context, '已补记 $added 笔周期账单');
     }
+  }
+}
+
+/// 「默认」小徽章：标在记账面板会预选的那个支出账户上。
+///
+/// 用 `bg2` 底 + `ink3` 字，不是实心 `ink` 底：它是一条**状态说明**，
+/// 不是「已达成」那种结论。做得和余额一样抢眼，扫列表时反而读不出重点。
+class _DefaultBadge extends StatelessWidget {
+  const _DefaultBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      // 右边留 2：紧挨着那颗 ⋯，不留缝隙会看成同一个控件
+      margin: const EdgeInsets.only(right: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: C.bg2,
+        borderRadius: BorderRadius.circular(R.xs),
+      ),
+      child: Text('默认', style: T.overline.copyWith(color: C.ink3)),
+    );
   }
 }
 

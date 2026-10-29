@@ -53,6 +53,20 @@ class Store extends ChangeNotifier {
   /// 落库」。出厂默认 [kDefaultTheme]（圣地 · 审判白），老库没有这个键就用它。
   HeitaThemeId _themeId = kDefaultTheme;
 
+  // ------------------------------------------------------------- 默认支出账户
+  //
+  // 记账面板新建一笔时用哪个账户做初值（「我的 → 账户管理 → 设为默认支出」）。
+  //
+  // 为什么不存账户名：账户可以改名，存名字会在改名那一刻变成死引用。存 id 之后
+  // 「账户被删」是唯一一种会让它失效的情况，而那一档在读取处回落即可
+  // （见 `record_sheet.dart` 的 `_initialAccountId`）—— 比在删除流程里加一条
+  // 「顺手清理设置」的联动少一处会漏的地方。
+
+  /// 默认支出账户 id；null = 没设过（或存的不是数字）。
+  int? _defaultExpenseAccountId;
+
+  static const _kDefaultExpenseAccount = 'default_expense_account';
+
   static const _kTheme = 'ui.theme';
 
   /// 「界面默认皮肤是『圣地 · 审判白』，可在『我的 → 主题』换回」这条一次性提示的落库标记。
@@ -412,6 +426,11 @@ class Store extends ChangeNotifier {
     // 触感开关：只有存过 '0' 才算关。老库没有这个键 → 保持默认开
     _hapticsEnabled = (await Repo.getSetting(_kHaptics)) != '0';
     Haptics.enabled = _hapticsEnabled;
+    // 默认支出账户：没这个键（老库）或存了非法值都回落 null = 「没设过」，
+    // 此时记账面板按原行为落到第一个账户。
+    _defaultExpenseAccountId = int.tryParse(
+      await Repo.getSetting(_kDefaultExpenseAccount) ?? '',
+    );
     // 主题：读不到（老库）或读到无效值都回落到出厂默认。
     //
     // 读到就立刻切（会通知全树重建），必须在这里切而不是等 boot 结束：

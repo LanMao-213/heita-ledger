@@ -64,6 +64,12 @@ extension StoreRead on Store {
   /// 计入总资产的账户余额之和（不含「不计入总资产」的账户）
   int get netWorthCents => _netWorthCents;
 
+  /// 默认支出账户 id。
+  ///
+  /// null 有两种含义且不区分：从没设过、或者设过的账户被删了 —— 两者的
+  /// 处理完全一样（记账面板回落到第一个账户），所以不必再存一个「是否失效」标志。
+  int? get defaultExpenseAccountId => _defaultExpenseAccountId;
+
   // ---- 分类
 
   /// 全部支出分类（含子分类，含已归档）

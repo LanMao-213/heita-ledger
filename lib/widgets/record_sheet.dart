@@ -152,8 +152,8 @@ class _RecordSheetState extends State<RecordSheet> {
         ? _RecordMode.income
         : _RecordMode.expense;
     _categoryId = e?.categoryId;
-    _accountId =
-        e?.accountId ?? (s.accounts.isEmpty ? null : s.accounts.first.id);
+    // 编辑时听原记录的，新建时听「默认支出账户」——见 [_initialAccountId]
+    _accountId = e?.accountId ?? _initialAccountId();
     _date = e?.date ?? Fmt.today();
     _note = TextEditingController(text: e?.note ?? '');
     if (e != null) {
@@ -173,6 +173,25 @@ class _RecordSheetState extends State<RecordSheet> {
     if (e != null && e.periodStart != null) {
       _liftOverride = e.periodStart != periodStartOf(e.date, s.cycleStartDay);
     }
+  }
+
+  /// 新建一笔时的默认账户（编辑态不走这里，编辑听原记录的）。
+  ///
+  /// 顺序：**用户设的默认支出账户 → 列表第一个**。
+  ///
+  /// 为什么拿之前要先验证：默认账户存的是 id 快照，账户被删掉之后它就是一个
+  /// 指不到任何账户的死引用。直接拿来用，新记录会挂在不存在账户上 ——
+  /// 明细里那笔解析不出账户名，账户余额也不会变，看起来像「记账丢了」。
+  /// 停用的账户同理（`Store.accounts` 本来就不含停用的，这里再挡一次是
+  /// 因为将来若把它改成含停用，这条兜底不用跟着改）。
+  int? _initialAccountId() {
+    final s = Store.i;
+    final preferred = s.defaultExpenseAccountId;
+    if (preferred != null) {
+      final hit = s.accountOf(preferred);
+      if (hit != null && !hit.archived) return hit.id;
+    }
+    return s.accounts.isEmpty ? null : s.accounts.first.id;
   }
 
   List<Category> get _cats =>
