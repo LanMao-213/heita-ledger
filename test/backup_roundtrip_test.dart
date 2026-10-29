@@ -9,8 +9,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ledger/data/backup/payload.dart';
-import 'package:ledger/data/backup/sealed_file.dart';
+// backup_service 会 re-export payload / sealed_file / snapshot，所以只 import 它
 import 'package:ledger/data/backup_service.dart';
 import 'package:ledger/data/db.dart';
 import 'package:ledger/data/models.dart';
