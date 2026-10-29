@@ -539,6 +539,17 @@ class Db {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_goal_flow_goal ON goal_flow (goal_id, date)',
     );
+    // 先探测 `saving_goal` 在不在 —— **极简老库可能根本没有这张表**。
+    //
+    // 迁移测试（以及「从只含单表的损坏库里救数据」这种真实现场）会造出没有
+    // saving_goal 的库：v3/v4 时代的测试夹具只建它关心的那几张表。此时
+    // `PRAGMA table_info(saving_goal)` 返回空表，若直接 `ALTER TABLE`，整条
+    // 升级会抛 `no such table: saving_goal` —— 用户看到的是启动页打不开，
+    // 而他的数据其实完好。这与 `_addUniqueIndexes` 里探 `txn` 表是同一条规矩。
+    final hasTable = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'saving_goal'",
+    );
+    if (hasTable.isEmpty) return;
     final cols = await db.rawQuery('PRAGMA table_info(saving_goal)');
     final hasMonthly = cols.any((c) => c['name'] == 'monthly_cents');
     if (!hasMonthly) {
