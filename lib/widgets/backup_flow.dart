@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/backup_service.dart';
 import '../design/tokens.dart';
+import 'busy_dialog.dart';
 import 'common.dart';
 import 'menu.dart';
 import 'password_sheet.dart';
@@ -48,12 +49,19 @@ Future<void> runPlainExportFlow(BuildContext context) async {
 /// 加密导出：设口令 → 写 `.heita` → 分享。
 ///
 /// 口令**不进日志、不留存**，用完即弃（见 `password_sheet.dart` 的红线）。
+///
+/// 加密这一步在 20k 笔的库上要 1.8 秒（低端机 3~5 秒），所以必须包一层阻塞
+/// 进度 —— 界面在这段时间里一动不动的话，用户会再点一次或以为崩了。
 Future<void> runSealedExportFlow(BuildContext context) async {
   final password = await showExportPasswordSheet(context);
   if (password == null || !context.mounted) return;
 
   try {
-    final path = await BackupService.writeSealedToTempFile(password: password);
+    final path = await runWithBusy(
+      context,
+      message: '正在加密备份…（约几秒，请不要退出）',
+      task: () => BackupService.writeSealedToTempFile(password: password),
+    );
     if (!context.mounted) return;
     await BackupService.share(path);
   } on BackupException catch (e) {
@@ -86,7 +94,17 @@ pickBackupFlow(BuildContext context) async {
       if (password == null || !context.mounted) return null;
     }
     try {
-      final payload = await BackupService.decodeAny(text, password: password);
+      if (!context.mounted) return null;
+      // 解密要派一次密钥（210000 次 PBKDF2，约 1.2s），低端机更久。
+      // 明文那一路不解密，就不必弹窗 —— 只有 sealed 才包。
+      final payload = sealed
+          ? await runWithBusy(
+              context,
+              message: '正在解密…（约几秒，请不要退出）',
+              task: () =>
+                  BackupService.decodeAny(text, password: password),
+            )
+          : await BackupService.decodeAny(text);
       if (!context.mounted) return null;
       return (payload: payload, summary: BackupService.summarize(payload), name: name);
     } on BackupSealedException catch (e) {

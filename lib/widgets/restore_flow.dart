@@ -4,6 +4,7 @@ import '../data/backup_compat.dart';
 import '../data/backup_service.dart';
 import '../design/tokens.dart';
 import '../store.dart';
+import 'busy_dialog.dart';
 import 'common.dart';
 import 'menu.dart';
 
@@ -62,13 +63,27 @@ Future<bool> runRestoreFlow(
     return false;
   }
 
+  // 留快照这一步也要好几帧（读全表 + 写盘），回来时 context 可能已经不在了
+  if (!context.mounted) return false;
+
   // 3. 写入 + 重载
+  //
+  // 这一步是整个应用里最重的一次写：整库替换 + 跑迁移 + 重载全部投影。
+  // 20k 笔的库要几秒，期间界面必须**看得出在跑** —— 一个几秒的冻结界面，
+  // 用户会以为崩了然后把 App 划掉（而此时事务正在写）。
   try {
     // 老备份可能少几个字段、或带着已经废弃的列：兼容动作记在这里，
     // 恢复完一并告诉用户 —— 悄悄丢一列比明说「忽略了 2 个旧字段」危险得多。
     final compat = ConformReport();
-    final counts = await BackupService.restore(payload, report: compat);
-    await Store.i.reloadAfterRestore();
+    final counts = await runWithBusy(
+      context,
+      message: '正在恢复…（约几秒，请不要退出）',
+      task: () async {
+        final n = await BackupService.restore(payload, report: compat);
+        await Store.i.reloadAfterRestore();
+        return n;
+      },
+    );
     if (!context.mounted) return true;
     await showAppNotice(
       context,
