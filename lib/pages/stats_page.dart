@@ -41,13 +41,13 @@ class _StatsPageState extends State<StatsPage> {
   ///   筛选侧用 `_catScope` 连带子分类一起命中 —— 点「餐饮」能看到正餐/外卖/聚餐。
   /// - 带上统计页当前的区间。统计页可以是「按月」也可以是「按本期」，
   ///   不带上就会出现「图表显示 3,874，点进去明细却是另一个数」。
-  Future<void> _openCategory(CatStat stat) async {
+  Future<void> _openCategory(int categoryId) async {
     final s = Store.i;
     s.switchTab(0);
     await s.applyFilter(
       TxnFilter(
         type: _type,
-        categoryId: stat.categoryId,
+        categoryId: categoryId,
         dateFrom: s.stats.from.isEmpty ? null : s.stats.from,
         dateTo: s.stats.to.isEmpty ? null : s.stats.to,
       ),
@@ -84,9 +84,44 @@ class _StatsPageState extends State<StatsPage> {
       ));
     }
 
-    // 「预算 vs 实际」只列**设过额度**的分类：没额度的没有对比对象，
-    // 塞进来只会让轨道恒满、把真正在追的那几个挤下去。
-    final budgeted = s.budgetStats.where((b) => b.budgetCents > 0).toList();
+    // 「预算 vs 实际」只认**设过额度**的分类：没额度的没有对比对象，
+    // 塞进来只会让轨道恒满。这里按 categoryId 索引，供下面那张合并后的
+    // 「各分类消费统计」同一行内展示预算进度。
+    final budgetOf = <int, BudgetStat>{
+      for (final b in s.budgetStats)
+        if (b.budgetCents > 0) b.categoryId: b,
+    };
+
+    // 合并后的行：**按金额降序**（已拍板）。笔数退为次要信息，占比与预算进度
+    // 同列展示。三处口径必须一起读：
+    // - 金额/占比：本页区间内的分类聚合（`stats`，已按金额降序）；
+    // - 预算：`budgetStats`（按一级分类聚合，含全部子分类的支出）；
+    // - 笔数：`stats` 里的 `count`。
+    //
+    // 设了预算、但这段区间里一分没花的分类也要出现，否则原来「预算 vs 实际」
+    // 里那条 0% 的信息会凭空消失。
+    final catRows = <_CatRowData>[
+      for (final st in stats)
+        _CatRowData(
+          categoryId: st.categoryId,
+          name: st.name,
+          icon: st.icon,
+          cents: st.totalCents,
+          count: st.count,
+          budget: budgetOf[st.categoryId],
+        ),
+      for (final b in s.budgetStats)
+        if (b.budgetCents > 0 && !stats.any((e) => e.categoryId == b.categoryId))
+          _CatRowData(
+            categoryId: b.categoryId,
+            name: b.name,
+            icon: b.icon,
+            // 这一段区间里确实没有支出 —— 不是「没查到」，是真的 0
+            cents: 0,
+            count: 0,
+            budget: b,
+          ),
+    ]..sort((a, b) => b.cents.compareTo(a.cents));
 
     return AnimatedBuilder(
       animation: s,
@@ -227,49 +262,29 @@ class _StatsPageState extends State<StatsPage> {
                 SectionCard(child: _DailyTrend(onDayTap: _openDay)),
               ],
 
-              // 「分类排行」原来按金额再排一遍，与上面图例是同一份数据换
-              // 一种画法，读起来是「我已经知道了」。换成**按笔数**：
-              // 具体金额看上面，这里回答「我总在哪随手花钱」。
-              if (stats.length > 1) ...[
-                const SectionTitle('记得最多'),
+              // ★ 1.5.2：原来这里是两张卡 —— 「记得最多」（按笔数）+ 「预算 vs
+              // 实际」（按金额）。同一批分类换两种画法各占一块，读起来是
+              // 「我已经知道了」。合并成一张**按金额降序**的表（口径已拍板），
+              // 笔数降为次要信息，占比与预算进度同列展示。
+              if (catRows.isNotEmpty) ...[
+                SectionTitle(_type.isExpense ? '各分类消费统计' : '各分类收入统计'),
                 SectionCard(
                   padding: const EdgeInsets.symmetric(vertical: S.sm),
                   child: Column(
                     children: [
-                      for (final st in ([...stats]
-                            ..sort((a, b) => b.count.compareTo(a.count)))
-                          .take(3))
-                        _FreqRow(
+                      for (final r in catRows)
+                        _CatStatRow(
                           // 稳定 key：测试要点「某个分类」这一行，
                           // 靠文本找会撞上图例里同名的分类
-                          key: ValueKey('freq-${st.categoryId}'),
-                          stat: st,
-                          onTap: () => _openCategory(st),
+                          key: ValueKey('freq-${r.categoryId}'),
+                          row: r,
+                          totalCents: total,
+                          onTap: () => _openCategory(r.categoryId),
                         ),
                     ],
                   ),
                 ),
               ],
-            ],
-
-            // 预算 vs 实际：与「计划页」分工明确 ——
-            // 计划页管**改额度**（点一行就能改），这里管**看差距**（一眼比完）。
-            // 没设过任何分类预算就整块不出现，不留空卡。
-            if (budgeted.isNotEmpty) ...[
-              const SectionTitle('预算 vs 实际'),
-              SectionCard(
-                padding: const EdgeInsets.symmetric(vertical: S.sm),
-                child: BudgetCompareBars(
-                  rows: [
-                    for (final b in budgeted)
-                      (
-                        name: b.name,
-                        spentCents: b.spentCents,
-                        budgetCents: b.budgetCents,
-                      ),
-                  ],
-                ),
-              ),
             ],
 
             // 下面两块和「支出/收入」切换无关，放在最后
@@ -339,42 +354,134 @@ class _BasisSwitch extends StatelessWidget {
   }
 }
 
-/// 「记得最多」的一行：图标 + 名字 + 笔数 + 金额。
+/// 「各分类消费统计」的一行数据。
 ///
-/// 点一下同样是「明细页只看这个分类」—— 和原排行卡保持同一个手感，
-/// 换了维度不等于丢了入口。
-class _FreqRow extends StatelessWidget {
-  const _FreqRow({super.key, required this.stat, required this.onTap});
+/// 为什么不直接拼一个 record：这一行要同时承载**三套口径**（分类聚合的金额/笔数、
+/// 预算表的额度/已用、以及占比要用的区间合计），用没有名字的 positional record
+/// 传进去，读代码时得回头数第几个字段是什么。给字段起名字更便宜。
+class _CatRowData {
+  const _CatRowData({
+    required this.categoryId,
+    required this.name,
+    required this.icon,
+    required this.cents,
+    required this.count,
+    this.budget,
+  });
 
-  final CatStat stat;
+  final int categoryId;
+  final String name;
+  final String icon;
+
+  /// 本区间的金额（分）。可能是 0（只有预算、这段区间没花）
+  final int cents;
+
+  /// 本区间的笔数
+  final int count;
+
+  /// 该分类这一期的预算（没设就是 null）
+  final BudgetStat? budget;
+}
+
+/// 「各分类消费统计」的一行：图标 + 名字 + 笔数 + 金额，下面一条进度条。
+///
+/// 进度条的分母**随有没有预算而变化**：
+/// - 有预算 → 画的是「预算用掉多少」，超支转红（`Bar` 是全应用唯一用红色的地方）；
+/// - 没预算 → 画的是「占本区间总额多少」，那是这一行唯一能比的基准。
+///
+/// 第二行固定三段：**占比（左）· 进度条 · 预算或超支（右）**。占比放在左端
+/// 而不是右端，是因为它每一行都有；预算只有设过额度的那几行才有，缺谁都不能
+/// 让另一半跟着左右横跳。
+class _CatStatRow extends StatelessWidget {
+  const _CatStatRow({
+    super.key,
+    required this.row,
+    required this.totalCents,
+    required this.onTap,
+  });
+
+  final _CatRowData row;
+
+  /// 本区间的合计（占比的分母）。0 时占比按 0 处理，不做除零。
+  final int totalCents;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final budget = row.budget;
+    final share = totalCents <= 0 ? 0.0 : row.cents / totalCents;
+    final over = budget?.over ?? false;
+    final ratio = budget == null ? share : budget.ratio;
+
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: S.md, vertical: 9),
-        child: Row(
+        child: Column(
           children: [
-            LineIcon(stat.icon, size: 19, color: C.ink2),
-            const SizedBox(width: S.md),
-            Expanded(
-              child: Text(
-                stat.name,
-                style: T.body,
-                overflow: TextOverflow.ellipsis,
-              ),
+            Row(
+              children: [
+                LineIcon(row.icon, size: 19, color: C.ink2),
+                const SizedBox(width: S.md),
+                Expanded(
+                  child: Text(
+                    row.name,
+                    style: T.body,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // 笔数是**次要信息**：先看金额，再看「这一类我记了几次」
+                Text('${row.count} 笔', style: T.amountSm),
+                const SizedBox(width: S.md),
+                SizedBox(
+                  width: 86,
+                  child: Text(
+                    Fmt.money(row.cents),
+                    textAlign: TextAlign.right,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: T.caption.copyWith(color: over ? C.over : C.ink),
+                  ),
+                ),
+              ],
             ),
-            Text('${stat.count} 笔', style: T.amountSm),
-            const SizedBox(width: S.md),
-            SizedBox(
-              width: 78,
-              child: Text(
-                Fmt.money(stat.totalCents),
-                textAlign: TextAlign.right,
-                style: T.caption,
-              ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                // 占比在**左**、预算在**右**，中间那条进度条随预算有无换分母。
+                // 三者的宽度都定死（数据位数不可控），只有进度条吃弹性 ——
+                // 金额位数一变就换行/溢出的那类问题，在这里靠"谁让谁"解决，
+                // 不靠调字号。
+                SizedBox(
+                  width: 54,
+                  child: Text(
+                    '占 ${Fmt.percent(share)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: T.caption.copyWith(color: C.ink3),
+                  ),
+                ),
+                Expanded(child: Bar(ratio: ratio, over: over, height: 4)),
+                if (budget != null) ...[
+                  const SizedBox(width: S.sm),
+                  SizedBox(
+                    width: 84,
+                    child: Text(
+                      over
+                          ? '超 ${Fmt.money(budget.overCents, trimZero: true)}'
+                          : '预算 ${Fmt.money(budget.budgetCents, trimZero: true)}',
+                      textAlign: TextAlign.end,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: T.caption.copyWith(
+                        color: over ? C.over : C.ink3,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
