@@ -13,13 +13,13 @@
 
 | | |
 |---|---|
-| 默认分支 | **`main`**,版本 **`1.6.0+26`**(已发版,标签 `v1.6.0`) |
+| 默认分支 | **`main`**,版本 **`1.7.0+27`**(已发版,标签 `v1.7.0`) |
 | 开发分支 | `feat/*`,合进 `main` 后按版本打标签(旧的 `feat/v2-merge` 已并入 `main` 并删除) |
-| 已发版 | **`v1.6.0`**:[Release 页](https://github.com/LanMao-213/heita-ledger/releases/tag/v1.6.0) 带 arm64 APK(19.8 MB);上一版 `v1.5.1` 带 arm64 APK(19.6 MB) |
+| 已发版 | **`v1.7.0`**:[Release 页](https://github.com/LanMao-213/heita-ledger/releases/tag/v1.7.0) 带 arm64 APK(18.3 MB);上一版 `v1.6.0` 带 arm64 APK(19.8 MB) |
 | 质量闸门 | `flutter analyze --fatal-infos` 0 issue、**全部测试全绿**(含界面截图自检，条数随用例增长，以 CI 输出为准)、版本号三处一致性(CI 内)、出包七项校验、隐私扫描四处载体 |
-| 规模 | `lib/` 约 2.9 万行、`test/` 约 2.1 万行(98 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
+| 规模 | `lib/` 约 3.0 万行、`test/` 约 2.1 万行(101 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
 | 许可 | [MIT](LICENSE) |
-| 待办 | 1.5.0 四项真机验收**已通过**(2026-10-28);**1.5.1 的「分类预算过滤」「趋势卡取消提示」两项、以及 1.6.0 的全部改动仍待真机复核**(设备离线,只有 CI 与单测背书)。剩余 3 票见 [Issues](https://github.com/LanMao-213/heita-ledger/issues):#5 真机数据态复核、#10 记一笔重构、#12 分发签名与权限面待拍板 |
+| 待办 | 1.5.0 四项真机验收**已通过**(2026-10-28);**1.5.1 的「分类预算过滤」「趋势卡取消提示」两项、以及 1.6.0 / 1.7.0 的全部改动仍待真机复核**(设备离线,只有 CI 与单测背书)。剩余 3 票见 [Issues](https://github.com/LanMao-213/heita-ledger/issues):#5 真机数据态复核、#10 记一笔重构、#12 分发签名与权限面待拍板 |
 
 > **六套皮肤**在 App 内切换(中性冷灰 / 纸墨暖米 / 露露缇雅·泽金 / 黑塔·永夜 / 血族·深红 / 圣地;
 > 出厂默认是**圣地 · 审判白**,1.5.1 起从「永夜」改来 —— 光线更接近原生启动窗口的浅底,默认路径上不再有冷启动跳变),
@@ -106,7 +106,8 @@ flutter run
 flutter analyze                                                # 提交前必须 0 issue
 flutter test                                                   # 全部测试
 flutter test test/ui_shot_test.dart                            # 只跑界面截图自检
-flutter build apk --release --target-platform android-arm64    # 发版:只出 arm64,约 20 MB
+flutter build apk --release --target-platform android-arm64 \
+  --obfuscate --split-debug-info=/c/hb/symbols                # 发版:只出 arm64,约 18.3 MB
 ```
 
 `--target-platform` 只管 `libapp.so`,管不住插件自带的 `.so` —— 不加约束时包里会混进
@@ -131,8 +132,13 @@ git archive HEAD | tar -x -C /c/hb/hl          # 只导出被跟踪文件
 cp android/key.properties /c/hb/hl/android/     # 签名文件未被跟踪,要手动补
 cp android/app/release.jks /c/hb/hl/android/app/
 cd /c/hb/hl && flutter pub get
-flutter build apk --release --target-platform android-arm64
+flutter build apk --release --target-platform android-arm64 \
+  --obfuscate --split-debug-info=/c/hb/symbols
 ```
+
+`--obfuscate --split-debug-info` 不能省:符号表若跟着 `libapp.so` 进包,
+光是调试信息就多 1.3 MB。同时要把 `C:/hb/symbols/app.android-arm64.symbols`
+和 APK 存到一处(不进仓库、不进 Release),线上崩溃的堆栈靠它才能还原成人能读的函数名。
 
 出包后必须验两遍,**两条都过才算能发**:
 
@@ -208,6 +214,8 @@ lib/
     svg_path.dart      SVG 路径解析器(手写)
     brand_paths.dart   品牌标志路径
   pages/               明细 / 图表 / 计划 / 我的 / 分类 / 周期账单 / 模板 / 账单导入 / 数据安全
+    app_drawer.dart        侧拉栏(五组入口) / help_page.dart 帮助说明 / onboarding_page.dart 首次引导
+    settings_actions.dart  设置类动作(导出、恢复、清空、账户与账本管理)，「我的」与侧拉栏共用
   widgets/             公共组件、图表、记一笔面板
     record_sheet.dart      记一笔面板：状态机 + 布局
     record_sheet/          行为方法(actions) / 展示型组件(rows)，part 分部
