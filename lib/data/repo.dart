@@ -471,15 +471,17 @@ class Repo {
 
   /// 存钱 / 取钱（金额可为负）。
   ///
-  /// [date] 默认今天；[accountId] 记的是「这笔钱从哪个账户挪进目标」，
-  /// 可以为空（用户只想记一句「我存了 500」，不想牵扯账户余额）。
+  /// [date] 默认今天；[note] 一句话备注。
+  ///
+  /// ★ 1.6.0 起**没有 `accountId` 参数**：旧参数只写 `goal_flow.account_id`、
+  ///   不改账户余额，等于在库里留一条「钱从 A 账户挪走了」的假事实
+  ///   （见 `_repoAddFunds` 的注释）。要记「从哪个账户出」，走转账。
   static Future<void> addFunds(
     int goalId,
     int deltaCents, {
     String? date,
-    int? accountId,
     String note = '',
-  }) => _repoAddFunds(goalId, deltaCents, date: date, accountId: accountId, note: note);
+  }) => _repoAddFunds(goalId, deltaCents, date: date, note: note);
 
   // --------------------------------------------------------------- 周期账单
   static Future<List<RecurringRule>> listRecurring(

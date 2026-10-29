@@ -328,23 +328,19 @@ extension StoreActions on Store {
 
   /// 存钱 / 取钱（金额可为负）→ 刷新目标投影与流水。
   ///
-  /// [date] 默认今天、[accountId] 可空（用户只想记一句「我存了 500」时不必
-  /// 牵扯账户余额）、[note] 一句话备注。三者都会落到 `goal_flow` 那一行上 ——
-  /// 「预计何时达成」全靠这张表算速率，漏传日期就等于把速率算错。
+  /// [date] 默认今天（「预计何时达成」全靠这张表算速率，漏传日期就等于把速率
+  /// 算错）、[note] 一句话备注。
+  ///
+  /// ★ 1.6.0 起**没有 `accountId` 参数**：旧参数只往 `goal_flow.account_id` 写
+  ///   一个 id，却不改那个账户的余额 —— 账本里于是留下「钱从 A 账户挪走了」
+  ///   这条假事实。账户引用只剩两条正确的路：记账/转账（会改余额）。
   Future<void> addFunds(
     int goalId,
     int deltaCents, {
     String? date,
-    int? accountId,
     String note = '',
   }) async {
-    await Repo.addFunds(
-      goalId,
-      deltaCents,
-      date: date,
-      accountId: accountId,
-      note: note,
-    );
+    await Repo.addFunds(goalId, deltaCents, date: date, note: note);
     await afterGoalChange();
   }
 

@@ -28,6 +28,23 @@ Future<int> _savedOf(int goalId) async {
   return g.savedCents;
 }
 
+/// 直接往库里塞一条「带 account_id 的目标流水」。
+///
+/// 为什么测试要绕开 `addFunds` 自己写：1.6.0 起 `addFunds` **不再接受
+/// accountId**（那个参数只写 id、不改账户余额，等于在账本里造一条假事实）。
+/// 但老库里**已经存在**这样的行 —— 那时它们是从 UI 写进去的。于是「账户被删
+/// 之后这些老行怎么办」仍然必须成立，而它只能靠直写 SQL 复现。
+Future<void> _insertLegacyFlow(int goalId, int accountId, int cents) async {
+  final db = await Db.open();
+  await db.insert('goal_flow', {
+    'goal_id': goalId,
+    'date': '2026-10-01',
+    'cents': cents,
+    'account_id': accountId,
+    'note': '老行',
+  });
+}
+
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
@@ -49,14 +66,20 @@ void main() {
 
   test('存入：saved_cents 与流水同时落，金额一致', () async {
     final id = await _newGoal();
-    await Repo.addFunds(id, 20000, date: '2026-10-01', accountId: 7, note: '奖金');
+    await Repo.addFunds(id, 20000, date: '2026-10-01', note: '奖金');
 
     expect(await _savedOf(id), 20000);
     final flows = await Repo.listGoalFlows(id);
     expect(flows, hasLength(1));
     expect(flows.single.cents, 20000);
     expect(flows.single.date, '2026-10-01');
-    expect(flows.single.accountId, 7);
+    // 1.6.0 起恒写 NULL：存钱不是账户流水，账户余额一分没动
+    expect(
+      flows.single.accountId,
+      isNull,
+      reason: '目标流水不该带账户 id —— 写进去等于说「钱从这个账户挪走了」，'
+          '而账户余额并没有变',
+    );
     expect(flows.single.note, '奖金');
     expect(flows.single.isDeposit, isTrue);
   });
@@ -131,14 +154,23 @@ void main() {
       const Account(id: 0, name: '共用钱包'),
     );
     final id = await _newGoal();
-    await Repo.addFunds(id, 10000, date: '2026-10-01', accountId: accId);
-    expect((await Repo.listGoalFlows(id)).single.accountId, accId);
+    await Repo.addFunds(id, 10000, date: '2026-10-01');
+    // 老库里确实有带 account_id 的行，这里直写复现它
+    await _insertLegacyFlow(id, accId, 5000);
+    expect(
+      (await Repo.listGoalFlows(id)).where((f) => f.accountId == accId),
+      hasLength(1),
+    );
 
     await Repo.deleteAccount(accId);
 
     final flows = await Repo.listGoalFlows(id);
-    expect(flows, hasLength(1), reason: '删账户不该连带删掉储蓄目标的存钱记录');
-    expect(flows.single.accountId, isNull, reason: '不能留悬空 id 指向已删账户');
-    expect(flows.single.cents, 10000);
+    expect(flows, hasLength(2), reason: '删账户不该连带删掉储蓄目标的存钱记录');
+    expect(
+      flows.where((f) => f.accountId != null),
+      isEmpty,
+      reason: '不能留悬空 id 指向已删账户',
+    );
+    expect(flows.fold<int>(0, (a, f) => a + f.cents), 15000);
   });
 }

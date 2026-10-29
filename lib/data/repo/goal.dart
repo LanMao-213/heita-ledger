@@ -81,11 +81,18 @@ Future<List<GoalFlow>> _repoListAllGoalFlows() async {
 ///    对不上，预计达成时间会基于一个不存在的余额算下去。
 /// 2. **整件事在一个事务里**。先读后写两条语句，中间若失败而 `saved_cents`
 ///    已提交，就会出现「钱存了但没流水」，比不存更糟。
+///
+/// ★ 1.6.0 收掉了 `accountId` 参数：它只往 `goal_flow.account_id` 写一个 id，
+///   **却不改那个账户的余额** —— 库里于是留下「钱从 A 账户挪走了」这条假事实，
+///   而账户余额一分没动，下次体检就会报一条对不上的账。要么两个都改（那是一次
+///   真实的转账，需要用户确认从哪个账户出、以及余额够不够），要么都不改。
+///   现在恒写 `NULL`：这一列留着不删（老库里的行还在、备份格式不动、不升 v11），
+///   含义收窄成「不涉及账户」。真正需要记「从哪个账户出」时，那是一个独立的
+///   转账流程，不是这里顺手加个参数。
 Future<void> _repoAddFunds(
   int goalId,
   int deltaCents, {
   String? date,
-  int? accountId,
   String note = '',
 }) async {
   if (deltaCents == 0) return;
@@ -113,7 +120,8 @@ Future<void> _repoAddFunds(
       'goal_id': goalId,
       'date': date ?? Fmt.today(),
       'cents': effective,
-      'account_id': accountId,
+      // 恒 NULL：见上面「1.6.0 收掉了 accountId」那段
+      'account_id': null,
       'note': note,
     });
   });

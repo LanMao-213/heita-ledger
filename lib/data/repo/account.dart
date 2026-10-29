@@ -9,6 +9,77 @@ part of '../repo.dart';
 // ---------------------------------------------------------------------------
 
   // ------------------------------------------------------------------- 账户
+
+/// 一处「账户引用」在账户消失之后该怎么办。
+///
+/// 四类不是我想出来的分类法，是**已经存在的四种事实**：有的列必须跟着人走
+/// （历史流水），有的列只能回到未选（「默认记到哪」是未来的计划，不是历史），
+/// 有的列属于账户自己、应当随它一起没（今天没有这种表），有的列名字像账户但
+/// 其实不是（今天也没有）。后两类留着名字，是为了将来加表的人**有地方登记**
+/// 而不是「顺手塞进置空那一组」。
+enum AccountRefAction {
+  /// 改挂到目标账户：这一行代表「钱曾经动过」，账户没了记录也要留着，
+  /// 否则明细里会出现解析不出账户名的孤儿。
+  repoint,
+
+  /// 置空：列的语义是「默认记到哪 / 从哪个账户挪的钱」。账户没了就回到未选
+  /// —— 改挂过去等于编造一个「你把这个账户的钱转走了」的事实。
+  detach,
+
+  /// 随账户一起删除：这一列是账户自身的数据。（当前全库无此类表。）
+  cascade,
+
+  /// 已核对无关：列名匹配，但它不是账户引用。（当前全库无此类列。）
+  unrelated,
+}
+
+/// 全库所有指向账户的列 → 账户消失后的处理方式。**唯一来源**。
+///
+/// 谁读它：[mergeAccount] 的改挂（[AccountRefAction.repoint]）与
+/// [_detachAccountRefs] 的置空（[AccountRefAction.detach]）。名单只有这一份，
+/// 所以「加一张带账户列的表」只可能漏在这里 —— 而漏在这里会被测试抓住。
+///
+/// 谁守它：`test/account_refs_test.dart` 扫 `PRAGMA table_info`（建完库之后
+/// 的真实形状），凡列名是 `account_id` / `to_account_id` 的表都必须在上面有
+/// 登记，没登记就红；登记了但库里没有这一列也红。
+///
+/// 这条守卫比「抽个函数」值钱：抽函数只保证今天两条路径一致，扫 schema 保证
+/// **将来加表时**不会又漏一处。
+const kAccountRefPlan = <String, AccountRefAction>{
+  'txn.account_id': AccountRefAction.repoint,
+  'txn.to_account_id': AccountRefAction.repoint,
+  'recurring.account_id': AccountRefAction.detach,
+  'txn_template.account_id': AccountRefAction.detach,
+  'debt.account_id': AccountRefAction.detach,
+  // 储蓄目标的存/取流水不是账户流水：它记的是「这笔钱从哪个账户挪进目标」，
+  // 储蓄目标卡片也不读它。置空而不是改挂，理由见上面 detach 的注释。
+  'goal_flow.account_id': AccountRefAction.detach,
+};
+
+/// `'txn.account_id'` → `('txn', 'account_id')`。
+(String, String) _splitAccountRef(String key) {
+  final dot = key.indexOf('.');
+  return (key.substring(0, dot), key.substring(dot + 1));
+}
+
+/// 账户被删之后，把所有「置空」类的账户引用清掉。
+///
+/// 合并与直删共用这一处。以前两条路径各写一份名单（一个 for 循环一个手写
+/// update），加表时改一处漏一处 —— 而漏掉不会有任何报错，只是库里多一个指向
+/// 不存在账户的 id，等哪天有界面读它才会露出来。
+Future<void> _detachAccountRefs(DatabaseExecutor tx, int id) async {
+  for (final entry in kAccountRefPlan.entries) {
+    if (entry.value != AccountRefAction.detach) continue;
+    final (table, column) = _splitAccountRef(entry.key);
+    await tx.update(
+      table,
+      {column: null},
+      where: '$column = ?',
+      whereArgs: [id],
+    );
+  }
+}
+
 Future<List<Account>> _repoListAccounts({
   bool includeArchived = false,
 }) async {
@@ -109,19 +180,17 @@ Future<void> _repoMergeAccount({
           'OR (account_id = ? AND to_account_id = ?))',
       whereArgs: [from, to, to, from],
     );
-    // 2. 流水改挂
-    await tx.update(
-      'txn',
-      {'account_id': to},
-      where: 'account_id = ?',
-      whereArgs: [from],
-    );
-    await tx.update(
-      'txn',
-      {'to_account_id': to},
-      where: 'to_account_id = ?',
-      whereArgs: [from],
-    );
+    // 2. 流水改挂（名单来自 [kAccountRefPlan]，不在这里另写一遍）
+    for (final entry in kAccountRefPlan.entries) {
+      if (entry.value != AccountRefAction.repoint) continue;
+      final (table, column) = _splitAccountRef(entry.key);
+      await tx.update(
+        table,
+        {column: to},
+        where: '$column = ?',
+        whereArgs: [from],
+      );
+    }
     // 3. 期初并入（余额随之增加同样的数，恒等式不破）
     final opening = (src['opening_cents'] as int?) ?? 0;
     final balance = (src['balance_cents'] as int?) ?? 0;
@@ -139,14 +208,7 @@ Future<void> _repoMergeAccount({
     //    置空而不是改挂到目标账户：目标流水不是账户流水，并过去等于
     //    编造一个「你从这个账户取过钱」的事实。
     await tx.delete('account', where: 'id = ?', whereArgs: [from]);
-    for (final table in ['recurring', 'txn_template', 'debt', 'goal_flow']) {
-      await tx.update(
-        table,
-        {'account_id': null},
-        where: 'account_id = ?',
-        whereArgs: [from],
-      );
-    }
+    await _detachAccountRefs(tx, from);
   });
 }
 
@@ -160,17 +222,12 @@ Future<void> _repoMergeAccount({
 /// ★ 但 `goal_flow.account_id` 要清：储蓄目标的存/取流水**不是账户流水**，
 ///   「没有流水」这个前提管不到它。不清就会留下一个指向已删账户的 id
 ///   （`plan_page` 目前不读这一列，所以看不出来；等哪天要显示「这笔记的钱
-///   是从哪个账户挪的」就会读出空账户）。与 [_repoMergeAccount] 里那张
-///   「账户被删后置空」的表保持同一份名单。
+///   是从哪个账户挪的」就会读出空账户）。名单与合并路径**共用**
+///   [_detachAccountRefs]，不再各写一份。
 Future<void> _repoDeleteAccount(int id) async {
   final db = await Db.open();
   await db.transaction((tx) async {
-    await tx.update(
-      'goal_flow',
-      {'account_id': null},
-      where: 'account_id = ?',
-      whereArgs: [id],
-    );
+    await _detachAccountRefs(tx, id);
     await tx.delete('account', where: 'id = ?', whereArgs: [id]);
   });
 }
