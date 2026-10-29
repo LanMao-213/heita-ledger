@@ -156,6 +156,10 @@ void main() {
     expect(Store.i.filter.txns.length, 3);
     expect(Store.i.filter.txns.any((t) => t.note == '打车'), isFalse);
     expect(Store.i.txns.any((t) => t.note == '打车'), isTrue);
-    expect(find.text('3 笔'), findsOneWidget);
+    expect(
+      find.text('共 3 条'),
+      findsOneWidget,
+      reason: '概览卡数的是记录条数（转账也算一条，但不进收支），见 summary_card',
+    );
   });
 }
