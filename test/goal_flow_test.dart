@@ -123,4 +123,22 @@ void main() {
     final g = (await Repo.listGoals()).firstWhere((e) => e.id == id);
     expect(g.monthlyCents, 50000);
   });
+
+  // 「没有流水的账户」可以从 UI 直删（有流水的走合并），但目标流水不是账户流水 ——
+  // 「没有流水」这个前提管不到它。不置空就会留一个指向已删账户的 id。
+  test('直删账户后，目标流水的 account_id 被置空，流水本身保留', () async {
+    final accId = await Repo.insertAccount(
+      const Account(id: 0, name: '共用钱包'),
+    );
+    final id = await _newGoal();
+    await Repo.addFunds(id, 10000, date: '2026-10-01', accountId: accId);
+    expect((await Repo.listGoalFlows(id)).single.accountId, accId);
+
+    await Repo.deleteAccount(accId);
+
+    final flows = await Repo.listGoalFlows(id);
+    expect(flows, hasLength(1), reason: '删账户不该连带删掉储蓄目标的存钱记录');
+    expect(flows.single.accountId, isNull, reason: '不能留悬空 id 指向已删账户');
+    expect(flows.single.cents, 10000);
+  });
 }

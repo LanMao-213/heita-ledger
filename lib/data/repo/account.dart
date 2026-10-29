@@ -151,9 +151,28 @@ Future<void> _repoMergeAccount({
 }
 
   /// 删除一个**没有流水、余额为 0** 的账户。有数据时必须走 [mergeAccount]。
+/// 直接删除账户。
+///
+/// ★ 调用前提：**这个账户没有流水**。UI 就是这么分支的（`mine_page.dart` 里
+///   `empty` 为真才走这里，否则走 [_repoMergeAccount] 把记录并入目标账户）。
+///   所以这里不必处理 `txn.account_id` 的改挂 —— 那是合并路径的职责。
+///
+/// ★ 但 `goal_flow.account_id` 要清：储蓄目标的存/取流水**不是账户流水**，
+///   「没有流水」这个前提管不到它。不清就会留下一个指向已删账户的 id
+///   （`plan_page` 目前不读这一列，所以看不出来；等哪天要显示「这笔记的钱
+///   是从哪个账户挪的」就会读出空账户）。与 [_repoMergeAccount] 里那张
+///   「账户被删后置空」的表保持同一份名单。
 Future<void> _repoDeleteAccount(int id) async {
   final db = await Db.open();
-  await db.delete('account', where: 'id = ?', whereArgs: [id]);
+  await db.transaction((tx) async {
+    await tx.update(
+      'goal_flow',
+      {'account_id': null},
+      where: 'account_id = ?',
+      whereArgs: [id],
+    );
+    await tx.delete('account', where: 'id = ?', whereArgs: [id]);
+  });
 }
 
   /// 某账户的流水合计。加减规则与 [_applyBalanceDelta] **逐字对应**：
