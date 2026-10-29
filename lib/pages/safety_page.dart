@@ -6,6 +6,7 @@ import '../design/hairline.dart';
 import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
+import '../widgets/backup_flow.dart';
 import '../widgets/common.dart';
 import '../widgets/menu.dart';
 import '../widgets/restore_flow.dart';
@@ -221,6 +222,38 @@ class _SafetyPageState extends State<SafetyPage> {
                       color: C.ink3,
                     ),
                     onTap: _checking ? null : _runCheck,
+                  ),
+                ),
+                const SizedBox(height: S.md),
+                // 导出的两个入口在这一页也要有：用户来「数据安全」的心态是
+                // 「我要给数据留个底」，而「我的」页那两行藏在设置列表中间。
+                //
+                // 加密与明文并列（见 backup_flow.dart 的文件头）：内容一字不差，
+                // 区别只在容器和代价。
+                const SectionTitle('导出到手机'),
+                SectionCard(
+                  padding: const EdgeInsets.symmetric(vertical: S.sm),
+                  child: Column(
+                    children: [
+                      SettingRow(
+                        icon: 'lock',
+                        title: '加密备份',
+                        subtitle: '设一个口令，文件离开手机也打不开（口令不保存）',
+                        onTap: () => runSealedExportFlow(context),
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: hairlineOf(context),
+                        color: C.line,
+                        indent: 52,
+                      ),
+                      SettingRow(
+                        icon: 'upload',
+                        title: '明文备份',
+                        subtitle: '明文 JSON（未加密），适合只存在自己的电脑里',
+                        onTap: () => runPlainExportFlow(context),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: S.md),

@@ -305,7 +305,7 @@ void main() {
     expect(Store.i.tabIndex, 0, reason: '横滑也要能换页，并且和 tab 状态是同一个');
   });
 
-  testWidgets('我的页有备份与恢复两个入口', (tester) async {
+  testWidgets('我的页有加密备份 / 明文备份 / 恢复三个入口', (tester) async {
     await seed(tester);
     tester.view.physicalSize = const Size(390 * 2, 1600 * 2);
     tester.view.devicePixelRatio = 2.0;
@@ -316,8 +316,13 @@ void main() {
     );
     await tester.pump();
 
-    // 这两行是全量备份的入口，删了就等于「换手机只能丢数据」
-    expect(find.text('备份全部数据'), findsOneWidget);
+    // 这三行是全量备份的入口，删了就等于「换手机只能丢数据」。
+    //
+    // 1.6.0 起「备份全部数据」拆成两行（加密 / 明文）：它不再是「一个动作」，
+    // 而是**同一份数据的两个容器**，代价不同（一个要记口令、一个谁拿到谁能读），
+    // 得让用户自己选。两者必须同时在，只有加密 = 忘了口令就再也带不走数据。
+    expect(find.text('加密备份'), findsOneWidget);
+    expect(find.text('明文备份'), findsOneWidget);
     expect(find.text('从备份恢复'), findsOneWidget);
   });
 }

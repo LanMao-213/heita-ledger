@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../app.dart';
-import '../data/backup_service.dart';
 import '../data/excel_service.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
@@ -10,6 +9,7 @@ import '../design/icons.dart';
 import '../design/palette.dart';
 import '../design/tokens.dart';
 import '../store.dart';
+import '../widgets/backup_flow.dart';
 import '../widgets/common.dart';
 import '../widgets/menu.dart';
 import '../widgets/restore_flow.dart';
@@ -182,15 +182,31 @@ class MinePage extends StatelessWidget {
                   color: C.line,
                   indent: 52,
                 ),
-                // Excel 只带账单；下面这两行才是「换手机能原样搬过去」
+                // Excel 只带账单；下面这几行才是「换手机能原样搬过去」。
+                //
+                // 加密与明文是**并列的两个入口**，不是「高级选项」：两者导出
+                // 的内容一字不差（同一份 payload），区别只在容器。所以副标题
+                // 各自把代价说清 —— 一个说「口令忘了打不开」，一个说「谁能
+                // 拿到谁能读」，让用户在两个代价之间选，而不是默认替他选。
+                SettingRow(
+                  icon: 'lock',
+                  title: '加密备份',
+                  subtitle: '设一个口令，文件离开手机也打不开（口令不保存）',
+                  onTap: () => runSealedExportFlow(context),
+                ),
+                Divider(
+                  height: 1,
+                  thickness: hairlineOf(context),
+                  color: C.line,
+                  indent: 52,
+                ),
                 SettingRow(
                   icon: 'upload',
-                  title: '备份全部数据',
+                  title: '明文备份',
                   // 副标题必须写明「未加密」：这是一份能被任何文本编辑器打开的
                   // 明文 JSON，里面是整本账（含备注、账户余额、「借给谁」）。
-                  // 以前只写「JSON」，读到的人默认会以为总要密码或者打不开。
-                  subtitle: '明文 JSON（未加密），含预算、目标、模板、余额',
-                  onTap: () => _backup(context),
+                  subtitle: '明文 JSON（未加密），适合只存在自己的电脑里',
+                  onTap: () => runPlainExportFlow(context),
                 ),
                 Divider(
                   height: 1,
@@ -455,55 +471,27 @@ class MinePage extends StatelessWidget {
   }
 
   // ------------------------------------------------------------------ 备份
-
-  static Future<void> _backup(BuildContext context) async {
-    // 导出口子是**唯一**会把整本账变成「一个可以随手转发的文件」的地方，
-    // 所以在这里把「不加密」讲明白，而不是只写在设置页的副标题里 ——
-    // 副标题会被一划而过，系统分享面板一打开，文件就出去了。
-    //
-    // 不做加密是刻意的取舍：真加密要引入 crypto 依赖、给备份格式加版本、
-    // 再做一套「忘了密码就永久打不开」的流程，本轮不铺这么大。所以先把
-    // 风险讲清楚，代价是一句话的确认。
-    final ok = await showAppConfirm(
-      context,
-      title: '导出全部数据？',
-      message: '文件是明文 JSON，拿到它的人能读出全部账目、备注和账户余额。\n\n'
-          '请只发给自己（存本地、发自己邮箱）。要发给别人，先把账目里的'
-          '隐私内容删掉。',
-      cancelLabel: '取消',
-      confirmLabel: '导出',
-    );
-    if (!ok || !context.mounted) return;
-
-    try {
-      final path = await BackupService.writeToTempFile();
-      if (!context.mounted) return;
-      await BackupService.share(path);
-    } catch (e) {
-      if (context.mounted) showToast(context, '备份失败：$e');
-    }
-  }
+  //
+  // 导出与「从备份恢复」的实现都在 `lib/widgets/backup_flow.dart` /
+  // `restore_flow.dart` 里：「我的」页和「数据安全」页走同一套动作，文案与
+  // 快照策略必须是同一份。这一页只负责把它们摆在菜单里。
 
   // ------------------------------------------------------------------ 恢复
 
   static Future<void> _restore(BuildContext context) async {
-    // 1. 选文件 + 读出来校验（校验失败不会碰数据库）
-    final Map<String, Object?> payload;
-    final BackupSummary summary;
-    try {
-      final picked = await BackupService.pickFile();
-      if (picked == null) return; // 用户取消
-      payload = picked.$1;
-      summary = BackupService.summarize(payload);
-    } on BackupException catch (e) {
-      if (context.mounted) showToast(context, e.message);
-      return;
-    }
-    if (!context.mounted) return;
+    // 1. 选文件 + 解出来（明文直接用，加密的要口令，最多试 3 次）。
+    //    校验失败不会碰数据库 —— payload 解不出来就走不到 restore。
+    final picked = await pickBackupFlow(context);
+    if (picked == null || !context.mounted) return;
 
     // 2~4. 二次确认 → 先留快照 → 覆盖 → 结果弹窗，全在 [runRestoreFlow] 里
     //      （「数据安全」页恢复自动快照走的是同一套，口径必须是同一份）
-    await runRestoreFlow(context, payload: payload, summary: summary);
+    await runRestoreFlow(
+      context,
+      payload: picked.payload,
+      summary: picked.summary,
+      sourceLabel: picked.name,
+    );
   }
 
   // ------------------------------------------------------------------ 清空

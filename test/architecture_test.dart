@@ -178,6 +178,76 @@ void main() {
     });
   });
 
+  group('备份的分层边界', () {
+    /// 「快照永远明文、只有用户主动导出才加密」这条口径，必须**在 import 图上**
+    /// 成立，而不是靠调用方自觉。
+    ///
+    /// 自觉型口径的破法很具体：某天有人想「顺便把快照也加密吧」，他会在
+    /// `snapshot.dart` 里加一个 `password` 参数，然后在调用链上补参数 ——
+    /// 三步都通得过 code review，因为每一步单看都合理。等发现「用户忘了口令
+    /// 就再也捞不回兜底」时，已经发版了。
+    ///
+    /// 所以这里两件事一起守：
+    ///   1. `snapshot.dart` 里不许出现 `password`，也不许 import 加密件；
+    ///   2. `payload.dart`（内容层）同样不许 —— 那一层拿不到口令，
+    ///      就没有「顺手加密一下」的机会。
+    ///
+    /// `plain_file.dart` 也一并钉住：它是「明文容器」，不认识加密才对。
+    test('快照与 payload 层拿不到口令，也看不见加密件', () {
+      const guarded = [
+        'lib/data/backup/payload.dart',
+        'lib/data/backup/snapshot.dart',
+        'lib/data/backup/plain_file.dart',
+      ];
+      final offenders = <String>[];
+      // 只看**代码行**：注释里点名这条规则是必须的（否则下一个人不知道为什么
+      // 不能这么写），把注释也算进去就变成了「解释规则的人被规则罚」。
+      bool isComment(String line) {
+        final t = line.trimLeft();
+        return t.startsWith('//') || t.startsWith('/*') || t.startsWith('*');
+      }
+
+      for (final path in guarded) {
+        final lines = _read(path).split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          final line = lines[i];
+          if (isComment(line)) continue;
+          // 大小写不敏感：`password` / `Password` / `PASSWORD` 都算
+          if (RegExp(r'password', caseSensitive: false).hasMatch(line)) {
+            offenders.add('$path:${i + 1} 出现口令：${line.trim()}');
+          }
+          if (RegExp(r'sealed_file|SealedBackupFile').hasMatch(line)) {
+            offenders.add('$path:${i + 1} 碰到加密件：${line.trim()}');
+          }
+        }
+      }
+      expect(
+        offenders,
+        isEmpty,
+        reason: '快照与 payload 必须永远明文、永远不需要口令：\n'
+            '${offenders.join('\n')}\n'
+            '加密只发生在 lib/data/backup/sealed_file.dart，只由用户点「加密导出」触发。',
+      );
+    });
+
+    test('依赖方向：加密件可以看明文件，反过来不行', () {
+      // sealed_file → plain_file（decodeAny 要判断「这份是不是明文的」）是设计；
+      // plain_file → sealed_file 才是错的方向。这条断言看着像废话，但它把方向
+      // 写进了测试 —— 下次有人想「在 plain_file 里顺便认一下加密文件」时会先看到这里。
+      final sealed = _read('lib/data/backup/sealed_file.dart');
+      expect(
+        RegExp(r"import 'plain_file\.dart';").hasMatch(sealed),
+        isTrue,
+        reason: '加密容器需要判型（明文 / 加密），这个方向是允许的',
+      );
+      expect(
+        RegExp(r"import '[^']*sealed_file\.dart';")
+            .hasMatch(_read('lib/data/backup/plain_file.dart')),
+        isFalse,
+      );
+    });
+  });
+
   group('record_sheet 的分部边界', () {
     /// 「记一笔」拆成三份：门面 + 状态机、行为方法、展示型组件。
     ///

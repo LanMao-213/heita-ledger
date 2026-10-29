@@ -169,6 +169,12 @@ void main() {
     await BackupService.deleteSnapshot(path); // 幂等
   });
   testWidgets('数据安全页：没有快照时给出空态与说明', (tester) async {
+    // 页面长高了（1.6.0 加了「导出到手机」一块），默认 800×600 会把空态挤到
+    // 折叠线以下 —— 给足高度，让这条断言继续测「空态在不在」而不是「滚没滚到」
+    tester.view.physicalSize = const Size(390 * 2, 1600 * 2);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
     await tester.runAsync(() => Store.i.boot());
     await tester.pumpWidget(const MaterialApp(home: SafetyPage()));
     await tester.pumpAndSettle();
