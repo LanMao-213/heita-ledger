@@ -76,7 +76,7 @@ class CalcKeypad extends StatelessWidget {
   /// 键盘的**自然高度**：5 排键 + 4 条竖向缝 + 上下内边距。
   ///
   /// 为什么要有这个函数：键盘被输入法「顶出去」时，面板要按这个高度算出还剩
-  /// 多少可见（见 `record_sheet.dart` 的 `_keypadSlotHeight`）。算错了就会多剪
+  /// 多少可见（见 record_sheet/layout.dart 的 `solveKeypadSlot`）。算错了就会多剪
   /// 或少剪一截 —— 多剪一截是「确认键被切掉」，少剪一截是「键盘底下露白」。
   ///
   /// 公式与 [build] 里的排布严格对应：`_upper` 3 行各留 1 条缝、

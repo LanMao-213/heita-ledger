@@ -17,6 +17,7 @@ import 'menu.dart';
 import 'picker_wheels.dart';
 
 part 'record_sheet/actions.dart';
+part 'record_sheet/layout.dart';
 part 'record_sheet/rows.dart';
 
 /// 保存成功后带出来的信息，给「已记账 · 10-01 至 10-31」这类提示用。
@@ -300,7 +301,7 @@ class _RecordSheetState extends State<RecordSheet> {
     //   顶回去 —— 一帧下坠 + 一段回升，就是「返回输入金额时界面抽搐一下」。
     //
     // 现在两条都归零：底边跟随 viewInsets，高度只由内容决定，数字键盘的让位
-    // 交给 [_keypadSlotHeight] 那条「1:1 被顶出去」的规则。三者一起，面板顶边
+    // 交给 record_sheet/layout.dart 那条「1:1 被顶出去」的规则。三者一起，面板顶边
     // 在键盘升起的整个过程里基本不动（见测试 `record_note_layout_test`）。
     final reserved = bottomInset;
     // 0.90：顶部多了「最近模板」那排之后，0.88 会把备注框切掉一条。
@@ -349,7 +350,7 @@ class _RecordSheetState extends State<RecordSheet> {
   /// widget 树里根本读不出来，改一行要靠猜。
   ///
   /// `keyboard` 是上面量到的输入法高度，往下传而不重算 —— 重算等于把同一件事
-  /// 写成两份。键高也在这里算，因为它要和键盘剩余高度对得上（见 [_keypadSlotHeight]）。
+  /// 写成两份。键高也在这里算，因为它要和键盘剩余高度对得上（见 `solveKeypadSlot`）。
   Widget _sheetBody(BuildContext context, {required double keyboard}) {
     // 键高按**屏幕高度**算，不按面板的可用高度。
     //
@@ -371,8 +372,16 @@ class _RecordSheetState extends State<RecordSheet> {
       38.0,
       _fields.isEmpty ? 56.0 : 52.0,
     );
-    // 数字键盘还剩多高（0 = 已经完全让给输入法）。见 [_keypadSlotHeight]。
-    final keypadSlot = _keypadSlotHeight(keyH, keyboard);
+    // 数字键盘还剩多高（0 = 已经完全让给输入法）。见 record_sheet/layout.dart。
+    //
+    // **这里只调纯函数，不做任何分段判断。**「剩不到一排键就整块收掉」那条规则
+    // 曾经住在这里，它是面板顶边在整段输入法动画里唯一的分段点 —— 跨过它的
+    // 那一帧顶边会跳（实测 177.5 → 217.5）。碎边是视觉问题，交给下面的渐隐，
+    // 布局层必须保持连续。
+    final slot = solveKeypadSlot(
+      keypadNaturalHeight: CalcKeypad.heightOf(keyH),
+      keyboardInset: keyboard,
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -595,49 +604,81 @@ class _RecordSheetState extends State<RecordSheet> {
         // 看起来就是「输入法从底下把键盘顶上去」，正是手指底下的物理事实。
         // 输入法比键盘还高（少数机型）时它自然变成 0，不需要额外分支。
         //
+        // 1.6.0 修掉了这条恒等式上唯一的分段点（`left < 40 ? 0 : left`）。
+        // 算式与全部推导见 record_sheet/layout.dart 的文件头；这里只剩「按算出来
+        // 的槽高摆一个框」，不再有任何 if。
+        //
         // 不给「完成」按钮：输入法自带的那颗 + 收起键盘，都是「写完了」。
         //
         // slot 归零时整块（含分隔线）都不出现，而不是留一个 0 高的空壳：
         // 「键盘已经让开了」在测试与读代码时都该是一个能直接判断的事实。
-        if (keypadSlot > 0) ...[
+        if (slot.visible) ...[
           _hairline(context),
           SizedBox(
             // key 给测试用：键盘本身的 rect 永远是「自然高度」（它被自己的
             // 排版尺寸撑开、只是被外层剪掉），要量「还剩多少露在外面」只能量
             // 这个槽。
             key: const ValueKey('record_keypad_slot'),
-            height: keypadSlot,
-            child: ClipRect(
-              // 键盘按**自然高度**排一次版，再由外面这个 SizedBox 从下往上
-              // 剪掉：不这么做，键会为了挤进剩余空间而改高度（那就变成
-              // 又一次「小键盘抖了一下」）。
-              child: OverflowBox(
-                alignment: Alignment.topCenter,
-                minHeight: CalcKeypad.heightOf(keyH),
-                maxHeight: CalcKeypad.heightOf(keyH),
-                child: CalcKeypad(
-                  onKey: _pressKey,
-                  onConfirm: _save,
-                  canConfirm: _canSave && !_saving,
-                  keyHeight: keyH,
+            height: slot.slot,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRect(
+                  // 键盘按**自然高度**排一次版，再由外面这个 SizedBox 从下往上
+                  // 剪掉：不这么做，键会为了挤进剩余空间而改高度（那就变成
+                  // 又一次「小键盘抖了一下」）。
+                  //
+                  // 「从下往上剪」意味着露在外面的是键盘**顶部的几排**，
+                  // 被剪断的那条边落在槽的**下沿**——也就是贴着输入法上沿的
+                  // 那一排半截键。用户说的「键盘抖/画坏了」就是它。
+                  child: OverflowBox(
+                    alignment: Alignment.topCenter,
+                    minHeight: slot.naturalHeight,
+                    maxHeight: slot.naturalHeight,
+                    child: CalcKeypad(
+                      onKey: _pressKey,
+                      onConfirm: _save,
+                      canConfirm: _canSave && !_saving,
+                      keyHeight: keyH,
+                    ),
+                  ),
                 ),
-              ),
+                // 碎边渐隐：把被剪断的那条边溶进卡面。
+                //
+                // 为什么画在**下沿**而不是上沿：被剪的是下面那一排（键盘被
+                // 输入法从底下顶出去），要溶的是贴着输入法的那一条。画在上沿
+                // 只会让键盘看起来从内容区里长出来，半截键照样贴在输入法上，
+                // 用户的抱怨一个字都没解决。
+                //
+                // 满键盘时 `shatterFade == 0`，这一层根本不出现 —— 「0 / . /
+                // 确认」那排真键绝不能被溶掉。
+                if (slot.shatterFade > 0)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: slot.shatterFade,
+                    child: IgnorePointer(
+                      child: Container(
+                        key: const ValueKey('record_keypad_shatter_fade'),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            // 终点是卡面，和 `_moreBelow` 同一条规则：
+                            // 渐隐的终点必须是面板自己的面，否则暗一圈
+                            colors: [C.cardBg.withValues(alpha: 0), C.cardBg],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
       ],
     );
-  }
-
-  /// 数字键盘还留下多高：键盘本体的高度减去被输入法顶掉的部分。
-  ///
-  /// 留一截碎边（不到 40dp，比一整排键矮得多）没有意义 —— 那只会是一排被切了
-  /// 一半的键贴在输入法上沿，看起来像画坏了。到这个程度就当它已经收起来了；
-  /// 代价是面板顶边会在这一下移动不到 40dp，比「一排半截的键」划算得多。
-  double _keypadSlotHeight(double keyH, double keyboard) {
-    final full = CalcKeypad.heightOf(keyH);
-    final left = (full - keyboard).clamp(0.0, full).toDouble();
-    return left < 40 ? 0 : left;
   }
 }
 

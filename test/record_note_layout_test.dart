@@ -10,7 +10,7 @@
 //   2) 失焦那一帧 minHeight 从满高掉到 0，面板当场塌 380dp，数字键盘再用
 //      150ms 长回来把内容顶回去 —— 一帧下坠 + 一段回升 = 抽搐。
 //
-// 现在的规则（见 record_sheet.dart 里 `_keypadSlotHeight`）：
+// 现在的规则（见 record_sheet/layout.dart 的 `solveKeypadSlot`）：
 // 数字键盘不再自己「收起」，而是**按输入法高度 1:1 被顶出去**。面板高度 =
 // 内容 + 剩余键盘，底边 = 输入法上沿，两者相消 —— 顶边在整段动画里不动。
 //
@@ -81,7 +81,7 @@ void main() {
   });
 
   test('键盘自然高度与排版公式一致（56 键高 = 324dp）', () {
-    // 5 排键 280 + 4 条缝 24 + 内边距 20。这个数被 `_keypadSlotHeight` 用来
+    // 5 排键 280 + 4 条缝 24 + 内边距 20。这个数被 `solveKeypadSlot` 用来
     // 决定「被输入法顶掉多少」，算错就是「确认键被切掉」或「键盘底下露白」。
     expect(CalcKeypad.heightOf(56), 324);
     expect(CalcKeypad.heightOf(52), 304);
@@ -117,11 +117,33 @@ void main() {
     final imeTop = _screenH - _keyboardH;
     final gap = imeTop - note.bottom;
 
+    // 1.6.0 起这个间距多了一截：输入法完全升起时，键盘槽里还留着
+    // `自然高度 − 输入法高度`（324 − 300 = 24dp）的碎边 —— 留着它是为了让面板
+    // 顶边不动（见 record_sheet/layout.dart 的恒等式），碎边本身被渐隐溶掉。
+    //
+    // 所以判据分两条，缺一条都可以糊弄过去：
+    //   1) 总留白 ≤ 24 + 碎边（碎边之外不许再有别的白）；
+    //   2) **把碎边减掉之后**的留白 ≤ 24 —— 这条才是用户原话「留白过高」
+    //      真正针对的东西（修好前是 102dp）。
+    final slotFinder = find.byKey(const ValueKey('record_keypad_slot'));
+    final slotH = slotFinder.evaluate().isEmpty
+        ? 0.0
+        : tester.getSize(slotFinder).height;
+    expect(
+      slotH,
+      closeTo(CalcKeypad.heightOf(56) - _keyboardH, 0.5),
+      reason: '槽高应当是「自然高度 − 输入法高度」，实际 $slotH',
+    );
     expect(
       gap,
+      lessThanOrEqualTo(24 + slotH),
+      reason: '备注框与键盘之间留白 ${gap.toStringAsFixed(1)}dp（槽高 $slotH）',
+    );
+    expect(
+      gap - slotH,
       lessThanOrEqualTo(24),
-      reason: '备注框与键盘之间留白 ${gap.toStringAsFixed(1)}dp —— 这块空白就是用户说的'
-          '「留白过高」',
+      reason: '减掉碎边之后还留白 ${(gap - slotH).toStringAsFixed(1)}dp —— 这块空白'
+          '就是用户说的「留白过高」',
     );
     expect(gap, greaterThanOrEqualTo(0), reason: '备注框被输入法盖住了');
     expect(tester.takeException(), isNull);

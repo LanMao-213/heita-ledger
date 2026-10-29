@@ -27,6 +27,31 @@ const _dbName = 'test_note_keyboard.db';
 Future<String> _dbPath() async =>
     p.join(await databaseFactory.getDatabasesPath(), _dbName);
 
+const _slotKey = ValueKey('record_keypad_slot');
+const _fadeKey = ValueKey('record_keypad_shatter_fade');
+
+/// 数字键盘是不是「已经让开了」。
+///
+/// 1.6.0 起判据从「CalcKeypad 这个 widget 不在场」变成「露出来的部分全都不可读」：
+///
+/// - 槽高为 0 → 整块不出现，显然让开了；
+/// - continuous 档 → 槽里只剩一条碎边，且这条碎边被渐隐盖满（`shatterFade`
+///   == 槽高），也就是一个可读的键都没露出来；
+/// - hardCut 档 → 退回旧判据，整块不在场。
+///
+/// 这样写而不是到处 `findsNothing`：契约变了（布局层不再分段），但用户看到的
+/// 「键盘让开了」这件事没变。
+bool _keypadYielded(WidgetTester tester) {
+  final slot = find.byKey(_slotKey);
+  if (slot.evaluate().isEmpty) return true;
+  final slotH = tester.getSize(slot).height;
+  expect(slotH, greaterThanOrEqualTo(0));
+  if (kKeypadYield == KeypadYield.hardCut) return false;
+  final fade = find.byKey(_fadeKey);
+  if (fade.evaluate().isEmpty) return false;
+  return tester.getSize(fade).height >= slotH - 0.5;
+}
+
 /// 屏幕逻辑高度与模拟的输入法高度（逻辑像素）
 const _screenH = 844.0;
 const _keyboardH = 300.0;
@@ -82,8 +107,13 @@ void main() {
     tester.view.viewInsets = const FakeViewPadding(bottom: _keyboardH * 2);
     await tester.pumpAndSettle();
 
-    // 键盘让位：数字键盘收起；不再有替代它的「完成」按钮
-    expect(find.byType(CalcKeypad), findsNothing);
+    // 键盘让位：露出来的部分全是渐隐（见 `_keypadYielded`）；不再有替代它的
+    // 「完成」按钮
+    expect(
+      _keypadYielded(tester),
+      isTrue,
+      reason: '输入法升满之后数字键盘仍然可读 —— 用户会看到一排半截的键贴在输入法上沿',
+    );
     expect(find.text('完成'), findsNothing);
 
     // 备注框整个落在键盘上沿之上（844 − 300 = 544）
@@ -167,15 +197,46 @@ void main() {
       closeTo(padFull - 200, 0.5),
     );
 
-    // 升满 300dp：324 − 300 = 24，只剩一排键都不到的碎边 → 整块收掉
+    // 升满 300dp：324 − 300 = 24，槽里只剩一条碎边。
+    //
+    // 1.6.0 起这条契约变了。老口径是「碎边不到一排键就整块收掉」，那是用**布局**
+    // 手段解决**视觉**问题：槽高在跨过 40dp 的那一帧从 39 掉到 0，面板顶边当场
+    // 往上跳 40dp（2026-10 用户反馈的「抽搐」）。现在碎边留着，交给槽下沿的一条
+    // 渐隐溶进卡面（`kKeypadShatterFade`），布局层保持连续。
+    //
+    // 下面按 `kKeypadYield` 分支：逃生阀切到 hardCut 时退回旧行为，这条测试跟着
+    // 一起退，不需要改代码 —— 这也是那个常量存在的意义。
     tester.view.viewInsets = const FakeViewPadding(bottom: _keyboardH * 2);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(
-      find.byType(CalcKeypad),
-      findsNothing,
-      reason: '剩下的碎边不到一排键，应当整块让开而不是留半排键贴在输入法上',
-    );
+    if (kKeypadYield == KeypadYield.continuous) {
+      expect(
+        tester.getSize(find.byKey(slotKey)).height,
+        closeTo(padFull - _keyboardH, 0.5),
+        reason: '碎边应当留在槽里（324 − 300 = 24），而不是整块收掉',
+      );
+      final fade = tester.widget<Container>(
+        find.byKey(const ValueKey('record_keypad_shatter_fade')),
+      );
+      expect(fade, isNotNull, reason: '碎边没有被溶掉 —— 会露出一排半截的键');
+      expect(
+        tester.getSize(find.byKey(const ValueKey('record_keypad_shatter_fade')))
+            .height,
+        24,
+        reason: '24dp 的碎边应当整条被渐隐盖住',
+      );
+    } else {
+      expect(
+        find.byType(CalcKeypad),
+        findsNothing,
+        reason: 'hardCut 档：剩下的碎边不到一排键，整块让开',
+      );
+      expect(
+        find.byKey(const ValueKey('record_keypad_shatter_fade')),
+        findsNothing,
+        reason: 'hardCut 档没有碎边可溶（槽高直接归零），不该画渐隐',
+      );
+    }
 
     // 收起键盘（输入法「完成」）→ 数字键盘和确认键回来
     await tester.testTextInput.receiveAction(TextInputAction.done);

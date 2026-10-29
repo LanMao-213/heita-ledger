@@ -245,5 +245,53 @@ void main() {
         reason: 'part 指向了不存在的文件',
       );
     });
+
+    /// 布局计算必须是**纯计算**：能脱离 widget 树、脱离 pumpWidget 被推到任意
+    /// 精度断言。
+    ///
+    /// `record_sheet/layout.dart` 是 part，编译器管不了它的 import（part 继承
+    /// 主文件的 import），所以这里用源码探针替编译器守：出现任何一个 Flutter
+    /// 类型就红。
+    ///
+    /// 为什么值得单独立一条：这条算式是「面板顶边抽搐」那个 bug 的全部答案
+    /// （恒等式见文件头）。它一旦长回 widget 树里，就再也测不出「1dp 的跳」——
+    /// 只能靠真机盯屏。
+    test('layout.dart 是纯计算：不碰 Flutter 类型，且 ≤ 300 行', () {
+      const layout = 'lib/widgets/record_sheet/layout.dart';
+      final src = _read(layout);
+
+      final flutterApi = RegExp(
+        r'\b(Widget|BuildContext|Color|Colors|MediaQuery|EdgeInsets|SizedBox|'
+        r'Container|Column|Row|Stack|Alignment|BoxDecoration|TextStyle|'
+        r'State|StatefulWidget|StatelessWidget|Theme|Text)\b',
+      );
+      final hits = <String>[];
+      for (final line in src.split('\n')) {
+        // 注释里点名 Flutter 是允许的：那是解释，不是依赖
+        final code = line.trimLeft();
+        if (code.startsWith('//')) continue;
+        final m = flutterApi.firstMatch(code);
+        if (m != null) hits.add('${m.group(1)} ← ${code.trim()}');
+      }
+      expect(
+        hits,
+        isEmpty,
+        reason: '布局计算必须是纯函数（不 pumpWidget 就能测）：${hits.take(5).join(' | ')}',
+      );
+      expect(
+        src.contains('package:flutter/'),
+        isFalse,
+        reason: 'part 不该有 import，出现了说明有人把它改成了独立文件',
+      );
+
+      // 行数预算只对新分部生效：rows.dart（818 行）/ actions.dart（317 行）是
+      // #10 挂账的历史文件，等那次拆分一起处理，不在这条守卫的射程内。
+      final lines = src.split('\n').length;
+      expect(
+        lines,
+        lessThanOrEqualTo(300),
+        reason: '$layout 已经 $lines 行 —— 纯算式长到这个量级说明它在做别的事',
+      );
+    });
   });
 }
