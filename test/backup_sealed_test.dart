@@ -411,11 +411,15 @@ void main() {
       final ms = sw.elapsedMilliseconds;
       // ignore: avoid_print
       print('BENCH 默认迭代($kDefaultKdfIterations) 一次 seal = ${ms}ms');
-      // 门限 3s，不是 2s：这条要抓的是「有人把默认迭代数改回 600000」这类
-      // 数量级回归（600k 单次派生 3.7s，必然超），不是基准测试。
-      // 本机空载实测 1.24s，但两个 `flutter test` 同时跑时实测过 2.03s ——
-      // 卡在 2s 上只会得到一条随机器负载变红的测试。
-      // 「默认值到底是哪个数」由上面那条常量断言钉着，那一条才是硬的。
+      // ★ **这是粗粒度数量级守卫，不是性能基准。** 精确值由上面那条
+      //   `expect(kDefaultKdfIterations, 210000)` 钉住 —— 那一条才是防线，
+      //   这一条只负责在「有人把默认迭代数改回 600000」时喊一声。
+      //
+      // 门限 3s 而不是 2s：600k 单次派生 3.7s，必然超；而本机空载实测 1.24s、
+      // 两个 `flutter test` 同时跑时实测过 2.03s —— 卡在 2s 上只会得到一条
+      // 「谁机器忙谁红」的测试，最后一定被人加 skip，那还不如不写。
+      // 别把这个 3s 当 SLA 读：真机低端机一次 seal 是 3~5s，见
+      // `docs/decisions/加密备份选型.md`。
       expect(
         ms,
         lessThan(3000),
