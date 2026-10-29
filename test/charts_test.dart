@@ -1,9 +1,13 @@
-// 两种新图型（P2）的组件级自检 + 截图。
+// 月度趋势折线的组件级自检 + 截图。
 //
-// 覆盖三个最容易出错的地方：
+// 覆盖两个最容易出错的地方：
 //   1. 空数据 —— 不能崩、不能画 NaN 坐标（全域兜底）；
-//   2. 颜色语义 —— 红**只**给超支那一段，正常进度不得出现红；
-//   3. 断月 —— 没有数据的月份必须断开，不能画成 0。
+//   2. 断月 —— 没有数据的月份必须断开，不能画成 0（画成 0 等于说「这个月
+//      一分没花」，和「这个月没记账」是两个完全不同的事实）。
+//
+// 曾经这里还有一个 `BudgetCompareBars`（预算 vs 实际对比条）：统计页合并之后
+// 已经没有任何页面用它了，只剩这组测试在测它 —— 只被测试使用的 widget 会
+// 制造虚假覆盖率（它天天绿，但用户永远看不到它）。1.6.0 删掉它和它的 5 条用例。
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -62,71 +66,8 @@ Widget _wrap(Widget child) => MaterialApp(
   ),
 );
 
-List<({String name, int spentCents, int budgetCents})> _rows() => const [
-  (name: '餐饮', spentCents: 150000, budgetCents: 100000), // 超支
-  (name: '交通', spentCents: 20000, budgetCents: 50000),
-  (name: '日用', spentCents: 0, budgetCents: 30000),
-];
-
 void main() {
   setUpAll(_loadChineseFont);
-
-  group('预算 vs 实际', () {
-    testWidgets('空数据：整块不占位，不崩', (tester) async {
-      await tester.pumpWidget(_wrap(const BudgetCompareBars(rows: [])));
-      expect(tester.takeException(), isNull);
-      expect(find.text('餐饮'), findsNothing);
-    });
-
-    testWidgets('没设预算的分类被过滤掉（没有对比对象）', (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          const BudgetCompareBars(
-            rows: [
-              (name: '餐饮', spentCents: 100, budgetCents: 0),
-              (name: '交通', spentCents: 100, budgetCents: 1000),
-            ],
-          ),
-        ),
-      );
-      expect(find.text('餐饮'), findsNothing);
-      expect(find.text('交通'), findsOneWidget);
-    });
-
-    testWidgets('红只出现在超支那一段，且只有一段', (tester) async {
-      await tester.pumpWidget(_wrap(BudgetCompareBars(rows: _rows())));
-      final over = tester
-          .widgetList<ColoredBox>(find.byType(ColoredBox))
-          .where((b) => b.color == C.over)
-          .length;
-      expect(over, 1, reason: '两行正常 + 一行超支 → 红色只能有 1 段');
-    });
-
-    testWidgets('超支行金额文案带「/」，且没有布局溢出', (tester) async {
-      await tester.pumpWidget(_wrap(BudgetCompareBars(rows: _rows())));
-      expect(tester.takeException(), isNull);
-      expect(find.textContaining(' / '), findsNWidgets(3));
-    });
-
-    testWidgets('超过 maxRows 只显示前几行', (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          BudgetCompareBars(
-            maxRows: 2,
-            rows: [
-              for (var i = 0; i < 6; i++)
-                (name: '类$i', spentCents: 1000 * (i + 1), budgetCents: 5000),
-            ],
-          ),
-        ),
-      );
-      final ink = tester
-          .widgetList<ColoredBox>(find.byType(ColoredBox))
-          .where((b) => b.color == C.ink)
-          .length;
-      expect(ink, 2);
-    });
-  });
 
   group('月度折线', () {
     testWidgets('全空：给一句人话，不画线', (tester) async {
@@ -169,38 +110,30 @@ void main() {
     });
   });
 
-  testWidgets('截图：两种图型', (tester) async {
+  testWidgets('截图：月度折线', (tester) async {
     tester.view.physicalSize = const Size(390 * 2, 844 * 2);
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       _wrap(
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            BudgetCompareBars(rows: _rows()),
-            const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: S.lg),
-              child: MonthTrendLine(
-                points: [
-                  (label: '1月', value: 320000),
-                  (label: '2月', value: 410000),
-                  (label: '3月', value: null),
-                  (label: '4月', value: 280000),
-                  (label: '5月', value: 520000),
-                  (label: '6月', value: 390000),
-                ],
-              ),
-            ),
-          ],
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: S.lg),
+          child: MonthTrendLine(
+            points: [
+              (label: '1月', value: 320000),
+              (label: '2月', value: 410000),
+              (label: '3月', value: null),
+              (label: '4月', value: 280000),
+              (label: '5月', value: 520000),
+              (label: '6月', value: 390000),
+            ],
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await _shot(tester, 'build/visual/chart_budget_trend.png');
+    await _shot(tester, 'build/visual/chart_month_trend.png');
   });
 }

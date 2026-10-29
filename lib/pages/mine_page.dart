@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../data/backup_service.dart';
-import '../data/db.dart';
 import '../data/excel_service.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
@@ -17,6 +16,7 @@ import '../widgets/restore_flow.dart';
 import '../widgets/storage_note.dart';
 import '../widgets/theme_sheet.dart';
 import '../widgets/transfer_sheet.dart';
+import '../widgets/wipe_flow.dart';
 import 'cats_page.dart';
 import 'import_bill_page.dart';
 import 'recurring_page.dart';
@@ -508,59 +508,8 @@ class MinePage extends StatelessWidget {
 
   // ------------------------------------------------------------------ 清空
 
-  static Future<void> _wipe(BuildContext context) async {
-    final ok = await showAppConfirm(
-      context,
-      title: '清空全部数据？',
-      message: '所有账目、账户、分类、目标都会被删除，恢复成刚装好的样子。\n\n'
-          '清空前会自动存一份快照，后悔了可以从「我的 → 数据安全」里找回来。',
-      confirmLabel: '确认清空',
-      danger: true,
-    );
-    if (!ok || !context.mounted) return;
-
-    // 先留快照再清：清空是单向门，1.4.1 就栽在「不可逆 + 静默失败」上。
-    // 留不下就**不清**，和「从备份恢复」的策略保持一致 —— 宁可这次没清成，
-    // 也不要开一条找不回来的口子。
-    final String snapshot;
-    try {
-      snapshot = await BackupService.writeSnapshot(reason: 'wipe');
-    } catch (e) {
-      if (context.mounted) showToast(context, '没能生成快照，已取消：$e');
-      return;
-    }
-
-    // 失败必须说出来：异常在 1.4.1 里被悄悄吞掉，用户看到的就是
-    // 「点了没反应、数据还在」。现在删除与重建在同一个事务里（见
-    // `Db.wipeAllData`），抛异常等于整体回滚，所以可以明确说「数据未改动」。
-    try {
-      await Db.wipeAllData();
-      await Store.i.reboot();
-      if (!context.mounted) return;
-      await showAppNotice(
-        context,
-        title: '已清空',
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('账目、账户、分类都已恢复成刚装好的样子。', style: T.body2),
-            const SizedBox(height: S.md),
-            Text('清空前的数据已存到：', style: T.caption),
-            const SizedBox(height: S.xs),
-            Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
-            const SizedBox(height: S.sm),
-            Text(
-              '要找回来的话，去「我的 → 数据安全」用这份快照恢复。',
-              style: T.caption,
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (context.mounted) showToast(context, '清空失败，数据未改动：$e');
-    }
-  }
+  /// 清空全部数据。流程本体在 [runWipeFlow]，和「从备份恢复」一样是覆盖式写。
+  static Future<void> _wipe(BuildContext context) => runWipeFlow(context);
 
   // -------------------------------------------------------------- 账户管理
 
