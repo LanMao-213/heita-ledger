@@ -55,6 +55,8 @@ class Repo {
     'txn',
     'budget',
     'saving_goal',
+    // goal_flow 是 saving_goal 的子表（goal_id 软关联），必须排在它后面
+    'goal_flow',
     'recurring',
     'txn_template',
     'setting',
@@ -455,8 +457,23 @@ class Repo {
 
   static Future<void> deleteGoal(int id) => _repoDeleteGoal(id);
 
-  /// 存钱 / 取钱（金额可为负）
-  static Future<void> addFunds(int goalId, int deltaCents) => _repoAddFunds(goalId, deltaCents);
+  /// 某个目标的存/取流水（最近在前）。用于「目标详情」回看，以及算月均存入速率。
+  static Future<List<GoalFlow>> listGoalFlows(int goalId) => _repoListGoalFlows(goalId);
+
+  /// 所有目标的流水，一次查完（计划页给每张卡算预计时间用，避免 N+1）。
+  static Future<List<GoalFlow>> listAllGoalFlows() => _repoListAllGoalFlows();
+
+  /// 存钱 / 取钱（金额可为负）。
+  ///
+  /// [date] 默认今天；[accountId] 记的是「这笔钱从哪个账户挪进目标」，
+  /// 可以为空（用户只想记一句「我存了 500」，不想牵扯账户余额）。
+  static Future<void> addFunds(
+    int goalId,
+    int deltaCents, {
+    String? date,
+    int? accountId,
+    String note = '',
+  }) => _repoAddFunds(goalId, deltaCents, date: date, accountId: accountId, note: note);
 
   // --------------------------------------------------------------- 周期账单
   static Future<List<RecurringRule>> listRecurring(

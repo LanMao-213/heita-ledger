@@ -60,7 +60,14 @@ class Db {
   ///      同一账本同一期存两份总预算（表级 UNIQUE 对 NULL 不生效，这是漏洞所在）。
   ///    迁移前先清存量重复：周期流水只把多余那条的 `recurring_id` 置 NULL
   ///    （**不删流水，钱一分不动**）；重复的总预算保留最新一条（预算是设置项）。
-  static const _version = 9;
+  /// 10：储蓄目标补**数据地基** —— 新增 `goal_flow`（存/取流水：日期、金额、
+  ///    账户、备注），并给 `saving_goal` 加 `monthly_cents`（每月定投额，0 = 没设）。
+  ///    起因：`addFunds` 原先只有一句 `UPDATE saved_cents`，既没有时间也没有账户，
+  ///    于是「按当前进度预计何时达成」根本算不出月均存入速率 —— 没有历史就没有速率。
+  ///    ⚠️ 老库里已有的 `saved_cents` **不补造流水**：那笔钱是哪天存的已无从考证，
+  ///    补一条假日期的流水等于在账本上编造事实。所以老目标要等有**新**流水之后
+  ///    才显示预计达成时间；`saved_cents` 本身继续作为「已存总额」的唯一真值。
+  static const _version = 10;
 
   /// 当前 schema 版本。备份文件里会记下来，恢复时用来判断兼容性。
   static int get schemaVersion => _version;
@@ -124,6 +131,9 @@ class Db {
         if (oldVersion < 9) {
           await _addUniqueIndexes(db);
         }
+        if (oldVersion < 10) {
+          await _addGoalFlowTable(db);
+        }
       },
       // 装了旧版本（库里的 schema 比这个包新）时走到这里。sqflite 默认会直接
       // 抛异常，用户在启动页只看到一行英文堆栈。这里换成一句能看懂的话 ——
@@ -179,6 +189,8 @@ class Db {
     'txn',
     'debt',
     'budget',
+    // goal_flow 是 saving_goal 的子表，必须排在它前面删
+    'goal_flow',
     'saving_goal',
     'recurring',
     'txn_template',
@@ -316,10 +328,25 @@ class Db {
         icon         TEXT    NOT NULL DEFAULT 'target',
         target_cents INTEGER NOT NULL DEFAULT 0,
         saved_cents  INTEGER NOT NULL DEFAULT 0,
+        monthly_cents INTEGER NOT NULL DEFAULT 0,
         due_month    TEXT,
         sort_order   INTEGER NOT NULL DEFAULT 0,
         archived     INTEGER NOT NULL DEFAULT 0
       )''',
+
+      '''
+      -- 储蓄目标的存/取流水（v10）。`saving_cents` 仍是"已存总额"的真值，
+      -- 这张表只回答"什么时候存了多少"，用于算月均速率与回看历史。
+      CREATE TABLE IF NOT EXISTS goal_flow (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        goal_id    INTEGER NOT NULL,
+        date       TEXT    NOT NULL,
+        cents      INTEGER NOT NULL,
+        account_id INTEGER,
+        note       TEXT    NOT NULL DEFAULT ''
+      )''',
+
+      'CREATE INDEX IF NOT EXISTS idx_goal_flow_goal ON goal_flow (goal_id, date)',
 
       '''
       CREATE TABLE recurring (
@@ -488,8 +515,40 @@ class Db {
   ///
   /// 幂等：两张表都先探测存在再操作（测试会造只含单表的极简库），
   /// 索引一律 `IF NOT EXISTS`，重复执行不报错。
-  static Future<void> _addUniqueIndexes(Database db) async {
-    final hasTxn = await db.rawQuery(
+  /// v10：储蓄目标流水表 + 每月定投额。
+  ///
+  /// 两处都做成**幂等**（`IF NOT EXISTS` / 先查 `PRAGMA table_info`），原因是
+  /// 「全新安装直接建到 v10」与「老库升上来」最终必须落到同一份 schema，
+  /// 而恢复旧备份时 `conformRow` 会按当前列清单补齐 —— 两边都得能在任意
+  /// 中间状态下重复执行而不炸。
+  ///
+  /// 定投额用 `ALTER TABLE ADD COLUMN ... DEFAULT 0`：老目标默认「没设」，
+  /// 意味着它只显示进度环，不显示「预计何时达成」——这是诚实的降级，
+  /// 而不是拿 0 当速率算出「永远达不成」。
+  static Future<void> _addGoalFlowTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS goal_flow (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        goal_id    INTEGER NOT NULL,
+        date       TEXT    NOT NULL,
+        cents      INTEGER NOT NULL,
+        account_id INTEGER,
+        note       TEXT    NOT NULL DEFAULT ''
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_goal_flow_goal ON goal_flow (goal_id, date)',
+    );
+    final cols = await db.rawQuery('PRAGMA table_info(saving_goal)');
+    final hasMonthly = cols.any((c) => c['name'] == 'monthly_cents');
+    if (!hasMonthly) {
+      await db.execute(
+        'ALTER TABLE saving_goal ADD COLUMN monthly_cents INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+  }
+
+  static Future<void> _addUniqueIndexes(Database db) async {    final hasTxn = await db.rawQuery(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'txn'",
     );
     if (hasTxn.isNotEmpty) {

@@ -141,4 +141,43 @@ extension StoreRead on Store {
   /// 是否要提示「默认皮肤已改成『圣地 · 审判白』」。
   /// 只在「从没手动选过皮肤 + 从没提示过 + 库里有账目」三条同时成立时为真。
   bool get themeDefaultNotice => _themeDefaultNotice;
+
+  // ------------------------------------------------------------- 储蓄目标
+
+  /// 某个目标的存/取流水（最近在前）。没有流水时是空表，不是 null ——
+  /// 调用方（预计时间计算）本来就要处理「一条都没有」这一档。
+  List<GoalFlow> goalFlows(int goalId) => _goalFlows[goalId] ?? const <GoalFlow>[];
+
+  /// 某个目标的预计达成时间。
+  ///
+  /// `today` 由这里取一次，不交给纯函数自己取 —— 一屏里「今天」只该有一个来源，
+  /// 否则列表里几张卡在跨零点时可能算出不同的窗口。
+  GoalEta goalEta(SavingGoal g) => projectGoal(
+    targetCents: g.targetCents,
+    savedCents: g.savedCents,
+    flows: goalFlows(g.id),
+    today: Fmt.today(),
+  );
+
+  /// 设了月度定投、但这个自然月还**没存过**的目标。
+  ///
+  /// 为什么按「自然月」而不是「周期」：定投这件事在用户心里就是「每个月存一笔」，
+  /// 与账单日无关。用周期会让「15 号开始的这一期」和日历月错位，
+  /// 用户看到提醒时会觉得日子不对。
+  ///
+  /// 只统计**存入**流水：取出不抵消「这个月已经存过了」这件事，
+  /// 否则用户存完又取一点，提醒会重新冒出来 —— 那是骚扰不是提醒。
+  List<SavingGoal> get goalsNeedMonthlyDeposit {
+    final month = Fmt.today().substring(0, 7);
+    return [
+      for (final g in _goals)
+        if (!g.archived &&
+            !g.done &&
+            g.monthlyCents > 0 &&
+            !goalFlows(g.id).any(
+              (f) => f.cents > 0 && f.date.startsWith(month),
+            ))
+          g,
+    ];
+  }
 }

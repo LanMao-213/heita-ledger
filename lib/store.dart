@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' hide Category;
 import 'data/db.dart';
 import 'data/cycle.dart' as cyc;
 import 'data/excel_service.dart';
+import 'data/goal_projection.dart';
 import 'data/integrity.dart';
 import 'data/models.dart';
 import 'data/repo.dart';
@@ -158,6 +159,13 @@ class Store extends ChangeNotifier {
 
   // 储蓄目标
   List<SavingGoal> _goals = [];
+
+  /// 储蓄目标的存/取流水，按 `goal_id` 分好组。
+  ///
+  /// 分组放在加载时做一次，而不是每张卡片自己去查：计划页一屏可能有 5 个目标，
+  /// 每次 rebuild 都查一遍库会让滚动明显发涩。目标数量本来就是个位数，
+  /// 全量取回的内存代价可以忽略。
+  Map<int, List<GoalFlow>> _goalFlows = const {};
 
   // ---------------------------------------------------------------- 周期 / 月
   //
@@ -573,6 +581,7 @@ class Store extends ChangeNotifier {
     await _loadCategories();
     await _loadDebts();
     _goals = await Repo.listGoals();
+    await _loadGoalFlows();
     _liftableCatIds = await Repo.liftableCategoryIds(_ledgerId);
     await loadTemplates();
     await loadCycle();
@@ -879,7 +888,18 @@ class Store extends ChangeNotifier {
 
   Future<void> afterGoalChange() async {
     _goals = await Repo.listGoals();
+    await _loadGoalFlows();
     notifyListeners();
+  }
+
+  /// 重取全部目标流水并按目标分组（一次 SQL，见 [Repo.listAllGoalFlows]）。
+  Future<void> _loadGoalFlows() async {
+    final rows = await Repo.listAllGoalFlows();
+    final grouped = <int, List<GoalFlow>>{};
+    for (final f in rows) {
+      (grouped[f.goalId] ??= <GoalFlow>[]).add(f);
+    }
+    _goalFlows = grouped;
   }
 
   Future<void> afterTemplateChange() async {

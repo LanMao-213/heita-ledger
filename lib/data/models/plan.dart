@@ -51,6 +51,7 @@ class SavingGoal {
     this.icon = 'target',
     required this.targetCents,
     this.savedCents = 0,
+    this.monthlyCents = 0,
     this.dueMonth,
     this.sortOrder = 0,
     this.archived = false,
@@ -61,6 +62,13 @@ class SavingGoal {
   final String icon;
   final int targetCents;
   final int savedCents;
+
+  /// 每月定投额（分）。0 = 没设，此时只显示进度环，不显示「预计何时达成」。
+  ///
+  /// ★ 它是**用户声明的计划**，不是已发生的事实；真正的存入记录在 `goal_flow`。
+  ///   两者分开存，是因为「打算每月存 500」和「这个月确实存了 500」是两件事，
+  ///   混在一起就会出现「计划完成率」这种自欺欺人的数字。
+  final int monthlyCents;
   final String? dueMonth; // YYYY-MM
   final int sortOrder;
   final bool archived;
@@ -78,6 +86,7 @@ class SavingGoal {
     icon: (m['icon'] as String?) ?? 'target',
     targetCents: (m['target_cents'] as int?) ?? 0,
     savedCents: (m['saved_cents'] as int?) ?? 0,
+    monthlyCents: (m['monthly_cents'] as int?) ?? 0,
     dueMonth: m['due_month'] as String?,
     sortOrder: (m['sort_order'] as int?) ?? 0,
     archived: ((m['archived'] as int?) ?? 0) == 1,
@@ -89,6 +98,7 @@ class SavingGoal {
     'icon': icon,
     'target_cents': targetCents,
     'saved_cents': savedCents,
+    'monthly_cents': monthlyCents,
     'due_month': dueMonth,
     'sort_order': sortOrder,
     'archived': archived ? 1 : 0,
@@ -99,6 +109,7 @@ class SavingGoal {
     String? icon,
     int? targetCents,
     int? savedCents,
+    int? monthlyCents,
     String? dueMonth,
     int? sortOrder,
     bool? archived,
@@ -108,9 +119,43 @@ class SavingGoal {
     icon: icon ?? this.icon,
     targetCents: targetCents ?? this.targetCents,
     savedCents: savedCents ?? this.savedCents,
+    monthlyCents: monthlyCents ?? this.monthlyCents,
     dueMonth: dueMonth ?? this.dueMonth,
     sortOrder: sortOrder ?? this.sortOrder,
     archived: archived ?? this.archived,
+  );
+}
+
+/// 储蓄目标的一次存/取流水（v10）。
+///
+/// `cents` 带符号：正 = 存入，负 = 取出。与 `saving_goal.saved_cents` 的关系是
+/// `saved_cents = Σ(goal_flow.cents)`（老数据例外，见 `Db._version = 10` 的注释）。
+class GoalFlow {
+  const GoalFlow({
+    required this.id,
+    required this.goalId,
+    required this.date,
+    required this.cents,
+    this.accountId,
+    this.note = '',
+  });
+
+  final int id;
+  final int goalId;
+  final String date; // YYYY-MM-DD
+  final int cents;
+  final int? accountId;
+  final String note;
+
+  bool get isDeposit => cents >= 0;
+
+  factory GoalFlow.fromMap(Map<String, Object?> m) => GoalFlow(
+    id: m['id'] as int,
+    goalId: m['goal_id'] as int,
+    date: m['date'] as String,
+    cents: (m['cents'] as int?) ?? 0,
+    accountId: m['account_id'] as int?,
+    note: (m['note'] as String?) ?? '',
   );
 }
 
