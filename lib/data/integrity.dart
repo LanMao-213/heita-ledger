@@ -1,5 +1,6 @@
 import 'db.dart';
 import 'models.dart';
+import 'sql_fragments.dart';
 
 /// 数据体检 —— 把「界面不说、数据已经不对」变成一句能看懂的结论。
 ///
@@ -150,16 +151,7 @@ abstract final class Integrity {
     final db = await Db.open();
     final rows = await db.rawQuery('''
       SELECT a.id AS id, a.balance_cents AS stored,
-             COALESCE((
-               SELECT SUM(CASE
-                 WHEN t.type = 'income'                                THEN  t.amount_cents
-                 WHEN t.type = 'expense'                               THEN -t.amount_cents
-                 WHEN t.type = 'transfer' AND t.account_id    = a.id   THEN -t.amount_cents
-                 WHEN t.type = 'transfer' AND t.to_account_id = a.id   THEN  t.amount_cents
-                 ELSE 0 END)
-               FROM txn t
-               WHERE t.account_id = a.id OR t.to_account_id = a.id
-             ), 0) AS flow
+             ${kAccountFlowSql('a.id')} AS flow
       FROM account a
     ''');
     await db.transaction((txn) async {
@@ -180,19 +172,12 @@ abstract final class Integrity {
   ///
   /// 注意 `amount_cents` 允许为负（键盘行首打 `-` 就是负数），所以这里
   /// 不做 `ABS`、也不判断正负 —— 增量维护当初怎么加减，这里就怎么加减。
-  static const _balanceSql = '''
+  /// 公式本体是 [kAccountFlowSql]（`Repo.accountFlowSum` 与「删账本后重算」
+  /// 读的是同一份），改口径只改那一处。
+  static String get _balanceSql => '''
     SELECT a.id AS id, a.name AS name,
            a.balance_cents AS stored,
-           a.opening_cents + COALESCE((
-             SELECT SUM(CASE
-               WHEN t.type = 'income'                              THEN  t.amount_cents
-               WHEN t.type = 'expense'                             THEN -t.amount_cents
-               WHEN t.type = 'transfer' AND t.account_id   = a.id  THEN -t.amount_cents
-               WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN  t.amount_cents
-               ELSE 0 END)
-             FROM txn t
-             WHERE t.account_id = a.id OR t.to_account_id = a.id
-           ), 0) AS expected
+           a.opening_cents + ${kAccountFlowSql('a.id')} AS expected
     FROM account a
     WHERE expected <> a.balance_cents
     ORDER BY a.id

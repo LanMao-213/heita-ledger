@@ -132,8 +132,14 @@ Future<void> _repoMergeAccount({
     );
     // 4. 删除 + 其它表置空（模板/定期/借贷里的账户只是「默认记到哪」，
     //    账户没了就回到未选，不跟着迁移 —— 那些是未来的计划，不是历史）
+    //
+    //    `goal_flow` 也在名单里：那一列记的是「这笔钱从哪个账户挪进目标」。
+    //    账户被删之后它就是一个指向不存在账户的 id，而储蓄目标卡片并不读它 ——
+    //    于是没有任何界面会报错，脏数据就这么一直躺着（QA 提的 P3）。
+    //    置空而不是改挂到目标账户：目标流水不是账户流水，并过去等于
+    //    编造一个「你从这个账户取过钱」的事实。
     await tx.delete('account', where: 'id = ?', whereArgs: [from]);
-    for (final table in ['recurring', 'txn_template', 'debt']) {
+    for (final table in ['recurring', 'txn_template', 'debt', 'goal_flow']) {
       await tx.update(
         table,
         {'account_id': null},
@@ -154,17 +160,13 @@ Future<void> _repoDeleteAccount(int id) async {
   /// 收入 +、支出 −、转账在转出端 −、在转入端 +。
   ///
   /// 金额允许为负（键盘行首打 `-` 就是负数），所以这里不做 `ABS`。
+  /// 公式本体在 [kAccountFlowSql] —— 体检与「删账本后重算」用的是同一份。
 Future<int> _repoAccountFlowSum(int accountId) async {
   final db = await Db.open();
-  final r = await db.rawQuery('''
-    SELECT COALESCE(SUM(CASE
-      WHEN t.type = 'income'                                THEN  t.amount_cents
-      WHEN t.type = 'expense'                               THEN -t.amount_cents
-      WHEN t.type = 'transfer' AND t.account_id    = ?      THEN -t.amount_cents
-      WHEN t.type = 'transfer' AND t.to_account_id = ?      THEN  t.amount_cents
-      ELSE 0 END), 0) AS s
-    FROM txn t WHERE t.account_id = ? OR t.to_account_id = ?
-  ''', [accountId, accountId, accountId, accountId]);
+  final r = await db.rawQuery(
+    'SELECT ${kAccountFlowSql('?')} AS s',
+    [accountId, accountId, accountId, accountId],
+  );
   return (r.first['s'] as int?) ?? 0;
 }
 

@@ -74,7 +74,7 @@ Future<void> _repoUpdateLedger(Ledger l) async {
   await db.update('ledger', l.toMap(), where: 'id = ?', whereArgs: [l.id]);
 }
 
-  /// 删除账本：**单事务级联**删掉它名下的一切。
+  /// 删除账本：**单事务级联**删掉它名下的一切，并冲回这些流水对账户余额的影响。
   ///
   /// ★ 1.5.2 修正。原实现只有一句 `DELETE FROM ledger`，靠外键级联兜底；
   ///   但 `budget` / `recurring` / `txn_template` 三张表的 DDL 里**没有**指向
@@ -86,9 +86,30 @@ Future<void> _repoUpdateLedger(Ledger l) async {
   /// ★ `saving_goal` / `goal_flow` **刻意不删**：`saving_goal` 的 schema 里
   ///   没有 `ledger_id`（储蓄目标是全局的，不按账本分），它不是账本的子表。
   ///   按账本去删它等于「删一个账本顺手清掉所有储蓄目标」。
+  ///
+  /// ★ **余额必须跟着回滚**（`account` 是全局表，没有 `ledger_id`）。被删账本
+  ///   的流水花的是**共用账户**上的钱：删掉流水却不冲回余额，账户就永久少了
+  ///   一笔 —— 而且症状极隐蔽，「数据体检」只会说「余额与流水不一致」，
+  ///   没人能从这里看出起因是删了一本账。见事务末尾那一段。
 Future<void> _repoDeleteLedger(int id) async {
   final db = await Db.open();
   await db.transaction((txn) async {
+    // ① 先记下这些流水碰过哪些账户 —— 删完就再也查不到了。
+    //    两个字段都要收：转账的转入端只出现在 `to_account_id` 上。
+    final rows = await txn.query(
+      'txn',
+      columns: ['account_id', 'to_account_id'],
+      where: 'ledger_id = ?',
+      whereArgs: [id],
+    );
+    final touched = <int>{
+      for (final r in rows) ...[
+        if (r['account_id'] != null) r['account_id']! as int,
+        if (r['to_account_id'] != null) r['to_account_id']! as int,
+      ],
+    };
+
+    // ② 子表在前、主表在后
     await txn.delete('txn', where: 'ledger_id = ?', whereArgs: [id]);
     await txn.delete('debt', where: 'ledger_id = ?', whereArgs: [id]);
     await txn.delete('budget', where: 'ledger_id = ?', whereArgs: [id]);
@@ -97,6 +118,26 @@ Future<void> _repoDeleteLedger(int id) async {
     // 分类：子分类的 parent_id 是同一张表里的软关联，一起删掉才不留孤儿
     await txn.delete('category', where: 'ledger_id = ?', whereArgs: [id]);
     await txn.delete('ledger', where: 'id = ?', whereArgs: [id]);
+
+    // ③ 余额回滚：按「期初 + 剩余流水」**重算**受影响账户。
+    //
+    //    为什么重算而不是逐笔反向 `_applyBalanceDelta`：逐笔要先读回整行、
+    //    按类型分正负号，等于把增量维护的公式抄第二遍；而重算用的
+    //    `kAccountFlowSql` 与体检、与「重算余额」是**同一份公式**，
+    //    结果可判定 —— 「重算之后体检必过」是能被测试钉住的事实。
+    //
+    //    口径：**不动 `opening_cents`**。期初是用户手填的基准，删一本账不该
+    //    改写它；被删的那部分流水回到「没发生过」的状态，于是余额也回到
+    //    「这些钱没花过」。想「这笔花费永久留在账户上」是另一种口径，
+    //    那会让余额与明细对不上，体检照样报红。
+    for (final accountId in touched) {
+      await txn.rawUpdate(
+        'UPDATE account SET balance_cents = opening_cents + '
+        "${kAccountFlowSql('?')} WHERE id = ?",
+        // 片段里 accountRef 出现 4 次，加上末尾 WHERE id = ? 共 5 个参数
+        [accountId, accountId, accountId, accountId, accountId],
+      );
+    }
   });
 }
 

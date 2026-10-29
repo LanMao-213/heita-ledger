@@ -219,14 +219,23 @@ extension StoreActions on Store {
   /// 已删除的 id 上会让明细、分类、预算全部查空 —— 用户看到的是「数据没了」。
   /// 切走复用 [switchLedger] 那条路径（清筛选 → 重载 → 补记），不另开一套。
   ///
+  /// ★ 被删的流水花的是**共用账户**上的钱，`Repo.deleteLedger` 已经按
+  ///   「期初 + 剩余流水」重算过余额。所以这里无论删的是不是当前账本，
+  ///   都必须重读账户与净资产 —— 否则「我的」页的总资产会停在删除前的数字，
+  ///   而那正好是最容易被用户当成"钱少了"的地方。
+  ///
   /// 「只剩一个账本不许删」的规则放在界面层（`mine_page.dart`）：那是产品约束，
   /// 不是数据层约束 —— 测试或恢复流程直接调数据层时不该被它挡住。
   Future<void> deleteLedger(int id) async {
     final wasCurrent = id == _ledgerId;
     await Repo.deleteLedger(id);
 
+    // 余额被重算过：内存里的那份副本立刻作废
+    _accounts = await Repo.listAccounts();
+    _netWorthCents = await Repo.totalBalanceCents();
+
     if (!wasCurrent) {
-      // 删的是别的账本：只有账本列表变了，其它投影不受影响
+      // 删的是别的账本：除账本列表外没有别的投影变化
       _ledgers = await Repo.listLedgers();
       notifyListeners();
       return;
