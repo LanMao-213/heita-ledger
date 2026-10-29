@@ -14,7 +14,10 @@ name: 测试与静态检查
 
 on:
   push:
-    branches: [main, 'feat/**', 'fix/**']
+    # `release/**` 不能漏：它才是**真正出包的那条分支**。此前只有 main / feat / fix，
+    # 于是发版分支上的每一次提交都不触发任何检查 —— 最后一道闸恰好是自动缺席的那道，
+    # 2026-10-29 推 release/1.6.0 时实测确认（推完 Actions 里零运行）。
+    branches: [main, 'feat/**', 'fix/**', 'release/**']
   pull_request:
   workflow_dispatch:
 
