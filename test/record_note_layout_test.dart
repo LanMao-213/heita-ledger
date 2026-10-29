@@ -16,7 +16,8 @@
 //
 // 这里钉四条：
 //   1. 备注框与输入法上沿的间距 ≤ 24dp（修好前是 102dp）；
-//   2. 输入法从 0 升到 300 的每一帧，面板顶边偏离静止位不超过 40dp；
+//   2. 输入法从 0 升到 300 的**每一帧**（每帧 5dp），面板顶边逐帧位移 ≤ 2dp，
+//      且全程不偏离静止位超过 2dp；
 //   3. 退回金额输入时（300 → 0）同样不跳，且数字键盘完整回来；
 //   4. 期间没有任何布局溢出（笔记里那一堆 RenderFlex overflow 都会抛异常）。
 import 'dart:io';
@@ -36,10 +37,24 @@ const _screenH = 844.0;
 const _keyboardH = 300.0;
 const _dpr = 3.0;
 
-/// 面板顶边的容差。留 40 是因为「数字键盘还剩不到一排键」时会被整块收掉
-/// （见 `_keypadSlotHeight` 的 40dp 门槛），那一下顶边会移动不到 40dp。
-/// 修好前这里是 152dp（单帧跳变），留 40 才有意义。
-const _topTolerance = 40.0;
+/// 面板顶边的容差。
+///
+/// 曾经是 40：因为 `_keypadSlotHeight` 里有一条 `left < 40 ? 0 : left` 的
+/// 门槛 —— 数字键盘还剩不到一排键时整块收掉，那一下顶边会移动不到 40dp，
+/// 于是容差只能放宽到 40 才不红。
+///
+/// **40 这个数字是尺子跟着实现弯的产物**：它宽到足以吞掉整条门槛（39.99dp），
+/// 于是「顶边抽搐」这件事再也测不出来了。顶边是用户唯一真正看见的东西，
+/// 它的容差必须按**人眼**定，不按实现的分段点定 —— 2dp。修完这条门槛，
+/// 顶边在整个升降过程中应当恒定（恒等式见 `record_sheet.dart`）。
+const _topTolerance = 2.0;
+
+/// 输入法升旗 / 退旗每帧走多少 dp。
+///
+/// 原来是 6 帧 × 50dp。50dp 的步长本身就是一个失明点：任何 < 50dp 的单帧
+/// 跳变都会被「一帧走 50」的采样吞掉。5dp 才对得起 2dp 的容差。
+const _imeStepDp = 5.0;
+const _imeSteps = 60;
 
 Future<String> _dbPath() async =>
     p.join(await databaseFactory.getDatabasesPath(), _dbName);
@@ -147,12 +162,12 @@ void main() {
     await tester.tap(find.byType(TextField));
     await tester.pump();
 
-    // 输入法按真机时序**逐帧**升起：6 帧走完 300dp
+    // 输入法按真机时序**逐帧**升起：60 帧走完 300dp（每帧 5dp）
     var prev = _panelTop(tester);
     final rising = <double>[];
-    for (var i = 1; i <= 6; i++) {
+    for (var i = 1; i <= _imeSteps; i++) {
       tester.view.viewInsets = FakeViewPadding(
-        bottom: _keyboardH * _dpr * i / 6,
+        bottom: _imeStepDp * _dpr * i,
       );
       await tester.pump(const Duration(milliseconds: 16));
       final top = _panelTop(tester);
@@ -160,7 +175,8 @@ void main() {
       expect(
         (top - prev).abs(),
         lessThanOrEqualTo(_topTolerance),
-        reason: '第 $i 帧面板顶边从 ${prev.toStringAsFixed(1)} 跳到 '
+        reason: '第 $i 帧（输入法 ${(_imeStepDp * i).toStringAsFixed(0)}dp）'
+            '面板顶边从 ${prev.toStringAsFixed(1)} 跳到 '
             '${top.toStringAsFixed(1)} —— 这就是「抽搐」',
       );
       prev = top;
@@ -179,16 +195,17 @@ void main() {
     // 退回金额输入：同样逐帧，同样不许跳
     await tester.testTextInput.receiveAction(TextInputAction.done);
     prev = _panelTop(tester);
-    for (var i = 5; i >= 0; i--) {
+    for (var i = _imeSteps - 1; i >= 0; i--) {
       tester.view.viewInsets = FakeViewPadding(
-        bottom: _keyboardH * _dpr * i / 6,
+        bottom: _imeStepDp * _dpr * i,
       );
       await tester.pump(const Duration(milliseconds: 16));
       final top = _panelTop(tester);
       expect(
         (top - prev).abs(),
         lessThanOrEqualTo(_topTolerance),
-        reason: '退旗第 $i 帧面板顶边从 ${prev.toStringAsFixed(1)} 跳到 '
+        reason: '退旗第 $i 步（输入法 ${(_imeStepDp * i).toStringAsFixed(0)}dp）'
+            '面板顶边从 ${prev.toStringAsFixed(1)} 跳到 '
             '${top.toStringAsFixed(1)}',
       );
       expect(
