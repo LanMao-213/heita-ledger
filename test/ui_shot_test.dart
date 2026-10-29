@@ -22,6 +22,7 @@ import 'package:ledger/data/repo.dart';
 import 'package:ledger/design/tokens.dart';
 import 'package:ledger/pages/safety_page.dart';
 import 'package:ledger/store.dart';
+import 'package:ledger/widgets/common.dart';
 import 'package:ledger/widgets/pickers.dart';
 import 'package:ledger/widgets/detail/txn_row.dart';
 import 'package:path/path.dart' as p;
@@ -268,6 +269,81 @@ void main() {
     expect(find.textContaining('系统备份可能给你留一份副本'), findsOneWidget);
     await tester.tap(find.text('知道了'));
     await tester.pumpAndSettle();
+
+    // ---- 侧拉栏（2026-10-29 新增）----
+    // 五组十九个入口挤在一列里，最容易出的事是「某一行文字换行把整列撑高」
+    // 或「分组标题的折叠箭头把行高顶歪」—— 两个都只会在真图上显形。
+    // 视口保持 390×844（真机尺寸）：抽屉比一屏高是**事实**，不靠拉高视口掩盖。
+    // 上一段把页面滚到了「本地存储」那一带，页头（含三横把手）已被滚出视口，
+    // 先滚回去 —— 页头在滚动区里，不是固定悬浮的。
+    await tester.dragUntilVisible(
+      find.byType(MenuButton),
+      find.byType(Scrollable).first,
+      const Offset(0, 200),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(MenuButton));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_26_drawer.png');
+    expect(tester.takeException(), isNull, reason: '侧拉栏有布局溢出');
+    expect(find.textContaining('当前账本 ·'), findsOneWidget);
+    // 「我的」页自己也有「管理」「关于」这类小节标题，同名文字会撞车 ——
+    // 一律限定在 Drawer 子树里找。
+    Finder inDrawer(String text) => find.descendant(
+      of: find.byType(Drawer),
+      matching: find.text(text),
+    );
+    for (final group in ['常用', '导航', '管理', '数据']) {
+      expect(inDrawer(group), findsOneWidget, reason: '侧拉栏缺分组「$group」');
+    }
+
+    // 收起一组：只剩标题，入口从树上消失 —— 顺手确认箭头与标题没有错位
+    await tester.tap(inDrawer('管理'));
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_27_drawer_collapsed.png');
+    expect(tester.takeException(), isNull, reason: '侧拉栏收起态有布局溢出');
+    expect(
+      inDrawer('账户管理'),
+      findsNothing,
+      reason: '收起后组内入口应该真的不在树上（「我的」页那份同名行不算）',
+    );
+
+    // ---- 首次使用引导（2026-10-29 新增）----
+    // 五步整屏，最窄的一步是「侧拉栏」那页（三行说明 + 一个「一次手势可达」），
+    // 小屏上最容易把主按钮挤出屏幕。这里拍两页：首页（有「跳过」）与末页
+    // （文案换成「开始记账」、上一步按钮存在）。
+    //
+    // 「帮助」组落在首屏之外（抽屉比屏幕高），先滚到它 —— 这本身也是
+    // 「入口真的够得着」的验证，比把视口拉高到 1400 更有意义。
+    final drawerList = find
+        .descendant(of: find.byType(Drawer), matching: find.byType(Scrollable))
+        .first;
+    await tester.dragUntilVisible(
+      find.text('使用引导'),
+      drawerList,
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('使用引导'));
+    await tester.pump(const Duration(milliseconds: 400)); // 抽屉先收完再 push
+    await tester.pumpAndSettle();
+    await _shot(tester, 'build/visual/shot_28_onboarding_1.png');
+    expect(tester.takeException(), isNull, reason: '引导首页有布局溢出');
+    expect(find.text('跳过'), findsOneWidget);
+
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.text('下一步'));
+      await tester.pumpAndSettle();
+    }
+    await _shot(tester, 'build/visual/shot_29_onboarding_last.png');
+    expect(tester.takeException(), isNull, reason: '引导末页有布局溢出');
+    expect(find.text('开始记账'), findsOneWidget);
+    expect(find.text('上一步'), findsOneWidget);
+
+    // 走完退出（落库不 await，这里只等界面回来）
+    await tester.tap(find.text('开始记账'));
+    await tester.pumpAndSettle();
+
     // 上面把它滚到了底部，这里反向滚回「账户管理」那一行 —— 后面几步要点它。
     // 不用固定位移：页面高度会随文案改动变化，写死 800 只是碰运气。
     await tester.dragUntilVisible(

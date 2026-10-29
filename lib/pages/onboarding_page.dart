@@ -57,7 +57,10 @@ const _steps = <_Step>[
     brand: true,
     title: '欢迎使用黑塔消费日记',
     body: '一个只存在这台手机上的记账本。没有账号、不联网、不上传。',
-    tips: ['打开就能记，不需要注册', '数据全部在本机的数据库文件里'],
+    tips: [
+      '打开就能记，不需要注册',
+      '数据全部在本机的数据库文件里',
+    ],
   ),
   _Step(
     icon: 'plus',
@@ -230,60 +233,77 @@ class _StepView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: S.xxl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: S.huge),
-          SizedBox(
-            height: 96,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: C.bg2,
-                  borderRadius: BorderRadius.circular(R.lg),
-                ),
-                child: Center(
-                  child: step.brand
-                      ? const BrandMark(height: 38)
-                      : LineIcon(step.icon, size: 34, color: C.ink),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: S.xl),
-          Text(step.title, style: T.title),
-          const SizedBox(height: S.md),
-          Text(step.body, style: T.body.copyWith(color: C.ink2, height: 1.6)),
-          const SizedBox(height: S.xl),
-          for (final t in step.tips)
-            Padding(
-              padding: const EdgeInsets.only(bottom: S.md),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 用小圆点而不是图标：这一列是「补充说明」，不是「功能入口」，
-                  // 给它配图标会让它看起来可以点
-                  Padding(
-                    padding: const EdgeInsets.only(top: 7, right: S.md),
-                    child: Container(
-                      width: 4,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: C.ink3,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+    // 垂直居中，而不是贴着顶部。
+    //
+    // 五步的文案都是两三行 + 两条补充，贴着顶部排版会在下方留出约 340dp 的
+    // 空白 —— 那不像留白，像「内容没加载完」。居中后上下各留一半，
+    // 视觉重心的位置与「一页一件事」的语气才对得上。
+    //
+    // 仍然套 `SingleChildScrollView`：大字号系统设置或横屏时内容会超过一屏，
+    // 那时 `minHeight` 撑不到底，Column 自然变成「从头排、可滚」，
+    // 不会把图标或按钮挤掉。
+    return LayoutBuilder(
+      builder: (context, box) => SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: S.xxl),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: box.maxHeight),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 96,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: C.bg2,
+                      borderRadius: BorderRadius.circular(R.lg),
+                    ),
+                    child: Center(
+                      child: step.brand
+                          ? const BrandMark(height: 38)
+                          : LineIcon(step.icon, size: 34, color: C.ink),
                     ),
                   ),
-                  Expanded(child: Text(t, style: T.body2)),
-                ],
+                ),
               ),
-            ),
-        ],
+              const SizedBox(height: S.xl),
+              Text(step.title, style: T.title),
+              const SizedBox(height: S.md),
+              Text(
+                step.body,
+                style: T.body.copyWith(color: C.ink2, height: 1.6),
+              ),
+              const SizedBox(height: S.xl),
+              for (final t in step.tips)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: S.md),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 用小圆点而不是图标：这一列是「补充说明」，不是「功能入口」，
+                      // 给它配图标会让它看起来可以点
+                      Padding(
+                        padding: const EdgeInsets.only(top: 7, right: S.md),
+                        child: Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: C.ink3,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Text(t, style: T.body2)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -343,10 +363,7 @@ class _PrimaryButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: T.body.copyWith(
-            color: C.bg,
-            fontWeight: FontWeight.w600,
-          ),
+          style: T.body.copyWith(color: C.bg, fontWeight: FontWeight.w600),
         ),
       ),
     );
