@@ -559,7 +559,8 @@ class Db {
     }
   }
 
-  static Future<void> _addUniqueIndexes(Database db) async {    final hasTxn = await db.rawQuery(
+  static Future<void> _addUniqueIndexes(Database db) async {
+    final hasTxn = await db.rawQuery(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'txn'",
     );
     if (hasTxn.isNotEmpty) {
