@@ -239,21 +239,33 @@ abstract final class RepoStats {
       // 只列一级分类（`parent_id IS NULL`）：预算设在「餐饮」上，
       // 不该出现「正餐」。已用金额则要**含该一级下的所有子分类**，
       // 否则把交易记到子分类之后，餐饮的预算进度条永远不动。
+      //
+      // ⚠️ 这里曾经用「相关子查询」按每个一级分类各算一次 SUM。那个写法有两个
+      // 毛病：① `COALESCE(tc.parent_id, tc.id) = c.id` 是表达式，索引根本用不上；
+      // ② 子查询里没有 `ledger_id` 条件，等于对全表扫一遍。而 `Store.loadCycle()`
+      // **每记一笔都会调这个函数**，于是记一笔的代价随总笔数线性上涨。
+      // 改成「先 GROUP BY 一次算完当期各一级分类的合计，再 LEFT JOIN 回分类表」，
+      // 单次扫描 + 一次 join，与账本总笔数脱钩。
+      'WITH spent AS ('
+      '  SELECT COALESCE(tc.parent_id, tc.id) AS pid, '
+      '         SUM(t.amount_cents) AS s '
+      '  FROM txn t JOIN category tc ON tc.id = t.category_id '
+      "  WHERE t.ledger_id = ? AND t.type = 'expense' AND t.debt_id IS NULL "
+      '    AND t.period_start BETWEEN ? AND ? '
+      '  GROUP BY COALESCE(tc.parent_id, tc.id)'
+      ') '
       'SELECT c.id AS cid, c.name AS name, c.icon AS icon, '
       '  b.amount_cents AS budget, '
-      '  COALESCE((SELECT SUM(t.amount_cents) FROM txn t '
-      '     JOIN category tc ON tc.id = t.category_id '
-      "     WHERE COALESCE(tc.parent_id, tc.id) = c.id AND t.type = 'expense' "
-      '       AND t.debt_id IS NULL '
-      '       AND t.period_start BETWEEN ? AND ?), 0) AS spent '
+      '  COALESCE(sp.s, 0) AS spent '
       'FROM category c '
       'LEFT JOIN budget b ON b.category_id = c.id '
       '  AND b.ledger_id = c.ledger_id AND b.period_start = ? '
+      'LEFT JOIN spent sp ON sp.pid = c.id '
       "WHERE c.ledger_id = ? AND c.type = 'expense' AND c.archived = 0 "
       '  AND c.parent_id IS NULL '
-      '  AND (b.amount_cents IS NOT NULL OR spent > 0) '
+      '  AND (b.amount_cents IS NOT NULL OR COALESCE(sp.s, 0) > 0) '
       'ORDER BY (b.amount_cents IS NULL), b.amount_cents DESC',
-      [from, to, periodStart, ledgerId],
+      [ledgerId, from, to, periodStart, ledgerId],
     );
     return rows
         .map(

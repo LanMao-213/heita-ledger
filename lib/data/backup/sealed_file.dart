@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -281,13 +282,27 @@ abstract final class SealedBackupFile {
     String password,
     List<int> salt,
     int iterations,
-  ) {
-    final pbkdf2 = Pbkdf2(
-      macAlgorithm: Hmac.sha256(),
-      iterations: iterations,
-      bits: 256,
-    );
-    return pbkdf2.deriveKeyFromPassword(password: password, nonce: salt);
+  ) async {
+    // PBKDF2 210000 次是**纯 CPU 死算**，在主 isolate 上约 1.2s。这段时间里
+    // 事件循环被完全占满：`runWithBusy` 的 `showDialog` 连一帧都画不出来，
+    // 用户看到的是「点了加密，界面僵住一秒多，然后弹窗一闪」。输错口令重试
+    // 还要再来一次。丢到后台 isolate，主线程只等结果。
+    //
+    // `SecretKey` 不能跨 isolate 传输，所以只把派生出的字节带回来。
+    // 参数（口令 / salt / 迭代数）都是可序列化的简单类型，无需 Transferable。
+    final bytes = await Isolate.run(() async {
+      final pbkdf2 = Pbkdf2(
+        macAlgorithm: Hmac.sha256(),
+        iterations: iterations,
+        bits: 256,
+      );
+      final key = await pbkdf2.deriveKeyFromPassword(
+        password: password,
+        nonce: salt,
+      );
+      return key.extractBytes();
+    });
+    return SecretKeyData(bytes);
   }
 
   static Map<String, Object?>? _tryDecode(String text) {

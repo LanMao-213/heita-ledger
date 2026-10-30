@@ -151,9 +151,12 @@ const HeitaThemeId kDefaultTheme = HeitaThemeId.holy;
 /// 按 id 取色板。
 ///
 /// `kPalettes` 的顺序与 [HeitaThemeId] 的声明顺序一致（加皮肤时两者一起加），
-/// 所以可以直接按下标取；万一有人动了一边没动另一边，就退回 [kDefaultTheme]，
-/// 宁可显示错一套也不能白屏。
+/// 所以先按下标直取 —— 这是热路径：`C.*` 全库 541 处调用，滚动时每帧上千次。
+/// 下标那一步带了一次 `id` 校验，两者不同步时会落到下面的线性兜底，
+/// 宁可多走几轮，也不能因为加皮肤漏改一处就返回错色板。
 Palette paletteOf(HeitaThemeId id) {
+  final i = id.index;
+  if (i < kPalettes.length && kPalettes[i].id == id) return kPalettes[i];
   for (final p in kPalettes) {
     if (p.id == id) return p;
   }
