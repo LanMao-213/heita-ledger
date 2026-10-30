@@ -281,14 +281,21 @@ class Store extends ChangeNotifier {
   Set<int> _liftableCatIds = {};
 
   /// 当前期的预算（预算也按周期，D13 已改）
-  int? totalBudgetCents;
+  ///
+  /// 只读投影：写入只发生在 [loadCycle] / [_loadPrevPeriod] 内部。
+  /// 1.7.2 之前它是**公开可变字段**，任何页面写一行
+  /// `Store.i.totalBudgetCents = 0` 都能编译通过并绕过所有不变量 ——
+  /// 而架构守卫当时只匹配「带 `= 初值` 的声明」，正好漏掉这一类。
+  int? _totalBudgetCents;
+  int? get totalBudgetCents => _totalBudgetCents;
 
   /// 上一期的支出合计、笔数、天数 —— **只在当前期没设预算时**才有值。
   ///
   /// 明细页底栏在没预算的期换成「日均 / 环比上一期」的小总结，环比要用它。
   /// 有预算的期这个字段恒为 null，`loadCycle` 也不会为它多查一次库 ——
   /// 一次记账要跑 loadCycle，不能为了一个不显示的文案给它加查询。
-  ({int expense, int count, int days})? prevPeriod;
+  ({int expense, int count, int days})? _prevPeriod;
+  ({int expense, int count, int days})? get prevPeriod => _prevPeriod;
 
   List<BudgetStat> _budgetStats = [];
 
@@ -527,14 +534,10 @@ class Store extends ChangeNotifier {
   /// 也不要让新用户看到一条不属于他的"变更说明"。
   ///
   /// `txn.date` 是等宽定长的 `'YYYY-MM-DD'` TEXT，字符串比较即日期比较。
-  Future<bool> _hasTxnBefore(String date) async {
-    final db = await Db.open();
-    final r = await db.rawQuery(
-      'SELECT EXISTS(SELECT 1 FROM txn WHERE date < ?) AS e',
-      [date],
-    );
-    return ((r.first['e'] as int?) ?? 0) != 0;
-  }
+  ///
+  /// 查询本身已搬到 `Repo.hasTxnBefore`（1.7.2）：这里是全库唯一一处状态层
+  /// 直接写 SQL 的地方，绕开了 `repo/*` 的口径，也不在架构守卫射程内。
+  Future<bool> _hasTxnBefore(String date) => Repo.hasTxnBefore(date);
 
   /// 从后台回到前台：日期或账本变了，就重算游标并补记周期账单。
   ///
@@ -665,7 +668,7 @@ class Store extends ChangeNotifier {
   /// 不能为了一条不显示的文案给它加一次查询。
   Future<void> _loadPrevPeriod() async {
     if (totalBudgetCents != null || _cycleFrom.isEmpty) {
-      prevPeriod = null;
+      _prevPeriod = null;
       return;
     }
     final prevFrom = cyc.shiftCycleDate(_cycleFrom, _cycleStartDay, -1);
@@ -675,7 +678,7 @@ class Store extends ChangeNotifier {
           .subtract(const Duration(days: 1)),
     );
     final t = await RepoStats.rangeTotals(_ledgerId, prevFrom, prevTo);
-    prevPeriod = (
+    _prevPeriod = (
       expense: t.$1,
       count: t.$3,
       // 期长现算：环比比的是日均，分母不能借用这一期的天数
@@ -690,7 +693,7 @@ class Store extends ChangeNotifier {
     _expenseCents = totals.$1;
     _incomeCents = totals.$2;
     _txnCount = totals.$3;
-    totalBudgetCents = await Repo.totalBudgetCents(_ledgerId, _cycleFrom);
+    _totalBudgetCents = await Repo.totalBudgetCents(_ledgerId, _cycleFrom);
     await _loadPrevPeriod();
     _budgetStats = await RepoStats.budgetStats(
       ledgerId: _ledgerId,
@@ -963,7 +966,7 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> afterBudgetChange() async {
-    totalBudgetCents = await Repo.totalBudgetCents(_ledgerId, _cycleFrom);
+    _totalBudgetCents = await Repo.totalBudgetCents(_ledgerId, _cycleFrom);
     // 预算被删掉时这个期会切到「小总结」底栏，环比数据要跟着补上
     await _loadPrevPeriod();
     _budgetStats = await RepoStats.budgetStats(

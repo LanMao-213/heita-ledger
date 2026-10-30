@@ -143,12 +143,19 @@ void main() {
   group('Store 的可变状态', () {
     test('没有公开可变字段（写入只能走 Store 的方法）', () {
       final lines = _read('lib/store.dart').split('\n');
-      // 形如 `  List<Txn> txns = [];`：缩进 2、以 `= ` 赋值、不是 late/static/私有
-      final fieldDecl = RegExp(r'^  [A-Za-z][A-Za-z0-9<>?,\s]*\s([a-z][A-Za-z0-9_]*) = ');
+      // 三种声明形态都要抓 —— 1.7.2 之前只认第一种，于是
+      // `int? totalBudgetCents;` 这种「不带初始值」的公开可变字段全被放过：
+      // ① 带初始值：`  List<Txn> txns = [];`
+      // ② 不带初始值：`  int? totalBudgetCents;`
+      // ③ record 类型：`  ({int a, int b})? prevPeriod;`
+      final patterns = [
+        RegExp(r'^  [A-Za-z][A-Za-z0-9<>?,\s]*\s([a-z][A-Za-z0-9_]*) = '),
+        RegExp(r'^  [A-Za-z][A-Za-z0-9<>?,\s]*\s([a-z][A-Za-z0-9_]*) *;$'),
+        RegExp(r'^  \([^)]*\)\? ?([a-z][A-Za-z0-9_]*) *;$'),
+      ];
       final offenders = <String>[];
       for (final line in lines) {
-        final m = fieldDecl.firstMatch(line);
-        if (m == null) continue;
+        if (!patterns.any((re) => re.hasMatch(line))) continue;
         if (line.contains(' late ') || line.contains('static')) continue;
         offenders.add(line.trim());
       }
