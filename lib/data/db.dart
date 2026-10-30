@@ -104,7 +104,8 @@ class Db {
   static Database? get cached => _db;
 
   static Future<Database> open() async {
-    if (_db != null) return _db!;    final dir = await getDatabasesPath();
+    if (_db != null) return _db!;
+    final dir = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dir, fileName),
       version: _version,
