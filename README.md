@@ -13,9 +13,9 @@
 
 | | |
 |---|---|
-| 默认分支 | **`fix/1.7.2-data-integrity`**,版本 **`1.7.2+29`**(待发版,上一版标签 `v1.7.1`) |
+| 默认分支 | **`fix/1.7.2-data-integrity`**,版本 **`1.7.3+30`**(待发版,上一版标签 `v1.7.1`) |
 | 开发分支 | `feat/*`,合进 `main` 后按版本打标签(旧的 `feat/v2-merge` 已并入 `main` 并删除) |
-| 已发版 | 最新公开版是 **`v1.7.1`**:[Release 页](https://github.com/LanMao-213/heita-ledger/releases/tag/v1.7.1) 带 arm64 APK(18.3 MB);`1.7.2` 是数据正确性补丁,尚未发布 |
+| 已发版 | 最新公开版是 **`v1.7.1`**:[Release 页](https://github.com/LanMao-213/heita-ledger/releases/tag/v1.7.1) 带 arm64 APK(18.3 MB);`1.7.2` 的数据修复与 `1.7.3` 的导航收敛合并为一版,尚未发布 |
 | 质量闸门 | `flutter analyze --fatal-infos` 0 issue、**全部测试全绿**(含界面截图自检，条数随用例增长，以 CI 输出为准)、版本号三处一致性(CI 内)、出包七项校验、隐私扫描四处载体 |
 | 规模 | `lib/` 约 3.0 万行、`test/` 约 2.1 万行(98 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
 | 许可 | [MIT](LICENSE) |
