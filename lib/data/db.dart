@@ -2,6 +2,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import 'category_seed.dart';
+import 'cycle.dart';
 
 /// 库里的数据版本比当前 App 新（用户装回了旧包）。
 ///
@@ -67,7 +68,11 @@ class Db {
   ///    ⚠️ 老库里已有的 `saved_cents` **不补造流水**：那笔钱是哪天存的已无从考证，
   ///    补一条假日期的流水等于在账本上编造事实。所以老目标要等有**新**流水之后
   ///    才显示预计达成时间；`saved_cents` 本身继续作为「已存总额」的唯一真值。
-  static const _version = 10;
+  /// 11：补 `idx_txn_to_account`。转账的两侧查询写的是
+  ///    `account_id = ? OR to_account_id = ?`，而此前只有 `account_id` 的索引，
+  ///    SQLite 的 OR 优化因此失效，退化成全表扫 —— 数据体检（每账户一次）
+  ///    与删账本（每个受影响账户一次）都会被放大。纯增索引，不动任何数据。
+  static const _version = 11;
 
   /// 当前 schema 版本。备份文件里会记下来，恢复时用来判断兼容性。
   static int get schemaVersion => _version;
@@ -146,6 +151,9 @@ class Db {
         }
         if (oldVersion < 10) {
           await _addGoalFlowTable(db);
+        }
+        if (oldVersion < 11) {
+          await _addToAccountIndex(db);
         }
       },
       // 装了旧版本（库里的 schema 比这个包新）时走到这里。sqflite 默认会直接
@@ -304,6 +312,10 @@ class Db {
       'CREATE INDEX idx_txn_ledger_period ON txn (ledger_id, period_start)',
       'CREATE INDEX idx_txn_category ON txn (category_id)',
       'CREATE INDEX idx_txn_account ON txn (account_id)',
+      // ★ v11：转账是双向的，账单/体检/删账本都写 `account_id = ? OR
+      //   to_account_id = ?`。只建一侧索引时 SQLite 的 OR 优化会直接放弃，
+      //   退化成整表扫 —— 这类查询「看起来有索引」，实际一次都没用上。
+      'CREATE INDEX IF NOT EXISTS idx_txn_to_account ON txn (to_account_id)',
       // ★ 借贷流水按 debt_id 反查（借贷详情页、结清校验）。
       //   这条索引原先只在 `_addDebtTable`（**升级路径**）里建，
       //   于是「全新装机的库」一直缺它 —— 由 `schema_equivalence_test` 当场抓到。
@@ -833,6 +845,20 @@ class Db {
   /// 就是月初，所以 `month || '-01'` 是**无损**的一对一换算，不需要按金额合并。
   /// 结算口径变了，但钱没变、条数没变 —— 这是这次迁移唯一要保证的事。
   ///
+  /// v10 → v11：补 `txn.to_account_id` 的索引。
+  ///
+  /// 纯增，不碰数据。写成 `IF NOT EXISTS` 是为了让「全新安装」与「升级」
+  /// 两条路径重复执行时都不报错（`schema_equivalence_test` 会比对两者）。
+  static Future<void> _addToAccountIndex(Database db) async {
+    final hasTxn = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'txn'",
+    );
+    if (hasTxn.isEmpty) return;
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_txn_to_account ON txn (to_account_id)',
+    );
+  }
+
   /// SQLite 不能改列名之外的约束，只能重建表：建新表 → 搬数据 → 删旧表 → 改名。
   /// 幂等：已有 `period_start` 列就直接返回。
   static Future<void> _moveBudgetToPeriod(Database db) async {
@@ -853,10 +879,38 @@ class Db {
         amount_cents INTEGER NOT NULL DEFAULT 0,
         UNIQUE (ledger_id, period_start, category_id)
       )''');
-    await db.execute('''
-      INSERT INTO budget_v5 (id, ledger_id, period_start, category_id, amount_cents)
-      SELECT id, ledger_id, month || '-01', category_id, amount_cents FROM budget
-    ''');
+
+    // 账单日：v4 的 `month` 只有年月，拼不出真实归属期。老实现直接拼 `-01`，
+    // 等于假定账单日 = 1 —— 账单日 15 的用户迁移后预算挂在「不存在的期」上，
+    // 计划页显示「本期未设预算」，而预算行其实还在库里（1.7.2 修）。
+    //
+    // 这里读 v4 库自己的 `cycle_start_day`；没有 setting 表（更老的库）
+    // 或没设过就按 1 号，与旧行为完全一致 —— 所以已有测试的期望值不受影响。
+    var startDay = 1;
+    final hasSetting = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'",
+    );
+    if (hasSetting.isNotEmpty) {
+      final rows = await db.rawQuery(
+        "SELECT v FROM setting WHERE k = 'cycle_start_day' LIMIT 1",
+      );
+      if (rows.isNotEmpty) {
+        startDay = (int.tryParse('${rows.first['v']}') ?? 1).clamp(1, 31);
+      }
+    }
+
+    final olds = await db.query('budget');
+    for (final r in olds) {
+      final month = (r['month'] as String?) ?? '';
+      final anchor = month.length >= 7 ? '${month.substring(0, 7)}-01' : '1970-01-01';
+      await db.insert('budget_v5', {
+        'id': r['id'],
+        'ledger_id': r['ledger_id'],
+        'period_start': periodStartOf(anchor, startDay),
+        'category_id': r['category_id'],
+        'amount_cents': r['amount_cents'],
+      });
+    }
     await db.execute('DROP TABLE budget');
     await db.execute('ALTER TABLE budget_v5 RENAME TO budget');
   }
