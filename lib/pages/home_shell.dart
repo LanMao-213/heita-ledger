@@ -16,8 +16,10 @@ import 'stats_page.dart';
 /// 主界面：底部四页 + 中间「记一笔」+ 左侧侧拉栏。
 ///
 /// 导航布局与原型一致：明细 · 图表 · ＋ · 计划 · 我的。
-/// 「分类管理」按用户要求移到了「我的 → 设置」里；1.7.0 起它同时也在侧拉栏的
-/// 「管理」组 —— 侧拉栏是跨页面的快捷入口，不是第二套设置页（两处指向同一批动作）。
+/// 设置类入口（账户 / 分类 / 账本 / 模板 / 周期 / 账单日 / 数据 / 帮助）1.7.3 起
+/// **只在侧拉栏**出现，「我的」页不再重复列一遍 —— 同一件事两个入口，用户会以为
+/// 它们是两件事。「我的」页只留与上下文相关的（导出当前筛选结果）和纯个人偏好
+/// （主题 / 触感）。
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -118,7 +120,7 @@ class _HomeShellState extends State<HomeShell> {
     }
 
     final parts = <String>[
-      if (Store.i.catsUpgradeJustDone) '分类已升级为「分类 + 子分类」两级，可在「我的 → 分类管理」里调整',
+      if (Store.i.catsUpgradeJustDone) '分类已升级为「分类 + 子分类」两级，可在侧拉栏的「分类管理」里调整',
       if (Store.i.recurringJustAdded > 0)
         '已补记 ${Store.i.recurringJustAdded} 笔周期账单',
       // 只对「升级上来的老用户」出现：他没点过任何东西，界面自己变浅了，
@@ -128,7 +130,7 @@ class _HomeShellState extends State<HomeShell> {
       // 确实变了」（他可能早就手动换过别的皮肤、只是没落这个标记）。说成陈述
       // 当前默认值 + 一条换回的路径，两种情况都不会说错。
       if (Store.i.themeDefaultNotice)
-        '界面默认皮肤是「圣地 · 审判白」；之前若是深色「黑塔 · 永夜」，可在「我的 → 主题」换回',
+        '界面默认皮肤是「圣地 · 审判白」；之前若是深色「黑塔 · 永夜」，可在「我的 → 偏好 → 主题」换回',
     ];
     if (parts.isEmpty || !mounted) return;
     showToast(context, parts.join('；'));

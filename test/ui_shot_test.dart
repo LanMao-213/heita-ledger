@@ -119,6 +119,26 @@ Finder _lineIcon(String name) => find.byWidgetPredicate(
   description: 'LineIcon($name)',
 );
 
+/// 开侧拉栏并点某个入口（1.7.3 起设置类入口只在抽屉里）。
+///
+/// 早期用例把「我的」页当枢纽，直接点行；入口搬走后这些点法全部失效。
+/// 抽屉本身是「页头把手 → 滑出 → 点行」三步，收在这里免得每处各写一遍。
+Future<void> _openDrawerAndTap(WidgetTester tester, String label) async {
+  // 页头在滚动区里（不是悬浮），翻页之后可能已被滚出视口，先保证把手可见
+  await tester.dragUntilVisible(
+    find.byType(MenuButton),
+    find.byType(Scrollable).first,
+    const Offset(0, 200),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byType(MenuButton));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.descendant(of: find.byType(Drawer), matching: find.text(label)),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() async {
     sqfliteFfiInit();
@@ -293,20 +313,24 @@ void main() {
       of: find.byType(Drawer),
       matching: find.text(text),
     );
-    for (final group in ['常用', '导航', '管理', '数据']) {
+    for (final group in ['账本', '数据', '帮助']) {
       expect(inDrawer(group), findsOneWidget, reason: '侧拉栏缺分组「$group」');
     }
 
     // 收起一组：只剩标题，入口从树上消失 —— 顺手确认箭头与标题没有错位
-    await tester.tap(inDrawer('管理'));
+    await tester.tap(inDrawer('账本'));
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_27_drawer_collapsed.png');
     expect(tester.takeException(), isNull, reason: '侧拉栏收起态有布局溢出');
     expect(
       inDrawer('账户管理'),
       findsNothing,
-      reason: '收起后组内入口应该真的不在树上（「我的」页那份同名行不算）',
+      reason: '收起后组内入口应该真的不在树上',
     );
+    // 展开回去：下面几张图（账户 / 分类 / 模板）都要从这一组进
+    await tester.tap(inDrawer('账本'));
+    await tester.pumpAndSettle();
+    expect(inDrawer('账户管理'), findsOneWidget, reason: '「账本」组没展开回去');
 
     // ---- 首次使用引导（2026-10-29 新增）----
     // 五步整屏，最窄的一步是「侧拉栏」那页（三行说明 + 一个「一次手势可达」），
@@ -319,12 +343,16 @@ void main() {
         .descendant(of: find.byType(Drawer), matching: find.byType(Scrollable))
         .first;
     await tester.dragUntilVisible(
-      find.text('使用引导'),
+      find.text('帮助与引导'),
       drawerList,
       const Offset(0, -120),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('使用引导'));
+    // 「帮助说明 / 重看使用引导」1.7.3 起收在「帮助与引导」的二级菜单里
+    // （两项读的是同一批文档，平铺两行反而让人以为内容不同）。
+    await tester.tap(find.text('帮助与引导'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('重看使用引导'));
     await tester.pump(const Duration(milliseconds: 400)); // 抽屉先收完再 push
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_28_onboarding_1.png');
@@ -344,20 +372,10 @@ void main() {
     await tester.tap(find.text('开始记账'));
     await tester.pumpAndSettle();
 
-    // 上面把它滚到了底部，这里反向滚回「账户管理」那一行 —— 后面几步要点它。
-    // 不用固定位移：页面高度会随文案改动变化，写死 800 只是碰运气。
-    await tester.dragUntilVisible(
-      find.text('账户管理'),
-      find.byType(Scrollable).first,
-      const Offset(0, 200),
-    );
-    await tester.pumpAndSettle();
-
     // ---- 账户管理（二级：列表弹层，行尾还挂一颗 ⋯）----
     // 这一层是「菜单组 + 自定义行」的混排，菜单件改版后要亲眼确认行高与
     // 分割线没错位，所以单独留一张。
-    await tester.tap(find.text('账户管理'));
-    await tester.pumpAndSettle();
+    await _openDrawerAndTap(tester, '账户管理');
     await _shot(tester, 'build/visual/shot_25_accounts_sheet.png');
     expect(tester.takeException(), isNull, reason: '账户管理弹层有布局溢出');
     // 点空白处关掉，回到我的页
@@ -365,7 +383,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // ---- 分类管理（一级列表）----
-    await tester.tap(find.text('分类管理'));
+    await _openDrawerAndTap(tester, '分类管理');
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_16_cats.png');
     expect(tester.takeException(), isNull, reason: '分类管理页有布局溢出');
@@ -409,7 +427,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // ---- 模板管理 ----
-    await tester.tap(find.text('记账模板'));
+    await _openDrawerAndTap(tester, '记账模板');
     await tester.pumpAndSettle();
     await _shot(tester, 'build/visual/shot_6_templates.png');
     expect(tester.takeException(), isNull, reason: '模板页有布局溢出');

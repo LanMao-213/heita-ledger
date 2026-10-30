@@ -162,11 +162,20 @@ abstract final class Fmt {
     return month(t);
   }
 
-  static int parseCents(String input) {
-    final s = input.trim().replaceAll(',', '');
-    if (s.isEmpty) return 0;
+  /// 元 → 分，**解析失败返回 null**。
+  ///
+  /// 与 [parseCents] 的区别只有一个：`parseCents` 把「解析不出来」和「就是 0」
+  /// 都压成 `0`，于是在导入场景里没法把「金额栏写着 `abc`」与「用户真记了 0 元」
+  /// 分开 —— 前者该报错，后者该拦下并说明原因。负数合法（退款冲正、跨侧归集）。
+  static int? tryParseCents(String input) {
+    final s = input.trim().replaceAll(',', '').replaceAll('¥', '').trim();
+    if (s.isEmpty) return null;
     final d = double.tryParse(s);
-    if (d == null) return 0;
+    if (d == null || d.isNaN || d.isInfinite) return null;
     return (d * 100).round();
+  }
+
+  static int parseCents(String input) {
+    return tryParseCents(input) ?? 0;
   }
 }

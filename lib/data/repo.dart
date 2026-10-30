@@ -309,6 +309,12 @@ class Repo {
     int offset = 0,
   }) => _repoListTxns(ledgerId: ledgerId, month: month, type: type, categoryId: categoryId, keyword: keyword, limit: limit, offset: offset);
 
+  /// [date] 之前是否已经有过任何一笔账（用于判断「这是老用户还是新装的」）。
+  ///
+  /// 从 `Store` 搬过来（1.7.2）：那是全库唯一一处**状态层直接写 SQL** 的地方，
+  /// 既绕开了 `repo/*` 的口径，也不在架构守卫的射程内。
+  static Future<bool> hasTxnBefore(String date) => _repoHasTxnBefore(date);
+
   /// 某一期的明细，条件打在 `period_start` 上；排序仍按真实 `date`。
   ///
   /// 翻页优先用游标 [afterDate] + [afterId]（取上一页最后一条），

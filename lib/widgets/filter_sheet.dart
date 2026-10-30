@@ -427,7 +427,7 @@ class _FilterSheetState extends State<_FilterSheet> {
     if (s.accounts.isEmpty) {
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: S.lg),
-        child: Text('还没有账户，请先到「我的 → 账户管理」添加', style: T.caption),
+        child: Text('还没有账户，请先到侧拉栏的「账户管理」添加', style: T.caption),
       );
     }
     return Padding(

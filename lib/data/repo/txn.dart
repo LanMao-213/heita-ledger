@@ -218,6 +218,19 @@ Future<int> _repoBatchDeleteTxns(List<Txn> items) =>
     WriteGateway.run(_DeleteTxns(items));
 
   /// 某月明细（按月倒排日期、同日按 id 倒排）—— [rangeListTxns] 的薄委托。
+/// [date] 之前是否已经有过任何一笔账。
+///
+/// `EXISTS` 找到第一条就返回，不会把匹配行取回来；`date` 上没有单列索引
+/// （`idx_txn_ledger_date` 的首列是 ledger_id），所以只在冷启动被调用一次。
+Future<bool> _repoHasTxnBefore(String date) async {
+  final db = await Db.open();
+  final r = await db.rawQuery(
+    'SELECT EXISTS(SELECT 1 FROM txn WHERE date < ?) AS e',
+    [date],
+  );
+  return ((r.first['e'] as int?) ?? 0) != 0;
+}
+
 Future<List<Txn>> _repoListTxns({
   required int ledgerId,
   required String month,

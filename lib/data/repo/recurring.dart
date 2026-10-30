@@ -73,6 +73,20 @@ Future<int> _repoRunDueRecurring(int ledgerId, {DateTime? now}) async {
   var created = 0;
   for (final row in rows) {
     var rule = RecurringRule.fromMap(row);
+
+    // 还原这条规则的「原始日」。`next_run_date` 是被 clamp 过的日期
+    // （1-31 走到 2 月就写成 2-28），直接拿它递推会永久停在 28 号。
+    // 用该规则**最早一笔流水**的日期反推：存量规则也能自愈。
+    // `ux_txn_recurring_date` 是 (recurring_id, date) 唯一索引，MIN 走索引。
+    final anchorRow = await db.rawQuery(
+      'SELECT MIN(date) AS d FROM txn WHERE recurring_id = ?',
+      [rule.id],
+    );
+    final anchorDate = anchorRow.first['d'] as String?;
+    final anchorDay = anchorDate != null
+        ? DateTime.parse(anchorDate).day
+        : DateTime.parse(rule.nextRunDate).day;
+
     // 单条规则连续欠多期时逐期补，最多 60 期防止死循环
     var guard = 0;
     while (rule.nextRunDate.compareTo(todayStr) <= 0 && guard++ < 60) {
@@ -119,7 +133,12 @@ Future<int> _repoRunDueRecurring(int ledgerId, {DateTime? now}) async {
       });
       if (inserted) created++;
 
-      final next = _advance(runDate, rule.freq, rule.interval);
+      final next = _advance(
+        runDate,
+        rule.freq,
+        rule.interval,
+        anchorDay: anchorDay,
+      );
       rule = RecurringRule(
         id: rule.id,
         ledgerId: rule.ledgerId,
@@ -145,22 +164,26 @@ Future<int> _repoRunDueRecurring(int ledgerId, {DateTime? now}) async {
   return created;
 }
 
-String _advance(String date, String freq, int interval) {
+String _advance(String date, String freq, int interval, {int? anchorDay}) {
   final d = DateTime.parse(date);
   final step = interval < 1 ? 1 : interval;
+  // 月 / 年的递推必须回到「原始日」再 clamp，不能拿已经 clamp 过的日子当基数：
+  // 1-31 走到 2 月被 clamp 成 2-28，再用 28 递推就永久停在 28 号，
+  // 3-31、5-31 都不再回来（1.7.2 修）。
+  final day = anchorDay ?? d.day;
   switch (freq) {
     case 'daily':
       return Fmt.date(d.add(Duration(days: step)));
     case 'weekly':
       return Fmt.date(d.add(Duration(days: 7 * step)));
     case 'yearly':
-      return Fmt.date(_clampMonth(d.year + step, d.month, d.day));
+      return Fmt.date(_clampMonth(d.year + step, d.month, day));
     case 'monthly':
     default:
       final m = d.month + step;
       final year = d.year + (m - 1) ~/ 12;
       final month = (m - 1) % 12 + 1;
-      return Fmt.date(_clampMonth(year, month, d.day));
+      return Fmt.date(_clampMonth(year, month, day));
   }
 }
 

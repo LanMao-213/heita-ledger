@@ -32,11 +32,21 @@ void main() {
   final readme = File('README.md').readAsStringSync();
 
   group('README 与仓库实体一致', () {
-    test('「N 个测试文件」等于 test/ 下的实际 dart 文件数', () {
+    test('「N 个测试文件」等于 test/ 下真正含用例的 dart 文件数', () {
+      // 只数「.dart 有几个」是把 `flutter_test_config.dart`（全局配置）和
+      // `support/` 里的辅助函数一起算进去 —— 那些文件一条用例都没有，
+      // 于是 README 长期宣称一个偏大的数（1.7.2 之前写 101，实际含用例的只有 97），
+      // 而这条守卫的 reason 还会主动教人把 README 改成那个错数。
+      // 现在改成「文件里真的出现 test( / testWidgets(」才算一个测试文件。
       final actual = Directory('test')
           .listSync(recursive: true)
           .whereType<File>()
           .where((f) => f.path.endsWith('.dart'))
+          .where(
+            (f) => RegExp(
+              r'\btest\(|\btestWidgets\(',
+            ).hasMatch(f.readAsStringSync()),
+          )
           .length;
 
       final m = RegExp(r'(\d+)\s*个测试文件').firstMatch(readme);
@@ -49,8 +59,8 @@ void main() {
       expect(
         m!.group(1),
         '$actual',
-        reason: 'README 写的是 ${m.group(1)} 个测试文件，test/ 下实际有 $actual 个。'
-            '请把 README 改成「$actual 个测试文件」',
+        reason: 'README 写的是 ${m.group(1)} 个测试文件，'
+            'test/ 下真正含用例的有 $actual 个。请把 README 改成「$actual 个测试文件」',
       );
     });
 

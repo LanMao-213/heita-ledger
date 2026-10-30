@@ -229,7 +229,7 @@ class _CatWheelSheetState extends State<_CatWheelSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(S.lg, S.sm, S.lg, 0),
               child: Text(
-                '这个分类还没有子分类，可在「我的 → 分类管理」里添加',
+                '这个分类还没有子分类，可在侧拉栏的「分类管理」里添加',
                 style: T.caption.copyWith(color: C.ink3),
               ),
             ),

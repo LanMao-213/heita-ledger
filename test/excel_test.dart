@@ -123,10 +123,12 @@ void main() {
     }
   });
 
-  test('导入新版 11 列：两级分类与详情字段都落库', () async {
+  test('导入新版 13 列：两级分类与详情字段都落库', () async {
     final path = _writeXlsx('heita_new_format.xlsx', [
       ExcelService.headers,
-      ['2026-10-12', '支出', '人情', '红包份子', '200.00', '现金', '', '', '', '张三', ''],
+      // 列序必须跟 headers 走：账户之后多了一列「转入账户」（1.7.2 为转账补的）
+      ['2026-10-12', '支出', '人情', '红包份子', '200.00', '现金', '',
+        '', '', '', '张三', '', ''],
     ]);
 
     final r = await ExcelService.importFile(ledgerId, path);
@@ -210,6 +212,129 @@ void main() {
     expect(rows.single.categoryId, target, reason: '不能认成「甲类 / 其他项」');
   });
 
+  test('往返等价：支出/收入/负数/转账 导出再导入后语义与余额都不变', () async {
+    // 这条用例存在的理由：此前导出侧只测 `exportRow` 的列形状、导入侧只测
+    // **手写的行数组**，两侧从未在同一份数据上交接 —— 于是「少一列」「类型
+    // 词表不一致」「符号约定不同」这类不对称在结构上不可能被发现。
+    // 1.7.2 修的两个缺陷（转账降级成支出、负数被静默丢弃）就是这么长期共存的。
+    // 这里让导出的真实输出直接喂给导入，任何不对称都会当场变红。
+    final cash = await Repo.insertAccount(
+      Account(id: 0, name: '现金', kind: AccountKind.cash, sortOrder: 1),
+    );
+    final bank = await Repo.insertAccount(
+      Account(id: 0, name: '银行卡', kind: AccountKind.debit, sortOrder: 2),
+    );
+
+    final cats = await Repo.listCategories(ledgerId);
+    final expTop = cats.firstWhere(
+      (c) => c.type == TxnType.expense && c.parentId == null,
+    );
+    final incTop = cats.firstWhere(
+      (c) => c.type == TxnType.income && c.parentId == null,
+    );
+
+    await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: ledgerId,
+        type: TxnType.expense,
+        amountCents: 1234,
+        date: '2026-10-12',
+        categoryId: expTop.id,
+        accountId: cash,
+        note: '午饭',
+      ),
+    );
+    await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: ledgerId,
+        type: TxnType.income,
+        amountCents: 500000,
+        date: '2026-10-10',
+        categoryId: incTop.id,
+        accountId: bank,
+        note: '工资',
+      ),
+    );
+    // 负数：退款冲正。导入侧旧实现 `amountCents <= 0` 直接跳过，往返即消失
+    await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: ledgerId,
+        type: TxnType.expense,
+        amountCents: -300,
+        date: '2026-10-13',
+        categoryId: expTop.id,
+        accountId: cash,
+        note: '退款冲正',
+      ),
+    );
+    // 转账：双向。旧实现只导出转出侧、导入一律当支出
+    await Repo.insertTxn(
+      Txn(
+        id: 0,
+        ledgerId: ledgerId,
+        type: TxnType.transfer,
+        amountCents: 10000,
+        date: '2026-10-14',
+        accountId: cash,
+        toAccountId: bank,
+        note: '存钱',
+      ),
+    );
+
+    final byId = {
+      for (final c in await Repo.listCategories(
+        ledgerId,
+        includeArchived: true,
+      ))
+        c.id: c,
+    };
+    final accNames = {
+      for (final a in await Repo.listAccounts(includeArchived: true)) a.id: a.name,
+    };
+    final exported = (await Repo.txnForExport(ledgerId: ledgerId))
+        .map((t) => ExcelService.exportRow(t, byId, accNames))
+        .toList();
+    expect(exported.length, 4);
+
+    final before = {
+      for (final a in await Repo.listAccounts()) a.name: a.balanceCents,
+    };
+
+    // 清库重建 = 模拟「换机后导入到一台新装的应用」
+    await Db.close();
+    final file = File(await _dbPath());
+    if (file.existsSync()) file.deleteSync();
+    await Db.open();
+    final freshLedger = await Repo.currentLedgerId();
+
+    final path = _writeXlsx('heita_roundtrip.xlsx', [
+      ExcelService.headers,
+      ...exported,
+    ]);
+    final r = await ExcelService.importFile(freshLedger, path);
+
+    expect(r.imported, 4, reason: '负数与转账都不该被丢掉');
+    expect(r.skipped, 0);
+
+    final rows = await Repo.listTxns(ledgerId: freshLedger, month: '2026-10');
+    expect(rows.length, 4);
+
+    final transfer = rows.firstWhere((t) => t.type == TxnType.transfer);
+    expect(transfer.toAccountId, isNotNull, reason: '转入账户必须原样回来');
+    expect(transfer.amountCents, 10000);
+
+    final refund = rows.firstWhere((t) => t.note == '退款冲正');
+    expect(refund.amountCents, -300, reason: '负数流水不能在往返中消失');
+
+    final after = {
+      for (final a in await Repo.listAccounts()) a.name: a.balanceCents,
+    };
+    expect(after, before, reason: '两个账户的余额都要与导出前完全一致');
+  });
+
   test('字段表与导出列保持同步', () {
     // 四个详情字段各占表里一列，漏一个就静默丢数据
     for (final f in TxnField.values) {
@@ -217,6 +342,26 @@ void main() {
         ExcelService.headers.contains(f.label),
         isTrue,
         reason: '${f.label} 没有出现在导出表头里',
+      );
+    }
+    // 只查详情字段是不够的：**类型维度**同样会漏。转账在 1.7.2 之前没有
+    // 转入侧列、`_parseType` 也不认「转账」，往返一次就变成一条普通支出 ——
+    // 而这条用例当时是绿的，因为它压根没看 TxnType。
+    for (final t in TxnType.values) {
+      expect(
+        ExcelService.exportRow(
+          Txn(
+            id: 0,
+            ledgerId: 1,
+            type: t,
+            amountCents: 100,
+            date: '2026-10-12',
+          ),
+          const {},
+          const {},
+        )[1],
+        t.label,
+        reason: '类型列必须写出 ${t.label}',
       );
     }
   });

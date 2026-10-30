@@ -275,7 +275,7 @@ class _SafetyPageState extends State<SafetyPage> {
                       const SizedBox(height: S.sm),
                       Text(
                         '只保留最近 3 份、最多 7 天。快照存在应用私有目录里，'
-                        '卸载应用会一起清掉 —— 要长期保存请用「我的 → 备份全部数据」'
+                        '卸载应用会一起清掉 —— 要长期保存请用侧拉栏的「备份与恢复」'
                         '导出到手机或网盘。',
                         style: T.caption,
                       ),

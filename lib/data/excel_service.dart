@@ -13,7 +13,7 @@ import 'repo.dart';
 /// Excel 账单导入 / 导出。
 ///
 /// 列顺序（也用于导入识别，第一行是表头）：
-///   日期 | 类型 | 分类 | 子分类 | 金额 | 账户 | 备注 | 出发地 | 目的地 | 对象 | 名称 | 往来
+///   日期 | 类型 | 分类 | 子分类 | 金额 | 账户 | 转入账户 | 备注 | 出发地 | 目的地 | 对象 | 名称 | 往来
 ///
 /// ★ 金额在表里用**元**（人类读写友好），进出数据库时立刻转成**分**。
 /// ★ 日期用 `YYYY-MM-DD` 文本，避免 Excel 按地区改成斜杠格式后解析失败。
@@ -21,6 +21,9 @@ import 'repo.dart';
 ///   文件、以及带「往来」列的新文件都能读。按列号读的话，多一列就整体错位，
 ///   而且错得很安静 —— 金额被读成账户名这种事查起来非常费劲。
 /// ★ 「往来」列是只读的：导出时写「借出 · 张三」，导入时忽略（不建债务记录）。
+/// ★ 「转入账户」列（1.7.2 新增）：转账是**双向**的，只写转出侧会让往返之后的
+///   转账变成一条普通支出 —— 转出账户少一笔、转入账户也不多一笔，而且不报错。
+///   老版本文件没有这一列，读到空串即按「非转账」处理，不影响旧文件。
 abstract final class ExcelService {
   static const headers = [
     '日期',
@@ -29,6 +32,7 @@ abstract final class ExcelService {
     '子分类',
     '金额',
     '账户',
+    '转入账户',
     '备注',
     '出发地',
     '目的地',
@@ -136,6 +140,8 @@ abstract final class ExcelService {
       parent == null ? '' : (cat?.name ?? ''),
       (t.amountCents / 100).toStringAsFixed(2),
       t.accountId == null ? '' : (accountNames[t.accountId] ?? ''),
+      // 转入侧只对转账有意义；支出 / 收入留空，免得被误认成第二账户
+      t.toAccountId == null ? '' : (accountNames[t.toAccountId] ?? ''),
       t.note,
       t.detail(TxnField.from),
       t.detail(TxnField.to),
@@ -274,6 +280,23 @@ abstract final class ExcelService {
       return id;
     }
 
+    /// 按名称找账户，找不到就建。转账的两侧都要走这里。
+    Future<int> ensureAccount(String name) async {
+      final hit = accs[name];
+      if (hit != null) return hit;
+      final id = await Repo.insertAccount(
+        Account(
+          id: 0,
+          name: name,
+          kind: AccountKind.other,
+          sortOrder: 999,
+        ),
+      );
+      accs[name] = id;
+      newAccs++;
+      return id;
+    }
+
     for (var r = 1; r < sheet.maxRows; r++) {
       final cells = sheet.row(r);
       String at(String col) {
@@ -288,6 +311,7 @@ abstract final class ExcelService {
       final rawSub = at('子分类');
       final rawAmount = at('金额');
       final rawAcc = at('账户');
+      final rawToAcc = at('转入账户');
       final note = at('备注');
 
       // 整行空白直接跳过（导出文件末尾常有空行）
@@ -301,10 +325,20 @@ abstract final class ExcelService {
       }
 
       final type = _parseType(rawType);
-      final amountCents = Fmt.parseCents(rawAmount.replaceAll('¥', ''));
-      if (amountCents <= 0) {
+
+      // 金额：**负数合法**（退款冲正、跨侧归集都靠它，见 `sql_fragments` 里的
+      // `amount_cents < 0` 分支）。旧版这里写 `amountCents <= 0` 就跳过，
+      // 于是「导出 → 导入」一次，负数流水全部消失且不报错。
+      // 现在只拦两种：解析不出来、恰好为 0。
+      final amountCents = Fmt.tryParseCents(rawAmount);
+      if (amountCents == null) {
         skipped++;
-        problems.add('第 ${r + 1} 行：金额「$rawAmount」无效');
+        problems.add('第 ${r + 1} 行：金额「$rawAmount」无法识别');
+        continue;
+      }
+      if (amountCents == 0) {
+        skipped++;
+        problems.add('第 ${r + 1} 行：金额为 0，已跳过');
         continue;
       }
 
@@ -312,20 +346,23 @@ abstract final class ExcelService {
 
       // 账户：按名称找；找不到就建
       int? accountId;
-      if (rawAcc.isNotEmpty) {
-        accountId = accs[rawAcc];
-        if (accountId == null) {
-          accountId = await Repo.insertAccount(
-            Account(
-              id: 0,
-              name: rawAcc,
-              kind: AccountKind.other,
-              sortOrder: 999,
-            ),
-          );
-          accs[rawAcc] = accountId;
-          newAccs++;
+      if (rawAcc.isNotEmpty) accountId = await ensureAccount(rawAcc);
+
+      // 转账必须两侧齐全。数据层 `_validateTransfer` 会直接抛异常，与其让整批
+      // 导入崩在第 N 行，不如把这一行挑出来报给用户（其余行继续导）。
+      int? toAccountId;
+      if (type == TxnType.transfer) {
+        if (rawAcc.isEmpty || rawToAcc.isEmpty) {
+          skipped++;
+          problems.add('第 ${r + 1} 行：转账缺少转出或转入账户，已跳过');
+          continue;
         }
+        if (rawToAcc == rawAcc) {
+          skipped++;
+          problems.add('第 ${r + 1} 行：转账的转出与转入是同一账户，已跳过');
+          continue;
+        }
+        toAccountId = await ensureAccount(rawToAcc);
       }
 
       await Repo.insertTxn(
@@ -337,6 +374,7 @@ abstract final class ExcelService {
           date: date,
           categoryId: categoryId,
           accountId: accountId,
+          toAccountId: toAccountId,
           note: note,
           placeFrom: at('出发地'),
           placeTo: at('目的地'),
@@ -373,7 +411,10 @@ abstract final class ExcelService {
 
   static TxnType _parseType(String raw) {
     final s = raw.trim();
-    if (s.contains('收') || s.toLowerCase() == 'income') return TxnType.income;
+    final lower = s.toLowerCase();
+    // 「转」要在「收」之前判：转账一旦落到 expense，往返之后余额会两边都对不上
+    if (s.contains('转') || lower == 'transfer') return TxnType.transfer;
+    if (s.contains('收') || lower == 'income') return TxnType.income;
     return TxnType.expense;
   }
 

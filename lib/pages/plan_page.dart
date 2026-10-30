@@ -256,17 +256,25 @@ class _TotalBudgetCard extends StatelessWidget {
                   '已用 ${Fmt.percent(used)}',
                   style: T.caption,
                 ),
-                const Spacer(),
-                if (over)
-                  Text(
-                    '超支 ${Fmt.money(s.overBudgetCents)}',
-                    style: T.amountXs.copyWith(color: C.over),
-                  )
-                else
-                  Text(
-                    '剩余 ${Fmt.money(s.budgetLeftCents)}',
-                    style: T.amountXs,
-                  ),
+                const SizedBox(width: S.sm),
+                // 右侧用 Expanded + 右对齐，而不是 Spacer + 自然宽度：
+                // 1.3 倍字号下「已用 100%」与「超支 ¥1,234.00」并排会超宽，
+                // Spacer 只能挤成 0，挤完仍然溢（1.7.2 修）。
+                Expanded(
+                  child: over
+                      ? Text(
+                          '超支 ${Fmt.money(s.overBudgetCents)}',
+                          style: T.amountXs.copyWith(color: C.over),
+                          textAlign: TextAlign.end,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      : Text(
+                          '剩余 ${Fmt.money(s.budgetLeftCents)}',
+                          style: T.amountXs,
+                          textAlign: TextAlign.end,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                ),
               ],
             ),
             // 预算节奏：把「还剩多少」翻成「还剩几天、每天能花多少」。
@@ -275,20 +283,25 @@ class _TotalBudgetCard extends StatelessWidget {
             Row(
               children: [
                 Text('还剩 ${pacing.remainDays} 天', style: T.caption),
-                const Spacer(),
                 // 已经超支时这个数必然是 0.00 —— 一个恒为 0 的数字不是信息
-                if (pacing.canSpendPerDayCents > 0)
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: '每天可花 ', style: T.caption),
-                        TextSpan(
-                          text: Fmt.money(pacing.canSpendPerDayCents),
-                          style: T.amountSm,
-                        ),
-                      ],
+                if (pacing.canSpendPerDayCents > 0) ...[
+                  const SizedBox(width: S.sm),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: '每天可花 ', style: T.caption),
+                          TextSpan(
+                            text: Fmt.money(pacing.canSpendPerDayCents),
+                            style: T.amountSm,
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.end,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                ],
               ],
             ),
             // 只在**有新增信息**时出现（已结束 / 按现在节奏会超）。

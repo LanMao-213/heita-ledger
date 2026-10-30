@@ -21,7 +21,11 @@ Future<String> _dbPath() async =>
     p.join(await databaseFactory.getDatabasesPath(), _dbName);
 
 /// 造一个 v4 老库：`budget` 还是按 `month` 存。
-Future<void> _makeV4Db() async {
+///
+/// [cycleStartDay] 非空时额外建 `setting` 表并写入账单日 —— 夹具缺这张表，
+/// 「账单日≠1 的用户升级后预算挂错期」这个场景在物理上就构造不出来，
+/// 于是缺陷 #4 一直测不到（1.7.2 补）。
+Future<void> _makeV4Db({int? cycleStartDay}) async {
   final file = File(await _dbPath());
   if (file.existsSync()) file.deleteSync();
 
@@ -39,6 +43,15 @@ Future<void> _makeV4Db() async {
             amount_cents INTEGER NOT NULL DEFAULT 0,
             UNIQUE (ledger_id, month, category_id)
           )''');
+        if (cycleStartDay != null) {
+          await db.execute(
+            'CREATE TABLE setting (k TEXT PRIMARY KEY, v TEXT NOT NULL)',
+          );
+          await db.insert('setting', {
+            'k': 'cycle_start_day',
+            'v': '$cycleStartDay',
+          });
+        }
         await db.insert('budget', {
           'ledger_id': 1,
           'month': '2026-10',
@@ -115,6 +128,36 @@ void main() {
       expect(rows[1]['period_start'], '2026-10-01');
       expect(rows[1]['category_id'], 7, reason: '分类预算要跟着走');
       expect(rows[2]['period_start'], '2026-11-01');
+    });
+
+    test('账单日 15 的库：预算归到 09-15 那期，而不是不存在的 10-01', () async {
+      // 旧实现把 `month || '-01'` 直接当归属期，等于假定账单日 = 1。
+      // 账单日 15 的用户迁移后，预算行还躺在库里，但挂在一个「不存在的期」上：
+      // 计划页读当前期 → 查不到 → 显示「本期未设预算」。数据没丢，功能没了。
+      await Db.close();
+      await _makeV4Db(cycleStartDay: 15);
+      await Db.open();
+
+      final db2 = await Db.open();
+      final rows = await db2.query('budget', orderBy: 'id');
+      expect(rows.length, 3, reason: '一条预算都不能丢');
+      // 2026-10-01 在账单日 15 的口径下属于「09-15 起」的那一期
+      expect(rows[0]['period_start'], '2026-09-15');
+      expect(rows[1]['period_start'], '2026-09-15');
+      // 2026-11-01 属于「10-15 起」的那一期
+      expect(rows[2]['period_start'], '2026-10-15');
+    });
+
+    test('账单日 15 的库：迁移后「本期总预算」读得出来', () async {
+      await Db.close();
+      await _makeV4Db(cycleStartDay: 15);
+      await Db.open();
+
+      expect(
+        await Repo.totalBudgetCents(1, '2026-09-15'),
+        500000,
+        reason: '预算必须落在当前期上，否则计划页显示「未设预算」',
+      );
     });
 
     test('迁移可重复执行', () async {

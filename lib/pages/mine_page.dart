@@ -6,17 +6,10 @@ import '../design/icons.dart';
 import '../design/palette.dart';
 import '../design/tokens.dart';
 import '../store.dart';
-import '../widgets/backup_flow.dart';
 import '../widgets/common.dart';
 import '../widgets/menu.dart';
 import '../widgets/storage_note.dart';
-import 'cats_page.dart';
-import 'help_page.dart';
-import 'import_bill_page.dart';
-import 'recurring_page.dart';
-import 'safety_page.dart';
 import 'settings_actions.dart';
-import 'templates_page.dart';
 
 /// 「我的」：全部设置项的**摆放位置**。
 ///
@@ -45,151 +38,24 @@ class MinePage extends StatelessWidget {
           ),
           // 读 Store 的组件不能用 const 实例化（重建会被跳过）
           _NetWorthCard(),
-          const SectionTitle('管理'),
-          SectionCard(
-            padding: const EdgeInsets.symmetric(vertical: S.sm),
-            child: Column(
-              children: [
-                SettingRow(
-                  icon: 'wallet',
-                  title: '账户管理',
-                  subtitle: '${s.accounts.length} 个账户',
-                  onTap: () => manageAccounts(context),
-                ),
-                const SettingDivider(),
-                SettingRow(
-                  icon: 'tag',
-                  title: '分类管理',
-                  subtitle:
-                      '支出 ${s.expenseCats.length} 类 · 收入 ${s.incomeCats.length} 类',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CatsPage()),
-                  ),
-                ),
-                const SettingDivider(),
-                SettingRow(
-                  icon: 'tpl',
-                  title: '记账模板',
-                  subtitle: s.templates.isEmpty
-                      ? '把常记的一笔存起来，一键填入'
-                      : '${s.templates.length} 个模板',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TemplatesPage()),
-                  ),
-                ),
-                const SettingDivider(),
-                SettingRow(
-                  icon: 'book',
-                  title: '账本管理',
-                  subtitle: '${s.ledgers.length} 个账本',
-                  onTap: () => manageLedgers(context),
-                ),
-                const SettingDivider(),
-                SettingRow(
-                  icon: 'rec',
-                  title: '周期账单',
-                  subtitle: '房租、话费这类每月固定支出',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RecurringPage()),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SectionTitle('记账周期'),
-          SectionCard(
-            padding: const EdgeInsets.symmetric(vertical: S.sm),
-            child: SettingRow(
-              icon: 'card',
-              title: '账单日',
-              subtitle: '每月 ${s.cycleStartDay} 号起算一期，到下月该日前一天',
-              onTap: () => pickCycleStartDay(context),
-            ),
-          ),
+          // 只留「导出当前筛选结果」：它依赖明细页此刻的筛选状态，是**上下文
+          // 动作**，搬不进侧拉栏（抽屉是全局面，读不到明细页筛了什么）。
+          //
+          // 其余导出 / 导入 / 备份 / 恢复 / 数据安全 / 账户 / 分类 / 账本 / 模板 /
+          // 周期账单 / 账单日 / 帮助，1.7.3 起统一只在侧拉栏出现 —— 同一件事两个
+          // 入口，用户会以为它们是两件事（「我的」页的加密备份和抽屉里的加密备份
+          // 曾经并存过一版）。
           const SectionTitle('数据'),
           SectionCard(
             padding: const EdgeInsets.symmetric(vertical: S.sm),
-            child: Column(
-              children: [
-                SettingRow(
-                  icon: 'upload',
-                  title: '导出账单到 Excel',
-                  subtitle: '生成 .xlsx，可发微信 / 存网盘',
-                  onTap: () => exportExcel(context),
-                ),
-                const SettingDivider(),
-                SettingRow(
-                  icon: 'filter',
-                  title: '导出当前筛选结果',
-                  subtitle: '只导明细页正在看的那部分',
-                  onTap: () => exportFilteredExcel(context),
-                ),
-                const SettingDivider(),
-                SettingRow(
-                  icon: 'download',
-                  title: '从 Excel 导入账单',
-                  subtitle: '按导出格式即可批量导入',
-                  onTap: () => importExcel(context),
-                ),
-                const SettingDivider(),
-                // 支付宝 / 微信账单是**别人的格式**：只补流水、不动余额，
-                // 所以单独一个入口，不并进上面那条 Excel 导入 ——
-                // 两条的语义完全不同（一个改余额，一个不改），混在一起用户会误判。
-                SettingRow(
-                  icon: 'download',
-                  title: '从支付宝 / 微信账单导入',
-                  subtitle: 'CSV（需 UTF-8 编码），逐行过目后再算入',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ImportBillPage(ledgerId: Store.i.ledgerId),
-                    ),
-                  ),
-                ),
-                const SettingDivider(),
-                // Excel 只带账单；下面这几行才是「换手机能原样搬过去」。
-                //
-                // 加密与明文是**并列的两个入口**，不是「高级选项」：两者导出
-                // 的内容一字不差（同一份 payload），区别只在容器。所以副标题
-                // 各自把代价说清 —— 一个说「口令忘了打不开」，一个说「谁能
-                // 拿到谁能读」，让用户在两个代价之间选，而不是默认替他选。
-                SettingRow(
-                  icon: 'lock',
-                  title: '加密备份',
-                  subtitle: '设一个口令，文件离开手机也打不开（口令不保存）',
-                  onTap: () => runSealedExportFlow(context),
-                ),
-                const SettingDivider(),
-                SettingRow(
-                  icon: 'upload',
-                  title: '明文备份',
-                  // 副标题必须写明「未加密」：这是一份能被任何文本编辑器打开的
-                  // 明文 JSON，里面是整本账（含备注、账户余额、「借给谁」）。
-                  subtitle: '明文 JSON（未加密），适合只存在自己的电脑里',
-                  onTap: () => runPlainExportFlow(context),
-                ),
-                const SettingDivider(),
-                SettingRow(
-                  icon: 'download',
-                  title: '从备份恢复',
-                  subtitle: '会覆盖当前全部数据，覆盖前自动留快照',
-                  onTap: () => restoreFromBackup(context),
-                ),
-                const SettingDivider(),
-                SettingRow(
-                  icon: 'shield',
-                  title: '数据安全',
-                  subtitle: '清空 / 恢复前的自动快照，可回滚',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SafetyPage()),
-                  ),
-                ),
-              ],
+            child: SettingRow(
+              icon: 'filter',
+              title: '导出当前筛选结果',
+              subtitle: '只导明细页正在看的那部分',
+              onTap: () => exportFilteredExcel(context),
             ),
           ),
+
           // 偏好：主题 + 触感。
           //
           // 主题这一行为什么存在：配色是记账 App 里少有的「纯个人口味」项 ——
@@ -247,16 +113,8 @@ class MinePage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: S.sm),
             child: Column(
               children: [
-                SettingRow(
-                  icon: 'help',
-                  title: '帮助说明',
-                  subtitle: '记账规则、备份、隐私，一篇看完',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HelpPage()),
-                  ),
-                ),
-                const SettingDivider(),
+                // 「帮助说明」已收进侧拉栏的「帮助与引导」（1.7.3）：
+                // 两个入口读的是同一篇文档，留着只会让人怀疑它们内容不同。
                 const SettingRow(
                   icon: 'info',
                   title: kAppName,
