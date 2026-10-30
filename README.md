@@ -13,11 +13,11 @@
 
 | | |
 |---|---|
-| 默认分支 | **`main`**,版本 **`1.7.1+28`**(已发版,标签 `v1.7.1`) |
+| 默认分支 | **`fix/1.7.2-data-integrity`**,版本 **`1.7.2+29`**(待发版,上一版标签 `v1.7.1`) |
 | 开发分支 | `feat/*`,合进 `main` 后按版本打标签(旧的 `feat/v2-merge` 已并入 `main` 并删除) |
-| 已发版 | **`v1.7.1`**:[Release 页](https://github.com/LanMao-213/heita-ledger/releases/tag/v1.7.1) 带 arm64 APK(18.3 MB);上一版 `v1.7.0` 带 arm64 APK(18.3 MB)、`v1.6.0` 带 arm64 APK(19.8 MB) |
+| 已发版 | 最新公开版是 **`v1.7.1`**:[Release 页](https://github.com/LanMao-213/heita-ledger/releases/tag/v1.7.1) 带 arm64 APK(18.3 MB);`1.7.2` 是数据正确性补丁,尚未发布 |
 | 质量闸门 | `flutter analyze --fatal-infos` 0 issue、**全部测试全绿**(含界面截图自检，条数随用例增长，以 CI 输出为准)、版本号三处一致性(CI 内)、出包七项校验、隐私扫描四处载体 |
-| 规模 | `lib/` 约 3.0 万行、`test/` 约 2.1 万行(101 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
+| 规模 | `lib/` 约 3.0 万行、`test/` 约 2.1 万行(98 个测试文件),无第三方状态管理(就是 `ChangeNotifier`) |
 | 许可 | [MIT](LICENSE) |
 | 待办 | 1.5.0 四项真机验收**已通过**(2026-10-28);**1.5.1 的「分类预算过滤」「趋势卡取消提示」两项、以及 1.6.0 / 1.7.0 的全部改动仍待真机复核**(设备离线,只有 CI 与单测背书)。剩余 3 票见 [Issues](https://github.com/LanMao-213/heita-ledger/issues):#5 真机数据态复核、#10 记一笔重构、#12 分发签名与权限面待拍板 |
 
@@ -199,7 +199,7 @@ lib/
   app.dart             主题、启动闸门(**没有启动页**,等待期只铺底色)、版本号常量
   store.dart           全局状态(ChangeNotifier),页面都读它
   data/
-    db.dart            建表 / 种子数据 / 版本迁移(schema v9)
+    db.dart            建表 / 种子数据 / 版本迁移(schema v11)
     models.dart        数据模型(库入口) + models/ 分部；格式化工具 Fmt
     repo.dart          SQL 门面(页面不直接碰库) + repo/ 12 个分部
     repo_stats.dart    统计聚合(与列表查询分开)
