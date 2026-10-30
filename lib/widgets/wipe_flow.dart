@@ -31,7 +31,7 @@ Future<bool> runWipeFlow(BuildContext context) async {
     context,
     title: '清空全部数据？',
     message: '所有账目、账户、分类、目标都会被删除，恢复成刚装好的样子。\n\n'
-        '清空前会自动存一份快照，后悔了可以从「我的 → 数据安全」里找回来。',
+        '清空前会自动存一份快照，后悔了可以从侧拉栏的「数据安全」里找回来。',
     confirmLabel: '确认清空',
     danger: true,
   );
@@ -68,7 +68,7 @@ Future<bool> runWipeFlow(BuildContext context) async {
           const SizedBox(height: S.xs),
           Text(snapshot, style: T.caption.copyWith(color: C.ink2)),
           const SizedBox(height: S.sm),
-          Text('要找回来的话，去「我的 → 数据安全」用这份快照恢复。', style: T.caption),
+          Text('要找回来的话，去侧拉栏的「数据安全」用这份快照恢复。', style: T.caption),
         ],
       ),
     );

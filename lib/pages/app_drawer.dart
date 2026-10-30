@@ -6,9 +6,11 @@ import '../design/icons.dart';
 import '../design/tokens.dart';
 import '../store.dart';
 import '../widgets/backup_flow.dart';
+import '../widgets/menu.dart';
 import '../widgets/transfer_sheet.dart';
 import 'cats_page.dart';
 import 'help_page.dart';
+import 'import_bill_page.dart';
 import 'onboarding_page.dart';
 import 'recurring_page.dart';
 import 'safety_page.dart';
@@ -75,8 +77,104 @@ class _AppDrawerState extends State<AppDrawer> {
     });
   }
 
-  /// 切到某个 tab（0 明细 / 1 图表 / 2 计划 / 3 我的）
-  void _tab(int i) => _run((_) => Store.i.switchTab(i));
+  /// 导入账单：两条路的语义完全不同（Excel 会改账户余额，支付宝/微信 CSV 不改、
+  /// 而是反向调期初），混成一个入口用户会误判 —— 所以合成一张菜单，让名字先说清楚。
+  void _showImportMenu(BuildContext host) {
+    showMenuSheet<void>(
+      context: host,
+      title: '导入账单',
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(
+              icon: 'doc',
+              title: 'Excel (.xlsx)',
+              subtitle: '按导出格式批量导入，会改账户余额',
+              onTap: () => importExcel(host),
+            ),
+            MenuAction(
+              icon: 'doc',
+              title: '支付宝 / 微信账单 CSV',
+              subtitle: '逐行过目后再算入，不改余额',
+              onTap: () => Navigator.of(host).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ImportBillPage(ledgerId: Store.i.ledgerId),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 备份与恢复：同一份数据的三个动作，收进一层。
+  ///
+  /// 为什么不再并列成三行：加密与明文导出的**内容一字不差**，区别只在容器；
+  /// 而恢复两种都认。三个入口摆在抽屉里，等于逼用户在打开抽屉的那一刻就决定
+  /// 「我要加密还是明文」，而他此刻想的是「备个份」。
+  void _showBackupMenu(BuildContext host) {
+    showMenuSheet<void>(
+      context: host,
+      title: '备份与恢复',
+      subtitle: '三者的内容相同，区别只在容器与方向',
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(
+              icon: 'lock',
+              title: '加密备份',
+              subtitle: '.heita · 要口令，忘口令不可恢复',
+              onTap: () => runSealedExportFlow(host),
+            ),
+            MenuAction(
+              icon: 'doc',
+              title: '明文备份',
+              subtitle: '.json · 谁拿到谁能读',
+              onTap: () => runPlainExportFlow(host),
+            ),
+            MenuAction(
+              icon: 'download',
+              title: '从备份恢复',
+              subtitle: '加密与明文都认，按内容判型',
+              onTap: () => restoreFromBackup(host),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 帮助：把「重看引导」和「帮助说明」放一起 —— 两者都是「我忘了怎么用」。
+  ///
+  /// 引导以前是抽屉里独立一行。它一年用不到第二次，却和管理类入口同样醒目，
+  /// 而真正会被反复翻的是帮助说明。
+  void _showHelpMenu(BuildContext host) {
+    showMenuSheet<void>(
+      context: host,
+      title: '帮助',
+      groups: [
+        MenuGroup(
+          actions: [
+            MenuAction(
+              icon: 'help',
+              title: '帮助说明',
+              subtitle: '记账规则、备份、隐私，一篇看完',
+              onTap: () => Navigator.of(host).push(
+                MaterialPageRoute<void>(builder: (_) => const HelpPage()),
+              ),
+            ),
+            MenuAction(
+              icon: 'bulb',
+              title: '重看使用引导',
+              subtitle: '五步，随时可以再看一遍',
+              onTap: () => showOnboarding(host),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   void _push(Widget page) => _run(
     (host) =>
@@ -109,56 +207,17 @@ class _AppDrawerState extends State<AppDrawer> {
                 child: ListView(
                   padding: EdgeInsets.zero,
                   children: [
+                    // 唯一的「动作」行。记一笔由底栏中央的「+」承担，抽屉里
+                    // 再放一条就是同一个动作两个入口（1.7.3 删）。
+                    _Entry(
+                      icon: 'coin',
+                      label: '转账',
+                      hint: '账户之间挪钱',
+                      onTap: () => _run(showTransferSheet),
+                    ).build(context),
                     _group(
-                      id: 'quick',
-                      title: '常用',
-                      entries: [
-                        _Entry(
-                          icon: 'plus',
-                          label: '记一笔',
-                          onTap: () => _run((_) => widget.onRecord()),
-                        ),
-                        _Entry(
-                          icon: 'coin',
-                          label: '转账',
-                          hint: '账户之间挪钱',
-                          onTap: () => _run(showTransferSheet),
-                        ),
-                      ],
-                    ),
-                    _group(
-                      id: 'nav',
-                      title: '导航',
-                      entries: [
-                        _Entry(
-                          icon: 'list',
-                          label: '明细',
-                          active: Store.i.tabIndex == 0,
-                          onTap: () => _tab(0),
-                        ),
-                        _Entry(
-                          icon: 'pie',
-                          label: '图表',
-                          active: Store.i.tabIndex == 1,
-                          onTap: () => _tab(1),
-                        ),
-                        _Entry(
-                          icon: 'target',
-                          label: '计划',
-                          active: Store.i.tabIndex == 2,
-                          onTap: () => _tab(2),
-                        ),
-                        _Entry(
-                          icon: 'person',
-                          label: '我的',
-                          active: Store.i.tabIndex == 3,
-                          onTap: () => _tab(3),
-                        ),
-                      ],
-                    ),
-                    _group(
-                      id: 'manage',
-                      title: '管理',
+                      id: 'ledger',
+                      title: '账本',
                       entries: [
                         _Entry(
                           icon: 'wallet',
@@ -204,20 +263,22 @@ class _AppDrawerState extends State<AppDrawer> {
                           label: '导出 Excel',
                           onTap: () => _run(exportExcel),
                         ),
-                        _Entry(
-                          icon: 'lock',
-                          label: '加密备份',
-                          onTap: () => _run(runSealedExportFlow),
-                        ),
-                        _Entry(
-                          icon: 'doc',
-                          label: '明文备份',
-                          onTap: () => _run(runPlainExportFlow),
-                        ),
+                        // 导入原本只在「我的」页：导出在抽屉、导入在设置页，
+                        // 同一件事的两个方向被拆到两处，是最容易「找不到」的形态。
                         _Entry(
                           icon: 'download',
-                          label: '从备份恢复',
-                          onTap: () => _run(restoreFromBackup),
+                          label: '导入账单',
+                          hint: 'Excel / 支付宝',
+                          onTap: () => _run(_showImportMenu),
+                        ),
+                        // 加密 / 明文 / 恢复是同一份数据的三个动作。三个并列入口
+                        // 让用户在这里就要做「加密还是明文」的决定，而他此刻想的
+                        // 只是「备个份」。收进一层，进到里面再选。
+                        _Entry(
+                          icon: 'lock',
+                          label: '备份与恢复',
+                          hint: '加密 / 明文 / 恢复',
+                          onTap: () => _run(_showBackupMenu),
                         ),
                         _Entry(
                           icon: 'shield',
@@ -232,14 +293,9 @@ class _AppDrawerState extends State<AppDrawer> {
                       title: '帮助',
                       entries: [
                         _Entry(
-                          icon: 'bulb',
-                          label: '使用引导',
-                          onTap: () => _run(showOnboarding),
-                        ),
-                        _Entry(
                           icon: 'help',
-                          label: '帮助说明',
-                          onTap: () => _push(const HelpPage()),
+                          label: '帮助与引导',
+                          onTap: () => _run(_showHelpMenu),
                         ),
                       ],
                     ),
@@ -380,12 +436,15 @@ class _Header extends StatelessWidget {
 }
 
 /// 抽屉里的一行。
+///
+/// 1.7.3 去掉了 `active`（「你正在这一页」的竖线标记）：那个标记只服务于
+/// 「导航」组，而导航组已经删掉 —— 底栏四个 tab 本身就是当前位置的标记，
+/// 抽屉再去标一遍，等于在一个不承担导航的面里做导航。
 class _Entry {
   const _Entry({
     required this.icon,
     required this.label,
     this.hint,
-    this.active = false,
     required this.onTap,
   });
 
@@ -394,9 +453,6 @@ class _Entry {
 
   /// 右侧的补充信息（「3 个」「每月 1 号」）。不是必需：绝大多数行不需要
   final String? hint;
-
-  /// 导航组里标出「你正在这一页」
-  final bool active;
 
   final VoidCallback onTap;
 
@@ -407,28 +463,14 @@ class _Entry {
         height: 44,
         child: Row(
           children: [
-            // 左侧那条竖线是「当前页」的唯一标记。放在图标左边而不是给整行加底色：
-            // 抽屉底色本身已经是 bg，加底色会和卡片区分不开，一条线最省
-            SizedBox(
-              width: 3,
-              height: 18,
-              child: active
-                  ? DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: C.ink,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: S.lg - 3),
-            LineIcon(icon, size: 19, color: active ? C.ink : C.ink2),
+            const SizedBox(width: S.lg),
+            LineIcon(icon, size: 19, color: C.ink2),
             const SizedBox(width: S.md),
             Expanded(
               child: Text(
                 label,
                 style: T.body.copyWith(
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                  fontWeight: FontWeight.w500,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

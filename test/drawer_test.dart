@@ -93,7 +93,7 @@ void main() {
     if (f.existsSync()) f.deleteSync();
   });
 
-  testWidgets('四个页头都有抽屉把手，点开是五个分组', (tester) async {
+  testWidgets('四个页头都有抽屉把手，点开是三个分组 + 一个动作行', (tester) async {
     await _bootHome(tester);
 
     // 四页共用同一个页头组件；切过去之后把手仍然在
@@ -105,23 +105,36 @@ void main() {
     expect(find.byType(MenuButton), findsOneWidget, reason: '我的页没有把手');
 
     await _openDrawer(tester);
-    for (final group in ['常用', '导航', '管理', '数据', '帮助']) {
+    // 1.7.3 删掉「常用」「导航」两组：记一笔在底栏中央的「+」，明细/图表/计划/我的
+    // 在底部 tab —— 抽屉里再列一遍，等于同一件事两个入口。
+    for (final group in ['账本', '数据', '帮助']) {
       expect(_inDrawer(group), findsOneWidget, reason: '缺「$group」分组');
     }
 
     // 每组抽一个入口：分组标题在、入口却不在，等于分组是个空壳
     for (final entry in [
-      '记一笔',
       '转账',
-      '明细',
       '账户管理',
       '账单日',
-      '加密备份',
+      '导入账单',
+      '备份与恢复',
       '数据安全',
+      '帮助与引导',
+    ]) {
+      expect(_inDrawer(entry), findsOneWidget, reason: '缺入口「$entry」');
+    }
+
+    // 反向断言：删掉的那些不能又长回来
+    for (final gone in [
+      '记一笔',
+      '明细',
+      '加密备份',
+      '明文备份',
+      '从备份恢复',
       '使用引导',
       '帮助说明',
     ]) {
-      expect(_inDrawer(entry), findsOneWidget, reason: '缺入口「$entry」');
+      expect(_inDrawer(gone), findsNothing, reason: '「$gone」应当已经移出抽屉');
     }
   });
 
@@ -130,44 +143,63 @@ void main() {
     await _openDrawer(tester);
 
     expect(_inDrawer('账户管理'), findsOneWidget);
-    await tester.tap(_inDrawer('管理'));
+    await tester.tap(_inDrawer('账本'));
     await tester.pumpAndSettle();
     expect(
       _inDrawer('账户管理'),
       findsNothing,
       reason: '收起后入口还在树上，只是被盖住 —— 那不是收起',
     );
-    expect(_inDrawer('管理'), findsOneWidget, reason: '组标题必须留着，否则没法展开');
+    expect(_inDrawer('账本'), findsOneWidget, reason: '组标题必须留着，否则没法展开');
 
-    await tester.tap(_inDrawer('管理'));
+    await tester.tap(_inDrawer('账本'));
     await tester.pumpAndSettle();
     expect(_inDrawer('账户管理'), findsOneWidget);
   });
 
-  testWidgets('导航组：点「图表」→ 抽屉关上且真的切到图表页', (tester) async {
+  testWidgets('点「转账」：抽屉关上并弹出转账面板', (tester) async {
     await _bootHome(tester);
-    expect(Store.i.tabIndex, 0);
-
     await _openDrawer(tester);
-    await _tapEntry(tester, '图表');
+    await _tapEntry(tester, '转账');
 
-    expect(Store.i.tabIndex, 1, reason: '没有切页');
     expect(find.byType(AppDrawer), findsNothing, reason: '抽屉没收起来');
+    expect(find.text('确认转账'), findsOneWidget, reason: '转账面板没打开');
   });
 
-  testWidgets('「使用引导」能打开引导；「帮助说明」能 push 到帮助页', (tester) async {
+  testWidgets('「备份与恢复」的三项都在，点加密备份走到口令那一步', (tester) async {
+    await _bootHome(tester);
+    await _openDrawer(tester);
+    await _tapEntry(tester, '备份与恢复');
+
+    // 三个动作收进一层之后，名字必须说清各自的代价
+    expect(find.text('加密备份'), findsOneWidget);
+    expect(find.text('明文备份'), findsOneWidget);
+    expect(find.text('从备份恢复'), findsOneWidget);
+  });
+
+  testWidgets('「帮助与引导」的二级菜单：帮助说明与重看引导都能打开', (tester) async {
     await _bootHome(tester);
 
     await _openDrawer(tester);
-    await _tapEntry(tester, '使用引导');
+    await _tapEntry(tester, '帮助与引导');
+    await tester.tap(find.text('帮助说明'));
+    await tester.pumpAndSettle();
+    expect(find.byType(HelpPage), findsOneWidget);
+
+    // 不能用 tester.pageBack()：HelpPage 的返回键是自绘的 IconButton + LineIcon，
+    // 没有标准 Back 按钮的 tooltip，pageBack 会直接 fail。这里从导航栈弹回去即可。
+    Navigator.of(tester.element(find.byType(HelpPage))).pop();
+    await tester.pumpAndSettle();
+
+    await _openDrawer(tester);
+    await _tapEntry(tester, '帮助与引导');
+    await tester.tap(find.text('重看使用引导'));
+    await tester.pumpAndSettle();
     expect(find.byType(OnboardingPage), findsOneWidget);
 
     await tester.tap(find.text('跳过'));
     await tester.pumpAndSettle();
     expect(find.byType(OnboardingPage), findsNothing);
-
-    await _openDrawer(tester);
-    await _tapEntry(tester, '帮助说明');
-    expect(find.byType(HelpPage), findsOneWidget);
   });
+
 }

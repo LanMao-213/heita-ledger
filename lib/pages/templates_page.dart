@@ -467,7 +467,7 @@ class _TemplateEditorPageState extends State<TemplateEditorPage> {
           if (_cats.isEmpty)
             Padding(
               padding: EdgeInsets.symmetric(horizontal: S.lg),
-              child: Text('还没有分类，请先到「我的 → 分类管理」添加', style: T.caption),
+              child: Text('还没有分类，请先到侧拉栏的「分类管理」添加', style: T.caption),
             )
           else
             Padding(

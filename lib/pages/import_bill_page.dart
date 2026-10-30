@@ -356,7 +356,7 @@ class _ImportBillPageState extends State<ImportBillPage> {
     if (_accounts.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(S.lg),
-        child: Text('还没有账户，先去「我的 → 账户」建一个再来。', style: T.caption),
+        child: Text('还没有账户，先去侧拉栏的「账户管理」建一个再来。', style: T.caption),
       );
     }
     return Container(

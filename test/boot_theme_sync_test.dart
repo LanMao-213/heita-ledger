@@ -21,6 +21,7 @@ import 'package:ledger/design/palette.dart';
 import 'package:ledger/design/theme_ctrl.dart';
 import 'package:ledger/design/tokens.dart';
 import 'package:ledger/pages/home_shell.dart';
+import 'package:ledger/widgets/common.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -92,11 +93,10 @@ void main() {
     // 真开一次弹层，量它实际画出来的底色
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('账户管理'),
-      240,
-      scrollable: find.byType(Scrollable).first,
-    );
+    // 「账户管理」1.7.3 起只在侧拉栏（「我的」页不再重复列设置入口）。
+    // 这里仍然借它开同一个弹层 —— 要验的是「弹层底色跟不跟皮肤」，
+    // 从哪个入口进不影响结论。
+    await tester.tap(find.byType(MenuButton));
     await tester.pumpAndSettle();
     await tester.tap(find.text('账户管理'));
     await tester.pumpAndSettle();

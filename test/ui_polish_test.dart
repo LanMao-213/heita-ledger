@@ -305,7 +305,7 @@ void main() {
     expect(Store.i.tabIndex, 0, reason: '横滑也要能换页，并且和 tab 状态是同一个');
   });
 
-  testWidgets('我的页有加密备份 / 明文备份 / 恢复三个入口', (tester) async {
+  testWidgets('我的页只剩「数据 + 偏好 + 危险操作 + 关于」，设置入口不再重复', (tester) async {
     await seed(tester);
     tester.view.physicalSize = const Size(390 * 2, 1600 * 2);
     tester.view.devicePixelRatio = 2.0;
@@ -316,13 +316,35 @@ void main() {
     );
     await tester.pump();
 
-    // 这三行是全量备份的入口，删了就等于「换手机只能丢数据」。
+    // 1.7.3 起设置类入口统一收进侧拉栏，「我的」页不再重复列一遍。
     //
-    // 1.6.0 起「备份全部数据」拆成两行（加密 / 明文）：它不再是「一个动作」，
-    // 而是**同一份数据的两个容器**，代价不同（一个要记口令、一个谁拿到谁能读），
-    // 得让用户自己选。两者必须同时在，只有加密 = 忘了口令就再也带不走数据。
-    expect(find.text('加密备份'), findsOneWidget);
-    expect(find.text('明文备份'), findsOneWidget);
-    expect(find.text('从备份恢复'), findsOneWidget);
+    // 之前这里断言「加密备份 / 明文备份 / 从备份恢复」三行都在本页 —— 那条
+    // 断言的**意图**（换手机不能只能丢数据）仍然成立，但落点搬到了抽屉，
+    // 由 drawer_test「「备份与恢复」的三项都在」继续守。本页现在要守的是
+    // **不要长回去**：两个入口指向同一件事，用户会以为它们是两件事。
+    for (final gone in [
+      '加密备份',
+      '明文备份',
+      '从备份恢复',
+      '导入账单',
+      '账户管理',
+      '分类管理',
+      '账本管理',
+      '数据安全',
+      '周期账单',
+      '账单日',
+      '帮助说明',
+    ]) {
+      expect(
+        find.text(gone),
+        findsNothing,
+        reason: '「$gone」应当只在侧拉栏出现，不该在「我的」页重复',
+      );
+    }
+
+    // 留下的四块：上下文动作 + 个人偏好 + 单向门 + 关于
+    for (final keep in ['导出当前筛选结果', '主题', '触感反馈', '清空全部数据']) {
+      expect(find.text(keep), findsOneWidget, reason: '「我的」页丢了「$keep」');
+    }
   });
 }
