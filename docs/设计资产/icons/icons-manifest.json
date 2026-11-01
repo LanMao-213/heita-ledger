@@ -1,0 +1,892 @@
+{
+  "name": "黑塔消费日记 · 图标集",
+  "grid": 24,
+  "stroke": 1.75,
+  "cap": "round",
+  "join": "round",
+  "fill": "none",
+  "colorToken": "currentColor",
+  "sizes": [
+    16,
+    20,
+    24,
+    32,
+    48,
+    64,
+    96
+  ],
+  "total": 66,
+  "groups": [
+    {
+      "key": "core",
+      "label": "核心",
+      "usage": "导航 / 收支 / 预算 / 报表等页面级",
+      "count": 19,
+      "icons": [
+        {
+          "name": "list",
+          "cn": "流水",
+          "en": "Transactions",
+          "note": "",
+          "sprite": "bt-list",
+          "svg": "icons/core/list.svg",
+          "keywords": [
+            "流水",
+            "transactions"
+          ]
+        },
+        {
+          "name": "add",
+          "cn": "记一笔",
+          "en": "New Entry",
+          "note": "",
+          "sprite": "bt-add",
+          "svg": "icons/core/add.svg",
+          "keywords": [
+            "记一笔",
+            "new entry"
+          ]
+        },
+        {
+          "name": "stats",
+          "cn": "统计",
+          "en": "Statistics",
+          "note": "",
+          "sprite": "bt-stats",
+          "svg": "icons/core/stats.svg",
+          "keywords": [
+            "统计",
+            "statistics"
+          ]
+        },
+        {
+          "name": "trend",
+          "cn": "趋势",
+          "en": "Trend",
+          "note": "",
+          "sprite": "bt-trend",
+          "svg": "icons/core/trend.svg",
+          "keywords": [
+            "趋势",
+            "trend"
+          ]
+        },
+        {
+          "name": "income",
+          "cn": "收入",
+          "en": "Income",
+          "note": "",
+          "sprite": "bt-income",
+          "svg": "icons/core/income.svg",
+          "keywords": [
+            "收入",
+            "income"
+          ]
+        },
+        {
+          "name": "expense",
+          "cn": "支出",
+          "en": "Expense",
+          "note": "",
+          "sprite": "bt-expense",
+          "svg": "icons/core/expense.svg",
+          "keywords": [
+            "支出",
+            "expense"
+          ]
+        },
+        {
+          "name": "transfer",
+          "cn": "转账",
+          "en": "Transfer",
+          "note": "",
+          "sprite": "bt-transfer",
+          "svg": "icons/core/transfer.svg",
+          "keywords": [
+            "转账",
+            "transfer"
+          ]
+        },
+        {
+          "name": "category",
+          "cn": "分类",
+          "en": "Category",
+          "note": "",
+          "sprite": "bt-category",
+          "svg": "icons/core/category.svg",
+          "keywords": [
+            "分类",
+            "category"
+          ]
+        },
+        {
+          "name": "tag",
+          "cn": "标签",
+          "en": "Tag",
+          "note": "",
+          "sprite": "bt-tag",
+          "svg": "icons/core/tag.svg",
+          "keywords": [
+            "标签",
+            "tag"
+          ]
+        },
+        {
+          "name": "budget",
+          "cn": "预算",
+          "en": "Budget",
+          "note": "",
+          "sprite": "bt-budget",
+          "svg": "icons/core/budget.svg",
+          "keywords": [
+            "预算",
+            "budget"
+          ]
+        },
+        {
+          "name": "asset",
+          "cn": "资产",
+          "en": "Assets",
+          "note": "",
+          "sprite": "bt-asset",
+          "svg": "icons/core/asset.svg",
+          "keywords": [
+            "资产",
+            "assets"
+          ]
+        },
+        {
+          "name": "goal",
+          "cn": "储蓄目标",
+          "en": "Savings Goal",
+          "note": "",
+          "sprite": "bt-goal",
+          "svg": "icons/core/goal.svg",
+          "keywords": [
+            "储蓄目标",
+            "savings goal"
+          ]
+        },
+        {
+          "name": "bill",
+          "cn": "账单提醒",
+          "en": "Reminder",
+          "note": "",
+          "sprite": "bt-bill",
+          "svg": "icons/core/bill.svg",
+          "keywords": [
+            "账单提醒",
+            "reminder"
+          ]
+        },
+        {
+          "name": "calendar",
+          "cn": "日历",
+          "en": "Calendar",
+          "note": "",
+          "sprite": "bt-calendar",
+          "svg": "icons/core/calendar.svg",
+          "keywords": [
+            "日历",
+            "calendar"
+          ]
+        },
+        {
+          "name": "report",
+          "cn": "报表",
+          "en": "Report",
+          "note": "",
+          "sprite": "bt-report",
+          "svg": "icons/core/report.svg",
+          "keywords": [
+            "报表",
+            "report"
+          ]
+        },
+        {
+          "name": "search",
+          "cn": "搜索",
+          "en": "Search",
+          "note": "",
+          "sprite": "bt-search",
+          "svg": "icons/core/search.svg",
+          "keywords": [
+            "搜索",
+            "search"
+          ]
+        },
+        {
+          "name": "settings",
+          "cn": "设置",
+          "en": "Settings",
+          "note": "",
+          "sprite": "bt-settings",
+          "svg": "icons/core/settings.svg",
+          "keywords": [
+            "设置",
+            "settings"
+          ]
+        },
+        {
+          "name": "profile",
+          "cn": "我的",
+          "en": "Profile",
+          "note": "",
+          "sprite": "bt-profile",
+          "svg": "icons/core/profile.svg",
+          "keywords": [
+            "我的",
+            "profile"
+          ]
+        },
+        {
+          "name": "lock",
+          "cn": "安全",
+          "en": "Security",
+          "note": "",
+          "sprite": "bt-lock",
+          "svg": "icons/core/lock.svg",
+          "keywords": [
+            "安全",
+            "security"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "category",
+      "label": "分类",
+      "usage": "消费与收入分类，多用圆形色底",
+      "count": 28,
+      "icons": [
+        {
+          "name": "food",
+          "cn": "餐饮",
+          "en": "Dining",
+          "note": "支出 · 碗与热气",
+          "sprite": "bt-food",
+          "svg": "icons/category/food.svg",
+          "keywords": [
+            "餐饮",
+            "碗与热气",
+            "dining"
+          ]
+        },
+        {
+          "name": "delivery",
+          "cn": "外卖",
+          "en": "Delivery",
+          "note": "支出 · 打包盒",
+          "sprite": "bt-delivery",
+          "svg": "icons/category/delivery.svg",
+          "keywords": [
+            "外卖",
+            "打包盒",
+            "delivery"
+          ]
+        },
+        {
+          "name": "coffee",
+          "cn": "咖啡",
+          "en": "Coffee",
+          "note": "支出 · 咖啡杯",
+          "sprite": "bt-coffee",
+          "svg": "icons/category/coffee.svg",
+          "keywords": [
+            "咖啡",
+            "咖啡杯",
+            "coffee"
+          ]
+        },
+        {
+          "name": "grocery",
+          "cn": "超市",
+          "en": "Groceries",
+          "note": "支出 · 购物篮",
+          "sprite": "bt-grocery",
+          "svg": "icons/category/grocery.svg",
+          "keywords": [
+            "超市",
+            "购物篮",
+            "groceries"
+          ]
+        },
+        {
+          "name": "transit",
+          "cn": "公共交通",
+          "en": "Transit",
+          "note": "支出 · 公交地铁",
+          "sprite": "bt-transit",
+          "svg": "icons/category/transit.svg",
+          "keywords": [
+            "公共交通",
+            "公交地铁",
+            "transit"
+          ]
+        },
+        {
+          "name": "taxi",
+          "cn": "打车",
+          "en": "Taxi",
+          "note": "支出 · 车辆",
+          "sprite": "bt-taxi",
+          "svg": "icons/category/taxi.svg",
+          "keywords": [
+            "打车",
+            "车辆",
+            "taxi"
+          ]
+        },
+        {
+          "name": "fuel",
+          "cn": "加油",
+          "en": "Fuel",
+          "note": "支出 · 加油机",
+          "sprite": "bt-fuel",
+          "svg": "icons/category/fuel.svg",
+          "keywords": [
+            "加油",
+            "加油机",
+            "fuel"
+          ]
+        },
+        {
+          "name": "parking",
+          "cn": "停车",
+          "en": "Parking",
+          "note": "支出 · 停车位",
+          "sprite": "bt-parking",
+          "svg": "icons/category/parking.svg",
+          "keywords": [
+            "停车",
+            "停车位",
+            "parking"
+          ]
+        },
+        {
+          "name": "shopping",
+          "cn": "购物",
+          "en": "Shopping",
+          "note": "支出 · 购物袋",
+          "sprite": "bt-shopping",
+          "svg": "icons/category/shopping.svg",
+          "keywords": [
+            "购物",
+            "购物袋",
+            "shopping"
+          ]
+        },
+        {
+          "name": "clothing",
+          "cn": "服饰",
+          "en": "Apparel",
+          "note": "支出 · T恤",
+          "sprite": "bt-clothing",
+          "svg": "icons/category/clothing.svg",
+          "keywords": [
+            "服饰",
+            "T恤",
+            "apparel"
+          ]
+        },
+        {
+          "name": "beauty",
+          "cn": "美妆",
+          "en": "Beauty",
+          "note": "支出 · 口红",
+          "sprite": "bt-beauty",
+          "svg": "icons/category/beauty.svg",
+          "keywords": [
+            "美妆",
+            "口红",
+            "beauty"
+          ]
+        },
+        {
+          "name": "digital",
+          "cn": "数码",
+          "en": "Digital",
+          "note": "支出 · 电脑",
+          "sprite": "bt-digital",
+          "svg": "icons/category/digital.svg",
+          "keywords": [
+            "数码",
+            "电脑",
+            "digital"
+          ]
+        },
+        {
+          "name": "housing",
+          "cn": "居住",
+          "en": "Housing",
+          "note": "支出 · 房屋",
+          "sprite": "bt-housing",
+          "svg": "icons/category/housing.svg",
+          "keywords": [
+            "居住",
+            "房屋",
+            "housing"
+          ]
+        },
+        {
+          "name": "utilities",
+          "cn": "水电",
+          "en": "Utilities",
+          "note": "支出 · 水滴",
+          "sprite": "bt-utilities",
+          "svg": "icons/category/utilities.svg",
+          "keywords": [
+            "水电",
+            "水滴",
+            "utilities"
+          ]
+        },
+        {
+          "name": "phone",
+          "cn": "通讯",
+          "en": "Mobile",
+          "note": "支出 · 手机",
+          "sprite": "bt-phone",
+          "svg": "icons/category/phone.svg",
+          "keywords": [
+            "通讯",
+            "手机",
+            "mobile"
+          ]
+        },
+        {
+          "name": "medical",
+          "cn": "医疗",
+          "en": "Medical",
+          "note": "支出 · 药丸",
+          "sprite": "bt-medical",
+          "svg": "icons/category/medical.svg",
+          "keywords": [
+            "医疗",
+            "药丸",
+            "medical"
+          ]
+        },
+        {
+          "name": "education",
+          "cn": "教育",
+          "en": "Education",
+          "note": "支出 · 学位帽",
+          "sprite": "bt-education",
+          "svg": "icons/category/education.svg",
+          "keywords": [
+            "教育",
+            "学位帽",
+            "education"
+          ]
+        },
+        {
+          "name": "entertainment",
+          "cn": "娱乐",
+          "en": "Leisure",
+          "note": "支出 · 游戏手柄",
+          "sprite": "bt-entertainment",
+          "svg": "icons/category/entertainment.svg",
+          "keywords": [
+            "娱乐",
+            "游戏手柄",
+            "leisure"
+          ]
+        },
+        {
+          "name": "travel",
+          "cn": "旅行",
+          "en": "Travel",
+          "note": "支出 · 飞机",
+          "sprite": "bt-travel",
+          "svg": "icons/category/travel.svg",
+          "keywords": [
+            "旅行",
+            "飞机",
+            "travel"
+          ]
+        },
+        {
+          "name": "fitness",
+          "cn": "健身",
+          "en": "Fitness",
+          "note": "支出 · 哑铃",
+          "sprite": "bt-fitness",
+          "svg": "icons/category/fitness.svg",
+          "keywords": [
+            "健身",
+            "哑铃",
+            "fitness"
+          ]
+        },
+        {
+          "name": "salary",
+          "cn": "工资",
+          "en": "Salary",
+          "note": "收入 · 现金",
+          "sprite": "bt-salary",
+          "svg": "icons/category/salary.svg",
+          "keywords": [
+            "工资",
+            "现金",
+            "salary"
+          ]
+        },
+        {
+          "name": "bonus",
+          "cn": "奖金",
+          "en": "Bonus",
+          "note": "收入 · 奖杯",
+          "sprite": "bt-bonus",
+          "svg": "icons/category/bonus.svg",
+          "keywords": [
+            "奖金",
+            "奖杯",
+            "bonus"
+          ]
+        },
+        {
+          "name": "parttime",
+          "cn": "兼职",
+          "en": "Side Job",
+          "note": "收入 · 公文包",
+          "sprite": "bt-parttime",
+          "svg": "icons/category/parttime.svg",
+          "keywords": [
+            "兼职",
+            "公文包",
+            "side job"
+          ]
+        },
+        {
+          "name": "investment",
+          "cn": "理财",
+          "en": "Investment",
+          "note": "收入 · 宝石",
+          "sprite": "bt-investment",
+          "svg": "icons/category/investment.svg",
+          "keywords": [
+            "理财",
+            "宝石",
+            "investment"
+          ]
+        },
+        {
+          "name": "reimburse",
+          "cn": "报销",
+          "en": "Reimburse",
+          "note": "收入 · 票据",
+          "sprite": "bt-reimburse",
+          "svg": "icons/category/reimburse.svg",
+          "keywords": [
+            "报销",
+            "票据",
+            "reimburse"
+          ]
+        },
+        {
+          "name": "refund",
+          "cn": "退款",
+          "en": "Refund",
+          "note": "收入 · 回转箭头",
+          "sprite": "bt-refund",
+          "svg": "icons/category/refund.svg",
+          "keywords": [
+            "退款",
+            "回转箭头",
+            "refund"
+          ]
+        },
+        {
+          "name": "redpacket",
+          "cn": "红包",
+          "en": "Red Packet",
+          "note": "收入 · 红包",
+          "sprite": "bt-redpacket",
+          "svg": "icons/category/redpacket.svg",
+          "keywords": [
+            "红包",
+            "红包",
+            "red packet"
+          ]
+        },
+        {
+          "name": "gift",
+          "cn": "礼品",
+          "en": "Gift",
+          "note": "收入 · 礼物盒",
+          "sprite": "bt-gift",
+          "svg": "icons/category/gift.svg",
+          "keywords": [
+            "礼品",
+            "礼物盒",
+            "gift"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "form",
+      "label": "表单",
+      "usage": "记一笔时的账户、键盘、备注等操作",
+      "count": 12,
+      "icons": [
+        {
+          "name": "account",
+          "cn": "账户",
+          "en": "Account",
+          "note": "钱包",
+          "sprite": "bt-account",
+          "svg": "icons/form/account.svg",
+          "keywords": [
+            "账户",
+            "钱包",
+            "account"
+          ]
+        },
+        {
+          "name": "card",
+          "cn": "银行卡",
+          "en": "Bank Card",
+          "note": "卡片",
+          "sprite": "bt-card",
+          "svg": "icons/form/card.svg",
+          "keywords": [
+            "银行卡",
+            "卡片",
+            "bank card"
+          ]
+        },
+        {
+          "name": "keypad",
+          "cn": "数字键盘",
+          "en": "Keypad",
+          "note": "计算器",
+          "sprite": "bt-keypad",
+          "svg": "icons/form/keypad.svg",
+          "keywords": [
+            "数字键盘",
+            "计算器",
+            "keypad"
+          ]
+        },
+        {
+          "name": "time",
+          "cn": "时间",
+          "en": "Time",
+          "note": "时钟",
+          "sprite": "bt-time",
+          "svg": "icons/form/time.svg",
+          "keywords": [
+            "时间",
+            "时钟",
+            "time"
+          ]
+        },
+        {
+          "name": "note",
+          "cn": "备注",
+          "en": "Note",
+          "note": "带折角的文书",
+          "sprite": "bt-note",
+          "svg": "icons/form/note.svg",
+          "keywords": [
+            "备注",
+            "带折角的文书",
+            "note"
+          ]
+        },
+        {
+          "name": "edit",
+          "cn": "编辑",
+          "en": "Edit",
+          "note": "铅笔",
+          "sprite": "bt-edit",
+          "svg": "icons/form/edit.svg",
+          "keywords": [
+            "编辑",
+            "铅笔",
+            "edit"
+          ]
+        },
+        {
+          "name": "delete",
+          "cn": "删除",
+          "en": "Delete",
+          "note": "垃圾桶",
+          "sprite": "bt-delete",
+          "svg": "icons/form/delete.svg",
+          "keywords": [
+            "删除",
+            "垃圾桶",
+            "delete"
+          ]
+        },
+        {
+          "name": "camera",
+          "cn": "拍照记账",
+          "en": "Camera",
+          "note": "相机",
+          "sprite": "bt-camera",
+          "svg": "icons/form/camera.svg",
+          "keywords": [
+            "拍照记账",
+            "相机",
+            "camera"
+          ]
+        },
+        {
+          "name": "attach",
+          "cn": "附件",
+          "en": "Attachment",
+          "note": "回形针",
+          "sprite": "bt-attach",
+          "svg": "icons/form/attach.svg",
+          "keywords": [
+            "附件",
+            "回形针",
+            "attachment"
+          ]
+        },
+        {
+          "name": "currency",
+          "cn": "币种",
+          "en": "Currency",
+          "note": "圆形 ¥",
+          "sprite": "bt-currency",
+          "svg": "icons/form/currency.svg",
+          "keywords": [
+            "币种",
+            "圆形 ¥",
+            "currency"
+          ]
+        },
+        {
+          "name": "filter",
+          "cn": "筛选",
+          "en": "Filter",
+          "note": "漏斗",
+          "sprite": "bt-filter",
+          "svg": "icons/form/filter.svg",
+          "keywords": [
+            "筛选",
+            "漏斗",
+            "filter"
+          ]
+        },
+        {
+          "name": "repeat",
+          "cn": "周期记账",
+          "en": "Recurring",
+          "note": "循环箭头",
+          "sprite": "bt-repeat",
+          "svg": "icons/form/repeat.svg",
+          "keywords": [
+            "周期记账",
+            "循环箭头",
+            "recurring"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "status",
+      "label": "状态",
+      "usage": "提交结果、空状态、同步与加载",
+      "count": 7,
+      "icons": [
+        {
+          "name": "alert",
+          "cn": "警告",
+          "en": "Warning",
+          "note": "三角感叹号",
+          "sprite": "bt-alert",
+          "svg": "icons/status/alert.svg",
+          "keywords": [
+            "警告",
+            "三角感叹号",
+            "warning"
+          ]
+        },
+        {
+          "name": "info",
+          "cn": "信息",
+          "en": "Info",
+          "note": "圆圈 i",
+          "sprite": "bt-info",
+          "svg": "icons/status/info.svg",
+          "keywords": [
+            "信息",
+            "圆圈 i",
+            "info"
+          ]
+        },
+        {
+          "name": "error",
+          "cn": "失败",
+          "en": "Error",
+          "note": "圆圈 ×",
+          "sprite": "bt-error",
+          "svg": "icons/status/error.svg",
+          "keywords": [
+            "失败",
+            "圆圈 ×",
+            "error"
+          ]
+        },
+        {
+          "name": "check",
+          "cn": "成功",
+          "en": "Success",
+          "note": "圆圈对勾",
+          "sprite": "bt-check",
+          "svg": "icons/status/check.svg",
+          "keywords": [
+            "成功",
+            "圆圈对勾",
+            "success"
+          ]
+        },
+        {
+          "name": "empty",
+          "cn": "空状态",
+          "en": "Empty",
+          "note": "空托盘",
+          "sprite": "bt-empty",
+          "svg": "icons/status/empty.svg",
+          "keywords": [
+            "空状态",
+            "空托盘",
+            "empty"
+          ]
+        },
+        {
+          "name": "sync",
+          "cn": "加载中",
+          "en": "Loading",
+          "note": "环形进度",
+          "sprite": "bt-sync",
+          "svg": "icons/status/sync.svg",
+          "keywords": [
+            "加载中",
+            "环形进度",
+            "loading"
+          ]
+        },
+        {
+          "name": "cloud",
+          "cn": "云同步",
+          "en": "Cloud Sync",
+          "note": "云",
+          "sprite": "bt-cloud",
+          "svg": "icons/status/cloud.svg",
+          "keywords": [
+            "云同步",
+            "云",
+            "cloud sync"
+          ]
+        }
+      ]
+    }
+  ]
+}

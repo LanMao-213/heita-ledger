@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs>
+  <linearGradient id="bgst" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#221B33"/><stop offset="1" stop-color="#08090E"/>
+  </linearGradient>
+
+  <filter id="glst" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="14" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="sfst" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="6" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <clipPath id="cpst"><path d="M110 256 Q256 206 402 256 Q256 306 110 256Z"/></clipPath>
+
+  <linearGradient id="barst" x1="0" y1="1" x2="0" y2="0">
+    <stop offset="0" stop-color="#7C1C31"/><stop offset=".6" stop-color="#E02B6B"/>
+    <stop offset="1" stop-color="#FF8FBF"/>
+  </linearGradient>
+  <linearGradient id="capst" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#FFFDF2"/><stop offset="1" stop-color="#F0C56A"/>
+  </linearGradient>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#bgst)"/>
+
+<ellipse cx="256" cy="330" rx="206" ry="150" fill="#E02B6B" opacity=".24" filter="url(#glst)"/>
+<g filter="url(#glst)">
+  <rect x="106" y="286" width="76" height="130" rx="20" fill="url(#barst)"/>
+  <rect x="218" y="196" width="76" height="220" rx="20" fill="url(#barst)"/>
+  <rect x="330" y="246" width="76" height="170" rx="20" fill="url(#barst)"/>
+</g>
+<rect x="106" y="286" width="76" height="130" rx="20" fill="none" stroke="#08090E" stroke-width="9"/>
+<rect x="218" y="196" width="76" height="220" rx="20" fill="none" stroke="#08090E" stroke-width="9"/>
+<rect x="330" y="246" width="76" height="170" rx="20" fill="none" stroke="#08090E" stroke-width="9"/>
+<g filter="url(#glst)" fill="url(#capst)">
+  <rect x="112" y="280" width="64" height="18" rx="9"/>
+  <rect x="224" y="190" width="64" height="18" rx="9"/>
+  <rect x="336" y="240" width="64" height="18" rx="9"/>
+</g>
+<path d="M72 424h368" stroke="#C9A227" stroke-width="13" stroke-linecap="round" filter="url(#sfst)"/>
+<path d="M418 152 L422.751712 163.248288 L434 168 L422.751712 172.751712 L418 184 L413.248288 172.751712 L402 168 L413.248288 163.248288 Z" fill="#FFF0C8"/>
+<path d="M148 214 L151.563784 222.436216 L160 226 L151.563784 229.563784 L148 238 L144.436216 229.563784 L136 226 L144.436216 222.436216 Z" fill="#FF6FA8"/>
+</svg>

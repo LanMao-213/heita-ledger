@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>黑塔 · 记账图标集</title>
+<style>
+  :root{--ink:#14161B;--graphite:#3A404C;--silver:#8D94A1;--blood:#B3392C;--gold:#C9A227;
+    --paper:#F6F4EF;--bg:#F3F4F6;--panel:#FFFFFF;--line:#E4E7EC;--sub:#606876;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.65;
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:44px 28px 34px}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.2em;color:var(--blood);
+    border:1px solid rgba(179,57,44,.3);border-radius:999px;padding:3px 12px;margin-bottom:14px}
+  h1{margin:0 0 8px;font-size:31px;letter-spacing:.01em}
+  h1 small{font-weight:400;font-size:15px;color:var(--sub);margin-left:10px;letter-spacing:0}
+  .lede{margin:0;max-width:900px;color:var(--sub);font-size:15px}
+  .swatches{display:flex;gap:14px;flex-wrap:wrap;margin-top:22px}
+  .sw{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--sub)}
+  .sw i{width:26px;height:26px;border-radius:8px;display:block;border:1px solid rgba(0,0,0,.07)}
+  main{padding:30px 28px 70px}
+  .group{margin-bottom:40px}
+  .group h2{font-size:16px;margin:0 0 16px;display:flex;align-items:center;gap:10px}
+  .group h2::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--blood)}
+  .group h2 em{font-style:normal;font-size:12.5px;color:var(--silver);font-weight:400}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:14px}
+  .cell{appearance:none;font:inherit;color:inherit;text-align:left;cursor:pointer;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 16px 15px;
+    display:flex;flex-direction:column;gap:3px;transition:border-color .16s,box-shadow .16s,transform .16s}
+  .cell:hover{border-color:var(--ink);box-shadow:0 6px 18px rgba(20,22,27,.09);transform:translateY(-2px)}
+  .cell .glyph{color:var(--ink);height:30px;display:flex;align-items:center;margin-bottom:8px}
+  .cell .cn{font-size:14.5px;font-weight:600}
+  .cell .en{font-size:11px;letter-spacing:.08em;color:var(--silver);text-transform:uppercase}
+  .cell .desc{font-size:12px;color:var(--sub);margin-top:6px;line-height:1.55}
+  h3.sec{font-size:16px;margin:0 0 14px}
+  .panelbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:40px}
+  .srow{display:flex;align-items:center;gap:18px;padding:11px 0;border-top:1px dashed var(--line)}
+  .srow:first-of-type{border-top:0}
+  .slabel{width:56px;font-size:12px;color:var(--silver);font-variant-numeric:tabular-nums}
+  .sglyphs{display:flex;align-items:center;gap:22px;color:var(--ink)}
+  .spec{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+  .spec div{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:13px 15px}
+  .spec b{display:block;font-size:12px;color:var(--silver);letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px}
+  .spec span{font-size:13.5px}
+  .artgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:760px}
+  .artcell{display:flex;flex-direction:column;align-items:center;gap:7px}
+  .artcell img{width:100%;max-width:176px;display:block;border-radius:38px;box-shadow:0 8px 20px rgba(20,22,27,.18)}
+  .artcell span{font-size:11.5px;color:var(--sub);text-align:center;line-height:1.4}
+  .chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:14px}
+  .chip{display:flex;flex-direction:column;align-items:center;gap:7px}
+  .disc{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .chip .cl{font-size:12px;color:var(--sub)}
+  .apps{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px}
+  .phone{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(20,22,27,.07)}
+  .phone.dark{background:#14161B;border-color:#22262F;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+  .phead{padding:18px 20px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-end}
+  .phone.dark .phead{border-color:#242832}
+  .phead b{font-size:14px}.phone.dark .phead b{color:#F2F3F5}
+  .phead em{font-style:normal;font-size:11px;color:var(--silver)}
+  .amtbig{font-size:26px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .phone.dark .amtbig{color:#F2F3F5}
+  .amounts{display:flex;gap:22px;margin-top:6px}
+  .amounts div{font-size:12px;color:var(--sub)}
+  .amounts b{display:block;font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .phone.dark .amounts b{color:#F2F3F5}.phone.dark .amounts div{color:#8D94A1}
+  .rows{padding:6px 0}
+  .row{display:flex;align-items:center;gap:13px;padding:11px 20px}
+  .phone.dark .row+.row{border-top:1px solid #1D2129}
+  .ricon{width:34px;height:34px;border-radius:10px;background:var(--paper);color:var(--ink);
+    display:flex;align-items:center;justify-content:center;flex:none}
+  .phone.dark .ricon{background:#1E222B;color:#D6D9DF}
+  .rtext{flex:1;min-width:0;display:flex;flex-direction:column}
+  .rtext b{font-size:13.5px;font-weight:600}.phone.dark .rtext b{color:#F2F3F5}
+  .rtext i{font-style:normal;font-size:11.5px;color:var(--silver)}
+  .ramt{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
+  .ramt.in{color:#2E8B74}.ramt.out{color:var(--blood)}.ramt.mid{color:#7A6BB5}
+  .ramt.warn{color:var(--gold);font-size:12px}
+  .tabbar{display:flex;align-items:center;justify-content:space-around;padding:9px 8px 13px;border-top:1px solid var(--line)}
+  .phone.dark .tabbar{border-color:#242832}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--silver);flex:1}
+  .tab .l{font-size:10px}.tab.center{color:var(--ink)}.phone.dark .tab.center{color:#F2F3F5}
+  .tab.center .g{width:44px;height:44px;margin-top:-20px;border-radius:14px;background:var(--ink);color:#fff;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(20,22,27,.28)}
+  pre{background:var(--ink);color:#E7E9EE;border-radius:10px;padding:15px 17px;overflow:auto;font-size:12.5px;line-height:1.6;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  code.inline{background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .notes{font-size:13.5px;color:var(--sub)}.notes li{margin-bottom:7px}.notes b{color:var(--ink)}
+  footer{border-top:1px solid var(--line);background:var(--panel);padding:24px 28px 44px;color:var(--sub);font-size:12.5px}
+  .toast{position:fixed;left:50%;bottom:34px;transform:translate(-50%,14px);background:var(--ink);color:#fff;
+    padding:9px 18px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="kicker">ICON SET</span>
+    <h1>黑塔 <small>Bookkeeping Icon Set · 66 枚 · 24×24 描边网格</small></h1>
+    <p class="lede">
+      面向记账软件的简约线性图标集。视觉母题取自漫画《血族Bloodline》中的超自然势力 <b>极黑之塔</b>——
+      藏书塔、法术书、符文、法阵，翻译成流水、预算、报表这些财务语义。
+      全部为 24px 网格、1.75px 等宽描边、圆头圆角，纯 <code class="inline">currentColor</code> 单色。
+      已按要求移除 <b>账簿</b>、<b>快捷记账</b>、<b>语音记账</b>（邪口）三枚，描边为 <b>1.75</b>；画风版中的账簿与邪口题材也已一并删除。
+    </p>
+    <div class="swatches">
+      <span class="sw"><i style="background:#14161B"></i>墨 · #14161B</span>
+      <span class="sw"><i style="background:#3A404C"></i>石墨 · #3A404C</span>
+      <span class="sw"><i style="background:#8D94A1"></i>银灰 · #8D94A1</span>
+      <span class="sw"><i style="background:#B3392C"></i>血红 · #B3392C</span>
+      <span class="sw"><i style="background:#C9A227"></i>旧金 · #C9A227</span>
+      <span class="sw"><i style="background:#F6F4EF"></i>纸 · #F6F4EF</span>
+    </div>
+  </div>
+</header>
+<main class="wrap">
+
+  <div class="panelbox">
+    <h3 class="sec">设计规范</h3>
+    <div class="spec">
+      <div><b>Grid</b><span>24 × 24，内容留白 2px</span></div>
+      <div><b>Stroke</b><span>1.75px，等宽描边</span></div>
+      <div><b>Cap / Join</b><span>round / round</span></div>
+      <div><b>Radius</b><span>方角 1.6–2.4px，圆角统一</span></div>
+      <div><b>Color</b><span>单色 currentColor，不设第二色</span></div>
+      <div><b>Fill</b><span>仅圆点用实心，其余全描边</span></div>
+      <div><b>Sizes</b><span>16 / 20 / 24 / 32 / 48 / 64 / 96</span></div>
+      <div><b>Count</b><span>66 枚（核心 19 / 分类 28 / 表单 12 / 状态 7）</span></div>
+    </div>
+  </div>
+
+      <section class="group">
+        <h2>核心 · 19 枚<em>导航、收支、预算、报表等页面级图标。</em></h2>
+        <div class="grid">
+        <button class="cell" data-name="list" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h10.6M9 12h10.6M9 17h6.6"/><circle cx="5.3" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="17" r="1.1" fill="currentColor" stroke="none"/></svg></span>
+          <span class="cn">流水</span>
+          <span class="en">Transactions</span>
+          <span class="desc">逐条列出的明细，前导圆点对应黑塔的「页」。</span>
+        </button>
+        <button class="cell" data-name="add" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.2"/><path d="M12 9.3v5.4M9.3 12h5.4"/></svg></span>
+          <span class="cn">记一笔</span>
+          <span class="en">New Entry</span>
+          <span class="desc">在书页中落下新的一笔，适合底部导航的中央凸起按钮。</span>
+        </button>
+        <button class="cell" data-name="stats" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20.2h16"/><rect x="6.3" y="13.2" width="2.8" height="7" rx="1.3"/><rect x="10.6" y="8.6" width="2.8" height="11.6" rx="1.3"/><rect x="14.9" y="15.4" width="2.8" height="4.8" rx="1.3"/></svg></span>
+          <span class="cn">统计</span>
+          <span class="en">Statistics</span>
+          <span class="desc">符文柱状图，三根柱体落在同一条基线上。</span>
+        </button>
+        <button class="cell" data-name="trend" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.4V5.2M4 19.4h15.8"/><path d="M7.4 15.6l3.4-3.6 2.8 2.4 4.9-5.4"/><path d="M15.6 9h2.9v2.9"/></svg></span>
+          <span class="cn">趋势</span>
+          <span class="en">Trend</span>
+          <span class="desc">坐标轴 + 折线 + 末端箭头，看月度走势。</span>
+        </button>
+        <button class="cell" data-name="income" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2v9.1M8.5 10.1l3.5 3.5 3.5-3.5"/><path d="M4.6 15.6v2.1a2.2 2.2 0 0 0 2.2 2.2h10.4a2.2 2.2 0 0 0 2.2-2.2v-2.1"/></svg></span>
+          <span class="cn">收入</span>
+          <span class="en">Income</span>
+          <span class="desc">箭头落进托盘 —— 只进不出，语义直白。</span>
+        </button>
+        <button class="cell" data-name="expense" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13.3V4.2M8.5 7.4l3.5-3.5 3.5 3.5"/><path d="M4.6 15.6v2.1a2.2 2.2 0 0 0 2.2 2.2h10.4a2.2 2.2 0 0 0 2.2-2.2v-2.1"/></svg></span>
+          <span class="cn">支出</span>
+          <span class="en">Expense</span>
+          <span class="desc">箭头离开托盘，与「收入」构成一对镜像。</span>
+        </button>
+        <button class="cell" data-name="transfer" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 9.2h12.6M14.4 6.4l2.8 2.8-2.8 2.8"/><path d="M19.4 14.8H6.8M9.6 12l-2.8 2.8 2.8 2.8"/></svg></span>
+          <span class="cn">转账</span>
+          <span class="en">Transfer</span>
+          <span class="desc">两组反向箭头，像黑塔的传送门双向开合。</span>
+        </button>
+        <button class="cell" data-name="category" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4.4" y="4.4" width="6.4" height="6.4" rx="1.8"/><rect x="13.2" y="4.4" width="6.4" height="6.4" rx="1.8"/><rect x="4.4" y="13.2" width="6.4" height="6.4" rx="1.8"/><rect x="13.2" y="13.2" width="6.4" height="6.4" rx="1.8"/></svg></span>
+          <span class="cn">分类</span>
+          <span class="en">Category</span>
+          <span class="desc">四宫格，对应黑塔「八大学派」的分格秩序。</span>
+        </button>
+        <button class="cell" data-name="tag" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.3V5.6A1.6 1.6 0 0 1 5.6 4h5.7a1.6 1.6 0 0 1 1.13.47l7.1 7.1a1.6 1.6 0 0 1 0 2.26l-5.7 5.7a1.6 1.6 0 0 1-2.26 0l-7.1-7.1A1.6 1.6 0 0 1 4 11.3z"/><circle cx="8.3" cy="8.3" r="1.25"/></svg></span>
+          <span class="cn">标签</span>
+          <span class="en">Tag</span>
+          <span class="desc">吊牌与穿孔，给账目打标记。</span>
+        </button>
+        <button class="cell" data-name="budget" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.7"/><circle cx="12" cy="12" r="6.1"/><path d="M12 8.3 15.2 13.85 8.8 13.85Z"/><path d="M12 15.7 8.8 10.15 15.2 10.15Z"/></svg></span>
+          <span class="cn">预算</span>
+          <span class="en">Budget</span>
+          <span class="desc">两个半径不一的同心圆，内圆嵌一枚六芒星。</span>
+        </button>
+        <button class="cell" data-name="asset" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.8" y="8.2" width="16.4" height="12.1" rx="2.2"/><path d="M3.8 12.5h16.4"/><rect x="10.3" y="10.5" width="3.4" height="4" rx="1"/></svg></span>
+          <span class="cn">资产</span>
+          <span class="en">Assets</span>
+          <span class="desc">宝匣，取隆音「藏宝阁」之意，拢住全部身家。</span>
+        </button>
+        <button class="cell" data-name="goal" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6.9 3.4v17"/><path d="M6.9 4.6h8.3l-2.1 3 2.1 3H6.9z"/><path d="M4.9 20.4h4"/></svg></span>
+          <span class="cn">储蓄目标</span>
+          <span class="en">Savings Goal</span>
+          <span class="desc">旗杆 + 燕尾旗 + 底座，代表目标与里程碑。</span>
+        </button>
+        <button class="cell" data-name="bill" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.4 3.8h9.2M7.4 20.2h9.2"/><path d="M8.7 3.8L12 12l3.3-8.2"/><path d="M8.7 20.2L12 12l3.3 8.2"/></svg></span>
+          <span class="cn">账单提醒</span>
+          <span class="en">Reminder</span>
+          <span class="desc">沙漏：账期倒计时。</span>
+        </button>
+        <button class="cell" data-name="calendar" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.8" y="5.2" width="16.4" height="15" rx="2.2"/><path d="M3.8 10.2h16.4"/><path d="M8.4 3.2v3.4M15.6 3.2v3.4"/><path d="M7.8 14.3h2.3M14 14.3h2.3M7.8 17.3h2.3"/></svg></span>
+          <span class="cn">日历</span>
+          <span class="en">Calendar</span>
+          <span class="desc">账期与月度账本入口。</span>
+        </button>
+        <button class="cell" data-name="report" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5.4" y="3.8" width="13.2" height="16.4" rx="2"/><path d="M7.4 16.4h9.2"/><path d="M8.8 16.4v-3M12 16.4v-6M15.2 16.4v-4.2"/></svg></span>
+          <span class="cn">报表</span>
+          <span class="en">Report</span>
+          <span class="desc">文书里嵌入小柱图，导出与报表共用。</span>
+        </button>
+        <button class="cell" data-name="search" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.2"/><path d="M15.4 15.4l4.5 4.5"/></svg></span>
+          <span class="cn">搜索</span>
+          <span class="en">Search</span>
+          <span class="desc">放大镜，通用语义不做魔改，保证识别度。</span>
+        </button>
+        <button class="cell" data-name="settings" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span class="cn">设置</span>
+          <span class="en">Settings</span>
+          <span class="desc">八齿齿轮，形制标准，圆角描边语言统一。</span>
+        </button>
+        <button class="cell" data-name="profile" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9.2" r="3.3"/><path d="M5.4 20.4c0-3.6 2.9-6.6 6.6-6.6s6.6 3 6.6 6.6"/></svg></span>
+          <span class="cn">我的</span>
+          <span class="en">Profile</span>
+          <span class="desc">人物剪影（头 + 肩），小尺寸识别度最优。</span>
+        </button>
+        <button class="cell" data-name="lock" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4.8" y="10.4" width="14.4" height="9.9" rx="2.4"/><path d="M8.2 10.4V7.7a3.8 3.8 0 0 1 7.6 0v2.7"/><circle cx="12" cy="14.4" r="1.1"/><path d="M12 15.5v1.7"/></svg></span>
+          <span class="cn">安全</span>
+          <span class="en">Security</span>
+          <span class="desc">挂锁，用于隐私账簿与支付密码入口。</span>
+        </button>
+        </div>
+      </section>
+      <section class="group">
+        <h2>消费 / 收入分类 · 28 枚<em>记账 App 用得最多的一组，通常配圆形色底使用。</em></h2>
+        <div class="grid">
+        <button class="cell" data-name="food" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg></span>
+          <span class="cn">餐饮</span>
+          <span class="en">Dining</span>
+          <span class="desc">支出 · 碗与热气</span>
+        </button>
+        <button class="cell" data-name="delivery" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.2 8.6 8.2 19.4a1.5 1.5 0 0 0 1.5 1.3h4.6a1.5 1.5 0 0 0 1.5-1.3l1-10.8z"/><path d="M9.8 8.6V7a2.2 2.2 0 0 1 4.4 0v1.6"/></svg></span>
+          <span class="cn">外卖</span>
+          <span class="en">Delivery</span>
+          <span class="desc">支出 · 打包盒</span>
+        </button>
+        <button class="cell" data-name="coffee" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 9.2h12v5.2a4.6 4.6 0 0 1-4.6 4.6h-2.8a4.6 4.6 0 0 1-4.6-4.6z"/><path d="M16.8 10.6h1.4a2.3 2.3 0 0 1 0 4.6h-1.4"/><path d="M4.4 21.2h12.8"/></svg></span>
+          <span class="cn">咖啡</span>
+          <span class="en">Coffee</span>
+          <span class="desc">支出 · 咖啡杯</span>
+        </button>
+        <button class="cell" data-name="grocery" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 9.4h15.2l-1.5 9.4a1.8 1.8 0 0 1-1.8 1.5H7.7a1.8 1.8 0 0 1-1.8-1.5z"/><path d="M8.4 9.4 10.8 4.8M15.6 9.4 13.2 4.8"/></svg></span>
+          <span class="cn">超市</span>
+          <span class="en">Groceries</span>
+          <span class="desc">支出 · 购物篮</span>
+        </button>
+        <button class="cell" data-name="transit" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5.4" y="3.8" width="13.2" height="13.6" rx="2.6"/><path d="M5.4 11.2h13.2"/><circle cx="8.6" cy="18.6" r="1.4"/><circle cx="15.4" cy="18.6" r="1.4"/></svg></span>
+          <span class="cn">公共交通</span>
+          <span class="en">Transit</span>
+          <span class="desc">支出 · 公交地铁</span>
+        </button>
+        <button class="cell" data-name="taxi" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 15.2v-2.8a1.8 1.8 0 0 1 1.8-1.8h13.2a1.8 1.8 0 0 1 1.8 1.8v2.8z"/><path d="M6.4 10.6 8.4 6.4h7.2l2 4.2"/><circle cx="7.4" cy="16.8" r="1.6"/><circle cx="16.6" cy="16.8" r="1.6"/></svg></span>
+          <span class="cn">打车</span>
+          <span class="en">Taxi</span>
+          <span class="desc">支出 · 车辆</span>
+        </button>
+        <button class="cell" data-name="fuel" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4.4" width="8.4" height="16" rx="2"/><path d="M4.2 20.4h12"/><path d="M6 9.8h8.4"/><path d="M14.4 10.2h1.4a1.8 1.8 0 0 1 1.8 1.8v4.4a1.5 1.5 0 0 0 3 0V9.6"/></svg></span>
+          <span class="cn">加油</span>
+          <span class="en">Fuel</span>
+          <span class="desc">支出 · 加油机</span>
+        </button>
+        <button class="cell" data-name="parking" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4.6" y="4.6" width="14.8" height="14.8" rx="4"/><path d="M10 16.4V7.8h3a2.6 2.6 0 0 1 0 5.2h-3"/></svg></span>
+          <span class="cn">停车</span>
+          <span class="en">Parking</span>
+          <span class="desc">支出 · 停车位</span>
+        </button>
+        <button class="cell" data-name="shopping" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5.4 8.4h13.2l1 10.8a1.4 1.4 0 0 1-1.4 1.6H5.8a1.4 1.4 0 0 1-1.4-1.6z"/><path d="M9 8.4V6.6a3 3 0 0 1 6 0v1.8"/></svg></span>
+          <span class="cn">购物</span>
+          <span class="en">Shopping</span>
+          <span class="desc">支出 · 购物袋</span>
+        </button>
+        <button class="cell" data-name="clothing" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8.6 3.8 4.2 6.6 6 9.8 8.2 8.7V20.2h7.6V8.7L18 9.8l1.8-3.2-4.4-2.8-2.4 2.4h-2z"/></svg></span>
+          <span class="cn">服饰</span>
+          <span class="en">Apparel</span>
+          <span class="desc">支出 · T恤</span>
+        </button>
+        <button class="cell" data-name="beauty" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="8.4" y="11.6" width="7.2" height="8.8" rx="1.5"/><path d="M9.8 11.6V6.2l4.4-2.6v8z"/></svg></span>
+          <span class="cn">美妆</span>
+          <span class="en">Beauty</span>
+          <span class="desc">支出 · 口红</span>
+        </button>
+        <button class="cell" data-name="digital" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4.8" y="6" width="14.4" height="9.4" rx="1.8"/><path d="M3.4 18.6h17.2l-1.2-2.8H4.6z"/></svg></span>
+          <span class="cn">数码</span>
+          <span class="en">Digital</span>
+          <span class="desc">支出 · 电脑</span>
+        </button>
+        <button class="cell" data-name="housing" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6 12 4.2l7.8 6.4v9.6a1 1 0 0 1-1 1H5.2a1 1 0 0 1-1-1z"/><path d="M9.8 20.2v-6.4h4.4v6.4"/></svg></span>
+          <span class="cn">居住</span>
+          <span class="en">Housing</span>
+          <span class="desc">支出 · 房屋</span>
+        </button>
+        <button class="cell" data-name="utilities" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6 7.6 10.2a5.1 5.1 0 1 0 8.8 0z"/></svg></span>
+          <span class="cn">水电</span>
+          <span class="en">Utilities</span>
+          <span class="desc">支出 · 水滴</span>
+        </button>
+        <button class="cell" data-name="phone" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3.6" width="10" height="16.8" rx="2.4"/><path d="M10.6 17.4h2.8"/></svg></span>
+          <span class="cn">通讯</span>
+          <span class="en">Mobile</span>
+          <span class="desc">支出 · 手机</span>
+        </button>
+        <button class="cell" data-name="medical" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13.3 4a4.2 4.2 0 0 1 5.9 5.9l-7.6 7.6a4.2 4.2 0 0 1-5.9-5.9z"/><path d="M9.5 7.8 15.4 13.7"/></svg></span>
+          <span class="cn">医疗</span>
+          <span class="en">Medical</span>
+          <span class="desc">支出 · 药丸</span>
+        </button>
+        <button class="cell" data-name="education" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.8 3.4 9.2 12 13.6l8.6-4.4z"/><path d="M6.6 11.6v4.2c0 1.7 2.4 2.9 5.4 2.9s5.4-1.2 5.4-2.9v-4.2"/></svg></span>
+          <span class="cn">教育</span>
+          <span class="en">Education</span>
+          <span class="desc">支出 · 学位帽</span>
+        </button>
+        <button class="cell" data-name="entertainment" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8.6 8.4h6.8a4.8 4.8 0 0 1 4.7 5.6l-.4 2.4a2.3 2.3 0 0 1-4.2 1l-1.5-2.1H9.9l-1.5 2.1a2.3 2.3 0 0 1-4.2-1l-.4-2.4a4.8 4.8 0 0 1 4.8-5.6z"/><path d="M8.6 12.2h2.4M9.8 11v2.4"/><circle cx="15.6" cy="11.8" r=".95" fill="currentColor" stroke="none"/><circle cx="16.9" cy="13.5" r=".95" fill="currentColor" stroke="none"/></svg></span>
+          <span class="cn">娱乐</span>
+          <span class="en">Leisure</span>
+          <span class="desc">支出 · 游戏手柄</span>
+        </button>
+        <button class="cell" data-name="travel" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8c1.2 0 2 1 2 2.4v5l6 3.8v2.2l-6-1.8v3.6l2 1.6v1.6L12 20l-4 1.2v-1.6l2-1.6v-3.6l-6 1.8v-2.2l6-3.8v-5c0-1.4.8-2.4 2-2.4z"/></svg></span>
+          <span class="cn">旅行</span>
+          <span class="en">Travel</span>
+          <span class="desc">支出 · 飞机</span>
+        </button>
+        <button class="cell" data-name="fitness" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 10.8v2.4M7 8.4v7.2M17 8.4v7.2M20.2 10.8v2.4M7 12h10"/></svg></span>
+          <span class="cn">健身</span>
+          <span class="en">Fitness</span>
+          <span class="desc">支出 · 哑铃</span>
+        </button>
+        <button class="cell" data-name="salary" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6.6" width="18" height="10.8" rx="2"/><circle cx="12" cy="12" r="2.8"/></svg></span>
+          <span class="cn">工资</span>
+          <span class="en">Salary</span>
+          <span class="desc">收入 · 现金</span>
+        </button>
+        <button class="cell" data-name="bonus" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.6 4.4h8.8v5.6a4.4 4.4 0 0 1-8.8 0z"/><path d="M7.6 6.6H5.8a2 2 0 0 0 0 4h1.8"/><path d="M16.4 6.6h1.8a2 2 0 0 1 0 4h-1.8"/><path d="M12 14.4v3.4M8.6 20.4h6.8M10.2 17.8h3.6"/></svg></span>
+          <span class="cn">奖金</span>
+          <span class="en">Bonus</span>
+          <span class="desc">收入 · 奖杯</span>
+        </button>
+        <button class="cell" data-name="parttime" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="7.4" width="17.2" height="12.6" rx="2.4"/><path d="M8.6 7.4V5.6a1.8 1.8 0 0 1 1.8-1.8h3.2a1.8 1.8 0 0 1 1.8 1.8v1.8"/><path d="M3.4 12.6h17.2"/></svg></span>
+          <span class="cn">兼职</span>
+          <span class="en">Side Job</span>
+          <span class="desc">收入 · 公文包</span>
+        </button>
+        <button class="cell" data-name="investment" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.4 4.4h9.2l3.4 4.6-8 10.6-8-10.6z"/><path d="M4 9h16"/></svg></span>
+          <span class="cn">理财</span>
+          <span class="en">Investment</span>
+          <span class="desc">收入 · 宝石</span>
+        </button>
+        <button class="cell" data-name="reimburse" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6h11.2v16.8l-2.24-1.4-2.24 1.4-2.24-1.4-2.24 1.4-2.24-1.4z"/><path d="M9 8.2h6M9 11.4h6M9 14.6h3.4"/></svg></span>
+          <span class="cn">报销</span>
+          <span class="en">Reimburse</span>
+          <span class="desc">收入 · 票据</span>
+        </button>
+        <button class="cell" data-name="refund" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.4 6.4 5.6 10l3.8 3.6"/><path d="M5.8 10h8.2a4.6 4.6 0 0 1 0 9.2H9"/></svg></span>
+          <span class="cn">退款</span>
+          <span class="en">Refund</span>
+          <span class="desc">收入 · 回转箭头</span>
+        </button>
+        <button class="cell" data-name="redpacket" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4.8" y="3.8" width="14.4" height="16.4" rx="2.2"/><path d="M4.8 8.6a10.5 10.5 0 0 0 14.4 0"/><circle cx="12" cy="15" r="2.2"/></svg></span>
+          <span class="cn">红包</span>
+          <span class="en">Red Packet</span>
+          <span class="desc">收入 · 红包</span>
+        </button>
+        <button class="cell" data-name="gift" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="8.8" width="17.6" height="3.6" rx="1.2"/><path d="M4.6 12.4h14.8v7.4a1.8 1.8 0 0 1-1.8 1.8H6.4a1.8 1.8 0 0 1-1.8-1.8z"/><path d="M12 8.8v12.8"/><path d="M8.6 5.6a2.7 2.7 0 0 1 3.4 3.2M15.4 5.6a2.7 2.7 0 0 0-3.4 3.2"/></svg></span>
+          <span class="cn">礼品</span>
+          <span class="en">Gift</span>
+          <span class="desc">收入 · 礼物盒</span>
+        </button>
+        </div>
+      </section>
+      <section class="group">
+        <h2>记账表单 · 12 枚<em>记一笔时用到的账户、键盘、备注、附件等操作。</em></h2>
+        <div class="grid">
+        <button class="cell" data-name="account" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="6.8" width="17.6" height="11.8" rx="2.6"/><path d="M3.2 10.8h17.6"/><circle cx="16.4" cy="15" r="1.15"/></svg></span>
+          <span class="cn">账户</span>
+          <span class="en">Account</span>
+          <span class="desc">钱包</span>
+        </button>
+        <button class="cell" data-name="card" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.8" y="5.6" width="18.4" height="12.8" rx="2.2"/><path d="M2.8 10h18.4"/><path d="M6 15.2h4"/></svg></span>
+          <span class="cn">银行卡</span>
+          <span class="en">Bank Card</span>
+          <span class="desc">卡片</span>
+        </button>
+        <button class="cell" data-name="keypad" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4.6" y="3.4" width="14.8" height="17.2" rx="2.4"/><path d="M7.4 7h9.2"/><circle cx="8.4" cy="11.8" r=".95" fill="currentColor" stroke="none"/><circle cx="12" cy="11.8" r=".95" fill="currentColor" stroke="none"/><circle cx="15.6" cy="11.8" r=".95" fill="currentColor" stroke="none"/><circle cx="8.4" cy="15.6" r=".95" fill="currentColor" stroke="none"/><circle cx="12" cy="15.6" r=".95" fill="currentColor" stroke="none"/><circle cx="15.6" cy="15.6" r=".95" fill="currentColor" stroke="none"/></svg></span>
+          <span class="cn">数字键盘</span>
+          <span class="en">Keypad</span>
+          <span class="desc">计算器</span>
+        </button>
+        <button class="cell" data-name="time" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.2V12l3.4 2.2"/></svg></span>
+          <span class="cn">时间</span>
+          <span class="en">Time</span>
+          <span class="desc">时钟</span>
+        </button>
+        <button class="cell" data-name="note" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5.4 3.6h9.4l3.8 3.8v13H5.4z"/><path d="M14.8 3.6v3.8h3.8"/><path d="M8.4 12h7.2M8.4 15h4.6"/></svg></span>
+          <span class="cn">备注</span>
+          <span class="en">Note</span>
+          <span class="desc">带折角的文书</span>
+        </button>
+        <button class="cell" data-name="edit" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16.6 3.9 20.1 7.4 8.6 18.9l-4.5 1 1-4.5z"/><path d="M14.4 6.1l3.5 3.5"/></svg></span>
+          <span class="cn">编辑</span>
+          <span class="en">Edit</span>
+          <span class="desc">铅笔</span>
+        </button>
+        <button class="cell" data-name="delete" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 6.8h15.2"/><path d="M9.2 6.8V5a1.6 1.6 0 0 1 1.6-1.6h2.4A1.6 1.6 0 0 1 14.8 5v1.8"/><path d="M6.4 6.8l.9 12.2a1.8 1.8 0 0 0 1.8 1.6h5.8a1.8 1.8 0 0 0 1.8-1.6l.9-12.2"/><path d="M10.4 10.6v6.2M13.6 10.6v6.2"/></svg></span>
+          <span class="cn">删除</span>
+          <span class="en">Delete</span>
+          <span class="desc">垃圾桶</span>
+        </button>
+        <button class="cell" data-name="camera" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.6" width="18" height="12.4" rx="2.4"/><path d="M8.4 7.6 9.6 5.2h4.8l1.2 2.4"/><circle cx="12" cy="13.6" r="3"/></svg></span>
+          <span class="cn">拍照记账</span>
+          <span class="en">Camera</span>
+          <span class="desc">相机</span>
+        </button>
+        <button class="cell" data-name="attach" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16.4 7.4v9a4.2 4.2 0 0 1-8.4 0V6.6a2.9 2.9 0 0 1 5.8 0v10.2a1.4 1.4 0 0 1-2.8 0V7.6"/></svg></span>
+          <span class="cn">附件</span>
+          <span class="en">Attachment</span>
+          <span class="desc">回形针</span>
+        </button>
+        <button class="cell" data-name="currency" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M9.2 7.6 12 12l2.8-4.4M9.4 11.4h5.2M9.4 14.2h5.2M12 12v5.2"/></svg></span>
+          <span class="cn">币种</span>
+          <span class="en">Currency</span>
+          <span class="desc">圆形 ¥</span>
+        </button>
+        <button class="cell" data-name="filter" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 5.4h16.4l-6.4 7.6v6.4l-3.6-2.1v-4.3z"/></svg></span>
+          <span class="cn">筛选</span>
+          <span class="en">Filter</span>
+          <span class="desc">漏斗</span>
+        </button>
+        <button class="cell" data-name="repeat" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19.4 12a7.4 7.4 0 1 1-2.2-5.2"/><path d="M14.4 5.2 17.2 6.8 15.6 9.6"/></svg></span>
+          <span class="cn">周期记账</span>
+          <span class="en">Recurring</span>
+          <span class="desc">循环箭头</span>
+        </button>
+        </div>
+      </section>
+      <section class="group">
+        <h2>状态与反馈 · 7 枚<em>提交结果、空状态、同步与加载。</em></h2>
+        <div class="grid">
+        <button class="cell" data-name="alert" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.8 2.9 19.6a.9.9 0 0 0 .8 1.3h16.6a.9.9 0 0 0 .8-1.3z"/><path d="M12 9.6v4.6"/><circle cx="12" cy="17.6" r=".95" fill="currentColor" stroke="none"/></svg></span>
+          <span class="cn">警告</span>
+          <span class="en">Warning</span>
+          <span class="desc">三角感叹号</span>
+        </button>
+        <button class="cell" data-name="info" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M12 11v5.2"/><circle cx="12" cy="7.9" r=".95" fill="currentColor" stroke="none"/></svg></span>
+          <span class="cn">信息</span>
+          <span class="en">Info</span>
+          <span class="desc">圆圈 i</span>
+        </button>
+        <button class="cell" data-name="error" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M9.2 9.2l5.6 5.6M14.8 9.2l-5.6 5.6"/></svg></span>
+          <span class="cn">失败</span>
+          <span class="en">Error</span>
+          <span class="desc">圆圈 ×</span>
+        </button>
+        <button class="cell" data-name="check" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M8.2 12.4 11 15.2 16 9.4"/></svg></span>
+          <span class="cn">成功</span>
+          <span class="en">Success</span>
+          <span class="desc">圆圈对勾</span>
+        </button>
+        <button class="cell" data-name="empty" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 13.2 6 4.6h12l2.6 8.6v5.6a1.6 1.6 0 0 1-1.6 1.6H5a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M3.4 13.2h4.8l1.4 2.6h4.8l1.4-2.6h4.8"/></svg></span>
+          <span class="cn">空状态</span>
+          <span class="en">Empty</span>
+          <span class="desc">空托盘</span>
+        </button>
+        <button class="cell" data-name="sync" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.8a8.2 8.2 0 1 1-5.8 2.4"/></svg></span>
+          <span class="cn">加载中</span>
+          <span class="en">Loading</span>
+          <span class="desc">环形进度</span>
+        </button>
+        <button class="cell" data-name="cloud" title="点击复制名称">
+          <span class="glyph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span>
+          <span class="cn">云同步</span>
+          <span class="en">Cloud Sync</span>
+          <span class="desc">云</span>
+        </button>
+        </div>
+      </section>
+
+  <div class="panelbox">
+    <h3 class="sec">分类色底用法</h3>
+    <div class="chips"><div class="chip"><span class="disc" style="background:#B0674E"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg></span><span class="cl">餐饮</span></div><div class="chip"><span class="disc" style="background:#C08A4E"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.2 8.6 8.2 19.4a1.5 1.5 0 0 0 1.5 1.3h4.6a1.5 1.5 0 0 0 1.5-1.3l1-10.8z"/><path d="M9.8 8.6V7a2.2 2.2 0 0 1 4.4 0v1.6"/></svg></span><span class="cl">外卖</span></div><div class="chip"><span class="disc" style="background:#8A6A4B"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 9.2h12v5.2a4.6 4.6 0 0 1-4.6 4.6h-2.8a4.6 4.6 0 0 1-4.6-4.6z"/><path d="M16.8 10.6h1.4a2.3 2.3 0 0 1 0 4.6h-1.4"/><path d="M4.4 21.2h12.8"/></svg></span><span class="cl">咖啡</span></div><div class="chip"><span class="disc" style="background:#7A8B5A"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 9.4h15.2l-1.5 9.4a1.8 1.8 0 0 1-1.8 1.5H7.7a1.8 1.8 0 0 1-1.8-1.5z"/><path d="M8.4 9.4 10.8 4.8M15.6 9.4 13.2 4.8"/></svg></span><span class="cl">超市</span></div><div class="chip"><span class="disc" style="background:#4E7C8C"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5.4" y="3.8" width="13.2" height="13.6" rx="2.6"/><path d="M5.4 11.2h13.2"/><circle cx="8.6" cy="18.6" r="1.4"/><circle cx="15.4" cy="18.6" r="1.4"/></svg></span><span class="cl">交通</span></div><div class="chip"><span class="disc" style="background:#5B7C99"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 15.2v-2.8a1.8 1.8 0 0 1 1.8-1.8h13.2a1.8 1.8 0 0 1 1.8 1.8v2.8z"/><path d="M6.4 10.6 8.4 6.4h7.2l2 4.2"/><circle cx="7.4" cy="16.8" r="1.6"/><circle cx="16.6" cy="16.8" r="1.6"/></svg></span><span class="cl">打车</span></div><div class="chip"><span class="disc" style="background:#A9714B"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5.4 8.4h13.2l1 10.8a1.4 1.4 0 0 1-1.4 1.6H5.8a1.4 1.4 0 0 1-1.4-1.6z"/><path d="M9 8.4V6.6a3 3 0 0 1 6 0v1.8"/></svg></span><span class="cl">购物</span></div><div class="chip"><span class="disc" style="background:#8A6A9B"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8.6 3.8 4.2 6.6 6 9.8 8.2 8.7V20.2h7.6V8.7L18 9.8l1.8-3.2-4.4-2.8-2.4 2.4h-2z"/></svg></span><span class="cl">服饰</span></div><div class="chip"><span class="disc" style="background:#6E8A6A"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6 12 4.2l7.8 6.4v9.6a1 1 0 0 1-1 1H5.2a1 1 0 0 1-1-1z"/><path d="M9.8 20.2v-6.4h4.4v6.4"/></svg></span><span class="cl">居住</span></div><div class="chip"><span class="disc" style="background:#A85A5A"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13.3 4a4.2 4.2 0 0 1 5.9 5.9l-7.6 7.6a4.2 4.2 0 0 1-5.9-5.9z"/><path d="M9.5 7.8 15.4 13.7"/></svg></span><span class="cl">医疗</span></div><div class="chip"><span class="disc" style="background:#5F8A8A"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.8 3.4 9.2 12 13.6l8.6-4.4z"/><path d="M6.6 11.6v4.2c0 1.7 2.4 2.9 5.4 2.9s5.4-1.2 5.4-2.9v-4.2"/></svg></span><span class="cl">教育</span></div><div class="chip"><span class="disc" style="background:#6A7BA8"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8c1.2 0 2 1 2 2.4v5l6 3.8v2.2l-6-1.8v3.6l2 1.6v1.6L12 20l-4 1.2v-1.6l2-1.6v-3.6l-6 1.8v-2.2l6-3.8v-5c0-1.4.8-2.4 2-2.4z"/></svg></span><span class="cl">旅行</span></div><div class="chip"><span class="disc" style="background:#8A8A4B"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6.6" width="18" height="10.8" rx="2"/><circle cx="12" cy="12" r="2.8"/></svg></span><span class="cl">工资</span></div><div class="chip"><span class="disc" style="background:#B08048"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.6 4.4h8.8v5.6a4.4 4.4 0 0 1-8.8 0z"/><path d="M7.6 6.6H5.8a2 2 0 0 0 0 4h1.8"/><path d="M16.4 6.6h1.8a2 2 0 0 1 0 4h-1.8"/><path d="M12 14.4v3.4M8.6 20.4h6.8M10.2 17.8h3.6"/></svg></span><span class="cl">奖金</span></div><div class="chip"><span class="disc" style="background:#A8607E"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="8.8" width="17.6" height="3.6" rx="1.2"/><path d="M4.6 12.4h14.8v7.4a1.8 1.8 0 0 1-1.8 1.8H6.4a1.8 1.8 0 0 1-1.8-1.8z"/><path d="M12 8.8v12.8"/><path d="M8.6 5.6a2.7 2.7 0 0 1 3.4 3.2M15.4 5.6a2.7 2.7 0 0 0-3.4 3.2"/></svg></span><span class="cl">礼品</span></div><div class="chip"><span class="disc" style="background:#5E7E62"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 10.8v2.4M7 8.4v7.2M17 8.4v7.2M20.2 10.8v2.4M7 12h10"/></svg></span><span class="cl">健身</span></div></div>
+    <p class="notes" style="margin:16px 0 0">
+      分类图标在记账 App 里通常做成 <b>46px 圆形色底 + 白色图形</b>。因为整套是 currentColor 单色，
+      直接把容器 <code class="inline">color</code> 设为 <code class="inline">#FFFFFF</code>、底色铺在圆上即可，不需要额外资源。
+      上面这组底色是低饱和的配套色，可按业务替换。
+    </p>
+  </div>
+
+  <div class="panelbox">
+    <h3 class="sec">尺寸表现</h3>
+            <div class="srow"><span class="slabel">16px</span><span class="sglyphs"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h10.6M9 12h10.6M9 17h6.6"/><circle cx="5.3" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="17" r="1.1" fill="currentColor" stroke="none"/></svg><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.6" width="18" height="12.4" rx="2.4"/><path d="M8.4 7.6 9.6 5.2h4.8l1.2 2.4"/><circle cx="12" cy="13.6" r="3"/></svg><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M8.2 12.4 11 15.2 16 9.4"/></svg></span></div>
+        <div class="srow"><span class="slabel">20px</span><span class="sglyphs"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h10.6M9 12h10.6M9 17h6.6"/><circle cx="5.3" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="17" r="1.1" fill="currentColor" stroke="none"/></svg><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.6" width="18" height="12.4" rx="2.4"/><path d="M8.4 7.6 9.6 5.2h4.8l1.2 2.4"/><circle cx="12" cy="13.6" r="3"/></svg><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M8.2 12.4 11 15.2 16 9.4"/></svg></span></div>
+        <div class="srow"><span class="slabel">24px</span><span class="sglyphs"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h10.6M9 12h10.6M9 17h6.6"/><circle cx="5.3" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="17" r="1.1" fill="currentColor" stroke="none"/></svg><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.6" width="18" height="12.4" rx="2.4"/><path d="M8.4 7.6 9.6 5.2h4.8l1.2 2.4"/><circle cx="12" cy="13.6" r="3"/></svg><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M8.2 12.4 11 15.2 16 9.4"/></svg></span></div>
+        <div class="srow"><span class="slabel">32px</span><span class="sglyphs"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h10.6M9 12h10.6M9 17h6.6"/><circle cx="5.3" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="17" r="1.1" fill="currentColor" stroke="none"/></svg><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.6" width="18" height="12.4" rx="2.4"/><path d="M8.4 7.6 9.6 5.2h4.8l1.2 2.4"/><circle cx="12" cy="13.6" r="3"/></svg><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M8.2 12.4 11 15.2 16 9.4"/></svg></span></div>
+        <div class="srow"><span class="slabel">48px</span><span class="sglyphs"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h10.6M9 12h10.6M9 17h6.6"/><circle cx="5.3" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="17" r="1.1" fill="currentColor" stroke="none"/></svg><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.6" width="18" height="12.4" rx="2.4"/><path d="M8.4 7.6 9.6 5.2h4.8l1.2 2.4"/><circle cx="12" cy="13.6" r="3"/></svg><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M8.2 12.4 11 15.2 16 9.4"/></svg></span></div>
+        <div class="srow"><span class="slabel">64px</span><span class="sglyphs"><svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h10.6M9 12h10.6M9 17h6.6"/><circle cx="5.3" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="17" r="1.1" fill="currentColor" stroke="none"/></svg><svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg><svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.6" width="18" height="12.4" rx="2.4"/><path d="M8.4 7.6 9.6 5.2h4.8l1.2 2.4"/><circle cx="12" cy="13.6" r="3"/></svg><svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M8.2 12.4 11 15.2 16 9.4"/></svg></span></div>
+    <p class="notes" style="margin:14px 0 0">
+      小于 20px 时线条视觉会变细，标签栏这类小尺寸场景建议把
+      <code class="inline">stroke-width</code> 提到 <b>2</b>。分类色底版因为底图是白色，可保持 1.75。
+    </p>
+  </div>
+
+  <div class="panelbox">
+    <h3 class="sec">界面应用示例</h3>
+    <div class="apps">
+      <div class="phone">
+        <div class="phead">
+          <div><b>本月结余</b><em>2026 年 10 月</em><div class="amtbig">¥ 9,707.50</div></div>
+          <div class="amounts"><div>收入<b>9,840.00</b></div><div>支出<b>132.50</b></div></div>
+        </div>
+        <div class="rows">          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6.6" width="18" height="10.8" rx="2"/><circle cx="12" cy="12" r="2.8"/></svg></span>
+            <span class="rtext"><b>工资入账</b><i>黑色法师塔工作室</i></span>
+            <span class="ramt in">+8,600.00</span>
+          </div>
+          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg></span>
+            <span class="rtext"><b>食材采购</b><i>隐仆烹饪 · 小牛排</i></span>
+            <span class="ramt out">-126.50</span>
+          </div>
+          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5.4" y="3.8" width="13.2" height="13.6" rx="2.6"/><path d="M5.4 11.2h13.2"/><circle cx="8.6" cy="18.6" r="1.4"/><circle cx="15.4" cy="18.6" r="1.4"/></svg></span>
+            <span class="rtext"><b>地铁通勤</b><i>2 号线 · 单程</i></span>
+            <span class="ramt out">-6.00</span>
+          </div>
+          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.4 4.4h9.2l3.4 4.6-8 10.6-8-10.6z"/><path d="M4 9h16"/></svg></span>
+            <span class="rtext"><b>基金赎回</b><i>理财 · 已到账</i></span>
+            <span class="ramt in">+1,240.00</span>
+          </div>
+          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.4 3.8h9.2M7.4 20.2h9.2"/><path d="M8.7 3.8L12 12l3.3-8.2"/><path d="M8.7 20.2L12 12l3.3 8.2"/></svg></span>
+            <span class="rtext"><b>账期提醒</b><i>信用卡 · 3 天后到期</i></span>
+            <span class="ramt warn">待还 1,240.00</span>
+          </div></div>
+        <div class="tabbar">        <div class="tab"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h10.6M9 12h10.6M9 17h6.6"/><circle cx="5.3" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="17" r="1.1" fill="currentColor" stroke="none"/></svg></span><span class="l">流水</span></div>
+        <div class="tab"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20.2h16"/><rect x="6.3" y="13.2" width="2.8" height="7" rx="1.3"/><rect x="10.6" y="8.6" width="2.8" height="11.6" rx="1.3"/><rect x="14.9" y="15.4" width="2.8" height="4.8" rx="1.3"/></svg></span><span class="l">统计</span></div>
+        <div class="tab center"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.2"/><path d="M12 9.3v5.4M9.3 12h5.4"/></svg></span><span class="l">记一笔</span></div>
+        <div class="tab"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.7"/><circle cx="12" cy="12" r="6.1"/><path d="M12 8.3 15.2 13.85 8.8 13.85Z"/><path d="M12 15.7 8.8 10.15 15.2 10.15Z"/></svg></span><span class="l">预算</span></div>
+        <div class="tab"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9.2" r="3.3"/><path d="M5.4 20.4c0-3.6 2.9-6.6 6.6-6.6s6.6 3 6.6 6.6"/></svg></span><span class="l">我的</span></div></div>
+      </div>
+      <div class="phone dark">
+        <div class="phead">
+          <div><b>本月结余</b><em>2026 年 10 月</em><div class="amtbig">¥ 9,707.50</div></div>
+          <div class="amounts"><div>收入<b>9,840.00</b></div><div>支出<b>132.50</b></div></div>
+        </div>
+        <div class="rows">          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6.6" width="18" height="10.8" rx="2"/><circle cx="12" cy="12" r="2.8"/></svg></span>
+            <span class="rtext"><b>工资入账</b><i>黑色法师塔工作室</i></span>
+            <span class="ramt in">+8,600.00</span>
+          </div>
+          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 11.6h15.6"/><path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0"/><path d="M8.4 10.4C9.7 9.0 7.1 7.4 8.4 6.0M12 10.0C13.3 8.6 10.7 7.0 12 5.6M15.6 10.4C16.9 9.0 14.3 7.4 15.6 6.0"/></svg></span>
+            <span class="rtext"><b>食材采购</b><i>隐仆烹饪 · 小牛排</i></span>
+            <span class="ramt out">-126.50</span>
+          </div>
+          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5.4" y="3.8" width="13.2" height="13.6" rx="2.6"/><path d="M5.4 11.2h13.2"/><circle cx="8.6" cy="18.6" r="1.4"/><circle cx="15.4" cy="18.6" r="1.4"/></svg></span>
+            <span class="rtext"><b>地铁通勤</b><i>2 号线 · 单程</i></span>
+            <span class="ramt out">-6.00</span>
+          </div>
+          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.4 4.4h9.2l3.4 4.6-8 10.6-8-10.6z"/><path d="M4 9h16"/></svg></span>
+            <span class="rtext"><b>基金赎回</b><i>理财 · 已到账</i></span>
+            <span class="ramt in">+1,240.00</span>
+          </div>
+          <div class="row">
+            <span class="ricon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.4 3.8h9.2M7.4 20.2h9.2"/><path d="M8.7 3.8L12 12l3.3-8.2"/><path d="M8.7 20.2L12 12l3.3 8.2"/></svg></span>
+            <span class="rtext"><b>账期提醒</b><i>信用卡 · 3 天后到期</i></span>
+            <span class="ramt warn">待还 1,240.00</span>
+          </div></div>
+        <div class="tabbar">        <div class="tab"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h10.6M9 12h10.6M9 17h6.6"/><circle cx="5.3" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.3" cy="17" r="1.1" fill="currentColor" stroke="none"/></svg></span><span class="l">流水</span></div>
+        <div class="tab"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20.2h16"/><rect x="6.3" y="13.2" width="2.8" height="7" rx="1.3"/><rect x="10.6" y="8.6" width="2.8" height="11.6" rx="1.3"/><rect x="14.9" y="15.4" width="2.8" height="4.8" rx="1.3"/></svg></span><span class="l">统计</span></div>
+        <div class="tab center"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.2"/><path d="M12 9.3v5.4M9.3 12h5.4"/></svg></span><span class="l">记一笔</span></div>
+        <div class="tab"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.7"/><circle cx="12" cy="12" r="6.1"/><path d="M12 8.3 15.2 13.85 8.8 13.85Z"/><path d="M12 15.7 8.8 10.15 15.2 10.15Z"/></svg></span><span class="l">预算</span></div>
+        <div class="tab"><span class="g"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9.2" r="3.3"/><path d="M5.4 20.4c0-3.6 2.9-6.6 6.6-6.6s6.6 3 6.6 6.6"/></svg></span><span class="l">我的</span></div></div>
+      </div>
+    </div>
+    <p class="notes" style="margin:16px 0 0">
+      同一份 SVG 通过 <code class="inline">currentColor</code> 继承颜色，亮/暗主题只换容器色值，无需两套资源。
+      金额语义色：收入 <b>#2E8B74</b>、支出 <b>#B3392C</b>、转账 <b>#7A6BB5</b>、到期提醒 <b>#C9A227</b>。<br>
+      若同一套图标要兼作行情涨跌，请改用国内习惯的<b>红涨绿跌</b>，与上表相反。
+    </p>
+  </div>
+
+  <div class="panelbox">
+    <h3 class="sec">参考图画风版 · 4 枚 · 亮 / 暗两套</h3>
+    <p class="notes" style="margin:0 0 16px">
+      按参考图 #1 / #2 的画风另做的一套彩色图标：暗底发光、厚描边、高饱和洋红与朱红 + 暖金辉光。
+      参考图给的其实是同一设计的两版配色，所以这套也输出 <b>dark / light</b> 两版 —— 同一份 512×512 矢量，只换底板与辉光强度。
+      题材取自露露缇雅的魔法道具：<b>阿卡狄的电火花</b>（飞行法杖）、双环六芒星法阵、符文柱、藏宝匣。
+    </p>
+    <div class="artgrid"><div class="artcell"><img src="画风版/dark/add.svg" alt="记一笔 · 阿卡狄的电火花"><span>暗底 · 记一笔 · 阿卡狄的电火花</span></div>
+<div class="artcell"><img src="画风版/dark/budget.svg" alt="预算 · 双环六芒星"><span>暗底 · 预算 · 双环六芒星</span></div>
+<div class="artcell"><img src="画风版/dark/stats.svg" alt="统计 · 符文柱"><span>暗底 · 统计 · 符文柱</span></div>
+<div class="artcell"><img src="画风版/dark/asset.svg" alt="资产 · 藏宝匣"><span>暗底 · 资产 · 藏宝匣</span></div>
+<div class="artcell"><img src="画风版/light/add.svg" alt="记一笔 · 阿卡狄的电火花"><span>亮底 · 记一笔 · 阿卡狄的电火花</span></div>
+<div class="artcell"><img src="画风版/light/budget.svg" alt="预算 · 双环六芒星"><span>亮底 · 预算 · 双环六芒星</span></div>
+<div class="artcell"><img src="画风版/light/stats.svg" alt="统计 · 符文柱"><span>亮底 · 统计 · 符文柱</span></div>
+<div class="artcell"><img src="画风版/light/asset.svg" alt="资产 · 藏宝匣"><span>亮底 · 资产 · 藏宝匣</span></div></div>
+    <p class="notes" style="margin:16px 0 0">
+      文件：<code class="inline">画风版/dark/*.svg</code> 与 <code class="inline">画风版/light/*.svg</code>，
+      各含 <code class="inline">png/</code> 下的 512 / 256 / 128 三档。
+      这套是<b>彩色成品图</b>，不参与 sprite 与 currentColor 换色；线性版仍是生产主力。
+    </p>
+  </div>
+
+  <div class="panelbox">
+    <h3 class="sec">文件清单</h3>
+    <pre>记账图标_黑塔风/
+├─ 记账图标集.html          本页（总览 / 规范 / 场景示例）
+├─ sprite.svg               66 枚打包为 SVG symbol，推荐生产使用
+└─ icons/
+   ├─ core/                 核心 19 枚
+   list.svg  add.svg  stats.svg  trend.svg  income.svg
+   expense.svg  transfer.svg  category.svg  tag.svg  budget.svg
+   asset.svg  goal.svg  bill.svg  calendar.svg  report.svg
+   search.svg  settings.svg  profile.svg  lock.svg
+   ├─ category/             消费 / 收入分类 28 枚
+   food.svg  delivery.svg  coffee.svg  grocery.svg  transit.svg
+   taxi.svg  fuel.svg  parking.svg  shopping.svg  clothing.svg
+   beauty.svg  digital.svg  housing.svg  utilities.svg  phone.svg
+   medical.svg  education.svg  entertainment.svg  travel.svg  fitness.svg
+   salary.svg  bonus.svg  parttime.svg  investment.svg  reimburse.svg
+   refund.svg  redpacket.svg  gift.svg
+   ├─ form/                 记账表单 12 枚
+   account.svg  card.svg  keypad.svg  time.svg  note.svg
+   edit.svg  delete.svg  camera.svg  attach.svg  currency.svg
+   filter.svg  repeat.svg
+   ├─ status/               状态与反馈 7 枚
+   alert.svg  info.svg  error.svg  check.svg  empty.svg
+   sync.svg  cloud.svg
+   └─ 各分组下的 png/        每枚 × 7 尺寸（16/20/24/32/48/64/96）
+画风版/
+├─ dark/                    暗底版 4 枚 + png/（512 / 256 / 128）
+└─ light/                   亮底版 4 枚 + png/（512 / 256 / 128）</pre>
+    <p class="notes" style="margin:14px 0 0">
+      PNG 全部为<b>透明底、保留统一 24 网格留白</b>，并排时视觉重量一致；颜色固定为墨黑
+      <code class="inline">#14161B</code>，需其它颜色请用 SVG 换色后导出。
+    </p>
+  </div>
+
+  <div class="panelbox">
+    <h3 class="sec">接入方式</h3>
+    <p class="notes" style="margin:0 0 10px">方式一：直接引用单个文件，颜色随 <code class="inline">color</code> 变化。</p>
+    <pre>&lt;span style="color:#14161B"&gt;
+  &lt;img src="icons/category/food.svg" width="24" height="24" alt="餐饮"&gt;
+&lt;/span&gt;</pre>
+    <p class="notes" style="margin:16px 0 10px">方式二：引入 <code class="inline">sprite.svg</code>，用 <code class="inline">&lt;use&gt;</code> 复用（推荐，一次加载全站可用）。</p>
+    <pre>&lt;svg class="icon"&gt;&lt;use href="sprite.svg#bt-food"&gt;&lt;/use&gt;&lt;/svg&gt;
+
+.icon { width:24px; height:24px; fill:none; stroke:currentColor;
+        stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }</pre>
+    <ul class="notes" style="margin:16px 0 0;padding-left:20px">
+      <li>sprite 内 id 统一为 <code class="inline">bt-&lt;文件名&gt;</code>，如 <code class="inline">category/food.svg</code> → <code class="inline">#bt-food</code>。</li>
+      <li>点任意图标卡片可复制其英文键名。</li>
+      <li>需要实心（filled）版本时，同一 24 网格上重绘填充路径即可，本套仅提供线性版。</li>
+    </ul>
+  </div>
+
+</main>
+<footer class="wrap">
+  记账图标集 · 黑塔风 ｜ 66 枚线性图标 + sprite + 多尺寸 PNG + 画风版 8 枚 ｜
+  视觉母题来自爱欧《血族Bloodline》的「极黑之塔」，仅作设计致敬，不含原作素材。
+</footer>
+<div class="toast" id="toast">已复制</div>
+<script>
+document.querySelectorAll('.cell').forEach(function(b){
+  b.addEventListener('click', function(){
+    var n=b.dataset.name;
+    navigator.clipboard && navigator.clipboard.writeText(n);
+    var t=document.getElementById('toast');
+    t.textContent='已复制：'+n; t.classList.add('on');
+    setTimeout(function(){ t.classList.remove('on'); },1400);
+  });
+});
+</script>
+
+</body>
+</html>

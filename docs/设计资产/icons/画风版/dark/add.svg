@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs>
+  <linearGradient id="bgad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#221B33"/><stop offset="1" stop-color="#08090E"/>
+  </linearGradient>
+
+  <filter id="glad" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="14" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="sfad" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="6" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <clipPath id="cpad"><path d="M110 256 Q256 206 402 256 Q256 306 110 256Z"/></clipPath>
+
+  <linearGradient id="rodad" x1="0" y1="1" x2="1" y2="0">
+    <stop offset="0" stop-color="#4A0F1E"/><stop offset=".45" stop-color="#8E2038"/>
+    <stop offset="1" stop-color="#C7455C"/>
+  </linearGradient>
+  <linearGradient id="spkad" x1="0" y1="1" x2="0" y2="0">
+    <stop offset="0" stop-color="#FF2D78"/><stop offset="1" stop-color="#FFE9B0"/>
+  </linearGradient>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#bgad)"/>
+
+<ellipse cx="368" cy="150" rx="196" ry="168" fill="#FF2D78" opacity=".24" filter="url(#glad)"/>
+<path d="M156 396 344 208" stroke="#4A0F1E" stroke-width="32" stroke-linecap="round"/>
+<path d="M156 396 344 208" stroke="url(#rodad)" stroke-width="23" stroke-linecap="round"/>
+<path d="M166 386 204 348" stroke="#2A0712" stroke-width="38" stroke-linecap="butt"/>
+<path d="M166 386 204 348" stroke="#7C1C31" stroke-width="27" stroke-linecap="butt"/>
+<path d="M175 361 199 385M188 348 212 372" stroke="#C7455C" stroke-width="5" stroke-linecap="round" opacity=".85"/>
+<g filter="url(#glad)">
+  <path d="M375 82 396 128 442 149 396 170 375 216 354 170 308 149 354 128Z" fill="url(#spkad)"/>
+</g>
+<path d="M375 90 393 130 433 149 393 168 375 208 357 168 317 149 357 130Z" fill="#FFFBF0" stroke="none" stroke-width="4" stroke-linejoin="round"/>
+<path d="M452 233 L457.048694 244.951306 L469 250 L457.048694 255.048694 L452 267 L446.951306 255.048694 L435 250 L446.951306 244.951306 Z" fill="#FF6FA8"/>
+<path d="M288 83 L291.860766 92.139234 L301 96 L291.860766 99.860766 L288 109 L284.139234 99.860766 L275 96 L284.139234 92.139234 Z" fill="#FFD98A"/>
+<path d="M474 52 L476.96982 59.03018 L484 62 L476.96982 64.96982 L474 72 L471.03018 64.96982 L464 62 L471.03018 59.03018 Z" fill="#FF6FA8"/>
+<path d="M112 424q58 20 112 4" stroke="#FF2D78" stroke-width="8" fill="none" stroke-linecap="round" opacity=".55" filter="url(#sfad)"/>
+</svg>
